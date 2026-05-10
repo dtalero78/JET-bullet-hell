@@ -162,6 +162,7 @@ const player = {
   coins: 0,
   iframe: 0,
   lastAttack: 0,
+  frozen: 0,
 };
 
 const ABILITIES = [
@@ -252,8 +253,16 @@ const ENEMY_TYPES = {
   tank:    { hp: 110, speed: 0.5, dmg: 11, r: 24, color: '#844', coins: 12 },
   shooter: { hp: 38,  speed: 0.6, dmg: 3,  r: 14, color: '#a4d', coins: 8, ranged: true },
   brute:   { hp: 280, speed: 0.6, dmg: 14, r: 30, color: '#622', coins: 30 },
-  boss:    { hp: 900, speed: 0.4, dmg: 18, r: 44, color: '#f33', coins: 200, ranged: true },
+  // Bosses (each with unique ability)
+  boss:       { hp: 900,  speed: 0.4, dmg: 18, r: 44, color: '#f33', coins: 200,  ranged: true, bossKind: 'bulletmaster', bossName: 'TIRADOR' },
+  chronos:    { hp: 1400, speed: 0.5, dmg: 20, r: 50, color: '#48f', coins: 350,  ranged: true, bossKind: 'chronos',      bossName: 'CRONOS' },
+  vampire:    { hp: 1800, speed: 1.0, dmg: 22, r: 42, color: '#a22', coins: 500,                bossKind: 'vampire',     bossName: 'VÁMPIRO' },
+  summoner:   { hp: 2200, speed: 0.4, dmg: 16, r: 48, color: '#4a6', coins: 700,                bossKind: 'summoner',    bossName: 'INVOCADOR' },
+  mirror:     { hp: 2800, speed: 0.7, dmg: 22, r: 46, color: '#f8a', coins: 900,                bossKind: 'mirror',      bossName: 'ESPEJO' },
+  juggernaut: { hp: 6500, speed: 0.3, dmg: 32, r: 60, color: '#777', coins: 1500,               bossKind: 'juggernaut',  bossName: 'COLOSO', armor: 0.5 },
+  warlord:    { hp: 9000, speed: 0.5, dmg: 28, r: 50, color: '#f4f', coins: 2500, ranged: true, bossKind: 'warlord',     bossName: 'SEÑOR DE LA GUERRA' },
 };
+const BOSS_CYCLE = ['boss', 'chronos', 'vampire', 'summoner', 'mirror', 'juggernaut', 'warlord'];
 
 function spawnEnemy(type) {
   const side = Math.floor(Math.random() * 4);
@@ -276,6 +285,13 @@ function spawnEnemy(type) {
     frozen: 0, spinning: 0, spinAngle: Math.random() * Math.PI * 2,
     vortexTarget: null,
     shootTimer: Math.random() * 90,
+    bossKind: t.bossKind || null,
+    bossName: t.bossName || null,
+    armor: t.armor || 0,
+    bossTimer: 0,
+    bossDashTimer: 0,
+    bossSplits: 0,
+    isClone: false,
   });
 }
 
@@ -299,7 +315,10 @@ function updateWave() {
   if (enemiesToSpawn > 0 && waveTimer % waveSpawnGap === 0) {
     let type = 'grunt';
     const r = Math.random();
-    if (wave % 5 === 0 && enemiesToSpawn === 1) type = 'boss';
+    if (wave % 5 === 0 && enemiesToSpawn === 1) {
+      const bIdx = Math.floor(wave / 5) - 1;
+      type = BOSS_CYCLE[bIdx % BOSS_CYCLE.length];
+    }
     else if (wave > 8 && r < 0.08) type = 'brute';
     else if (wave > 3 && r < 0.20) type = 'tank';
     else if (wave > 4 && r < 0.40) type = 'shooter';
@@ -318,6 +337,11 @@ function updateWave() {
 
 // ---------------- Player ----------------
 function updatePlayer() {
+  if (player.frozen > 0) {
+    player.frozen--;
+    player.iframe = Math.max(0, player.iframe - 1);
+    return;
+  }
   let dx = 0, dy = 0;
   if (keys['w'] || keys['arrowup'])    dy--;
   if (keys['s'] || keys['arrowdown'])  dy++;
@@ -381,7 +405,8 @@ function doAttack() {
 // ---------------- Abilities ----------------
 function damageEnemy(e, dmg, color) {
   // damage infinite is preserved (bubbles)
-  const finalDmg = dmg >= 999999 ? dmg : dmg * playerDmgMult;
+  let finalDmg = dmg >= 999999 ? dmg : dmg * playerDmgMult;
+  if (e.armor) finalDmg = finalDmg * (1 - e.armor);
   e.hp -= finalDmg;
   for (let p = 0; p < 3; p++) {
     particles.push({
@@ -598,6 +623,110 @@ function updateEnemies() {
     if (timeStopTimer > 0) return;
     if (e.frozen > 0) { e.frozen--; return; }
 
+    // ---- Boss special abilities ----
+    if (e.bossKind) {
+      e.bossTimer++;
+      if (e.bossKind === 'chronos') {
+        // Cada 12s para al jugador 1.5s
+        if (e.bossTimer % 720 === 0) {
+          player.frozen = 90;
+          effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 30, max: 30, r: 0, color: '#48f' });
+          shake = 12;
+        }
+        // disparos triples cada 50f
+        if (e.bossTimer % 50 === 0) {
+          const a = angleBetween(e, player);
+          for (let i = -1; i <= 1; i++) {
+            projectiles.push({
+              x: e.x, y: e.y,
+              vx: Math.cos(a + i * 0.2) * 5, vy: Math.sin(a + i * 0.2) * 5,
+              r: 7, dmg: e.dmg * 0.6, life: 240, type: 'enemy', color: '#48f'
+            });
+          }
+        }
+      }
+      if (e.bossKind === 'vampire') {
+        // Dash cada 4s hacia el jugador
+        if (e.bossDashTimer > 0) {
+          e.bossDashTimer--;
+        } else if (e.bossTimer % 220 === 0) {
+          e.bossDashTimer = 30;
+        }
+      }
+      if (e.bossKind === 'summoner') {
+        // Cada 5s invoca 3 grunts
+        if (e.bossTimer % 300 === 0) {
+          for (let i = 0; i < 3; i++) {
+            const t = ENEMY_TYPES.fast;
+            enemies.push({
+              id: nextEnemyId++,
+              x: e.x + rand(-40, 40), y: e.y + rand(-40, 40),
+              r: t.r, hp: t.hp * 1.5, maxHp: t.hp * 1.5,
+              speed: t.speed, dmg: t.dmg, color: '#6c4', coins: 3,
+              type: 'fast', ranged: false,
+              vx: 0, vy: 0, frozen: 0, spinning: 0, spinAngle: 0,
+              vortexTarget: null, shootTimer: 0,
+              bossKind: null, bossName: null, armor: 0,
+              bossTimer: 0, bossDashTimer: 0, bossSplits: 0, isClone: true
+            });
+          }
+          effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 22, max: 22, r: 0, color: '#4a6' });
+        }
+      }
+      if (e.bossKind === 'mirror' && !e.isClone) {
+        // Al 66% y 33% de HP se clona
+        const pct = e.hp / e.maxHp;
+        if (e.bossSplits === 0 && pct < 0.66) {
+          for (let i = 0; i < 2; i++) {
+            enemies.push({
+              ...e, id: nextEnemyId++,
+              x: e.x + rand(-60, 60), y: e.y + rand(-60, 60),
+              hp: e.maxHp * 0.35, maxHp: e.maxHp * 0.35,
+              isClone: true, bossSplits: 999, bossTimer: 0, vx: 0, vy: 0
+            });
+          }
+          e.bossSplits = 1;
+          effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 22, max: 22, r: 0, color: '#f8a' });
+        } else if (e.bossSplits === 1 && pct < 0.33) {
+          for (let i = 0; i < 2; i++) {
+            enemies.push({
+              ...e, id: nextEnemyId++,
+              x: e.x + rand(-60, 60), y: e.y + rand(-60, 60),
+              hp: e.maxHp * 0.25, maxHp: e.maxHp * 0.25,
+              isClone: true, bossSplits: 999, bossTimer: 0, vx: 0, vy: 0
+            });
+          }
+          e.bossSplits = 2;
+        }
+      }
+      if (e.bossKind === 'warlord') {
+        // Ráfaga espiral continua
+        if (e.bossTimer % 6 === 0) {
+          const a = e.bossTimer * 0.12;
+          for (let i = 0; i < 3; i++) {
+            const aa = a + i * (Math.PI * 2 / 3);
+            projectiles.push({
+              x: e.x, y: e.y,
+              vx: Math.cos(aa) * 4, vy: Math.sin(aa) * 4,
+              r: 6, dmg: e.dmg * 0.5, life: 220, type: 'enemy', color: '#f4f'
+            });
+          }
+        }
+        // Bombazo cada 8s
+        if (e.bossTimer % 480 === 0) {
+          for (let i = 0; i < 16; i++) {
+            const aa = (i / 16) * Math.PI * 2;
+            projectiles.push({
+              x: e.x, y: e.y,
+              vx: Math.cos(aa) * 6, vy: Math.sin(aa) * 6,
+              r: 8, dmg: e.dmg * 0.8, life: 200, type: 'enemy', color: '#f8f'
+            });
+          }
+          shake = 14;
+        }
+      }
+    }
+
     let tx = player.x, ty = player.y;
     if (e.spinning > 0 && e.vortexTarget) {
       e.spinning--;
@@ -615,7 +744,9 @@ function updateEnemies() {
 
     const ddx = tx - e.x, ddy = ty - e.y;
     const m = Math.hypot(ddx, ddy) || 1;
-    const eSpd = e.speed * enemySpeedMult;
+    let speedBoost = 1;
+    if (e.bossDashTimer > 0) speedBoost = 5;
+    const eSpd = e.speed * enemySpeedMult * speedBoost;
     e.vx = e.vx * 0.85 + (ddx / m) * eSpd * 0.4;
     e.vy = e.vy * 0.85 + (ddy / m) * eSpd * 0.4;
     e.x += e.vx;
@@ -640,9 +771,16 @@ function updateEnemies() {
     }
 
     if (dist(player, e) < player.r + e.r && player.iframe <= 0) {
-      player.hp -= e.dmg * enemyDmgMult;
+      const taken = e.dmg * enemyDmgMult;
+      player.hp -= taken;
       player.iframe = 50;
       shake = Math.max(shake, 8);
+      if (e.bossKind === 'vampire') {
+        e.hp = Math.min(e.maxHp, e.hp + taken * 1.5);
+        for (let p = 0; p < 8; p++) {
+          particles.push({ x: e.x, y: e.y, vx: rand(-3,3), vy: rand(-3,3), life: 22, max: 22, color: '#f44', r: 3 });
+        }
+      }
     }
 
     if (e.spinning > 0) {
@@ -936,10 +1074,17 @@ function draw() {
     ctx.fillStyle = '#f44';
     ctx.fillRect(e.x - w / 2, e.y - e.r - 9, w * Math.max(0, e.hp) / e.maxHp, 4);
 
-    if (e.type === 'boss') {
+    if (e.bossName) {
       ctx.fillStyle = '#fff';
-      ctx.font = '12px monospace';
-      ctx.fillText('JEFE', e.x - 16, e.y + 4);
+      ctx.font = 'bold 13px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(e.bossName, e.x, e.y - e.r - 16);
+      ctx.textAlign = 'left';
+    }
+    if (e.bossDashTimer > 0) {
+      ctx.strokeStyle = '#f88';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 6, 0, Math.PI * 2); ctx.stroke();
     }
   });
 
@@ -950,6 +1095,18 @@ function draw() {
   ctx.strokeStyle = '#fff';
   ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2); ctx.stroke();
+  if (player.frozen > 0) {
+    ctx.strokeStyle = '#48f';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.r + 10, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (player.frozen / 90));
+    ctx.stroke();
+    ctx.fillStyle = '#48f';
+    ctx.font = 'bold 14px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('CONGELADO', player.x, player.y - player.r - 12);
+    ctx.textAlign = 'left';
+  }
 
   const ang = aimAngle();
   ctx.strokeStyle = ABILITIES[active].color;
