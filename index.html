@@ -174,14 +174,14 @@ const ABILITIES = [
     desc: 'Puños demoledores + proyectiles que perforan enemigos.', color: '#f84' },
   { id: 'rain',     name: '4. Lluvia Mortal',           cost: 250,
     desc: 'Lluvia continua sobre el cursor. Mantén click para apuntar.', color: '#6cf' },
-  { id: 'timestop', name: '5. Puños del Tiempo',        cost: 500,
+  { id: 'bastion',  name: '5. Bastión Inmóvil',         cost: 350,
+    desc: 'Quédate quieto: cúpula azul-morado, inmunidad y reflejo (30s c/50s). Moverte pausa la carga.', color: '#a8f' },
+  { id: 'timestop', name: '6. Puños del Tiempo',        cost: 500,
     desc: 'Puños + dedo perforante. R: paraliza el tiempo 10s cada 25s.', color: '#93f' },
-  { id: 'dash',     name: '6. Embestida Fulgurante',    cost: 900,
+  { id: 'dash',     name: '7. Embestida Fulgurante',    cost: 900,
     desc: 'Dash veloz que atraviesa enemigos. Los que mata se vuelven aliados 30s.', color: '#6fa' },
-  { id: 'vortex',   name: '7. Pistola Vórtice',         cost: 1200,
+  { id: 'vortex',   name: '8. Pistola Vórtice',         cost: 1200,
     desc: 'Atrae enemigos a un torbellino donde se dañan entre sí.', color: '#fc4' },
-  { id: 'bastion',  name: '8. Bastión Inmóvil',         cost: 1700,
-    desc: 'Quédate quieto: cúpula azul-morado, inmunidad y reflejo (30s c/50s). Moviéndote disparas balas.', color: '#a8f' },
   { id: 'rewind',   name: '9. Puños del Rebobinado',    cost: 3000,
     desc: 'Puños devastadores + T: rebobina enemigos 18s. Cura y limpia balas.', color: '#84f' },
   { id: 'bubble',   name: '10. Burbujas Infinitas',     cost: 7000,
@@ -371,9 +371,9 @@ function updatePlayer() {
     player.x += (dx / m) * player.speed;
     player.y += (dy / m) * player.speed;
   }
-  // Bastion shield: equipado en slot 7
+  // Bastión Inmóvil: equipado en slot 5 (idx 4)
   const moving = !!(dx || dy);
-  if (active === 7) {
+  if (active === 4) {
     if (shieldCD > 0) {
       shieldCD--;
       shieldActive = false;
@@ -388,9 +388,8 @@ function updatePlayer() {
         shieldActive = false;
         shieldCD = SHIELD_CD_MAX;
       }
-    } else if (shieldActive && moving) {
-      shieldActive = false;
-      shieldCD = SHIELD_CD_MAX;
+    } else if (moving) {
+      shieldActive = false; // pausa la carga; CD sólo arranca al agotarse
     }
   } else {
     shieldActive = false;
@@ -431,7 +430,7 @@ function updatePlayer() {
   if (keyPressed['q']) cycleAbility(-1);
   if (keyPressed['e']) cycleAbility(1);
 
-  if (active === 4 && keyPressed['r'] && timeStopCD <= 0) {
+  if (active === 5 && keyPressed['r'] && timeStopCD <= 0) {
     timeStopTimer = 60 * 10;
     timeStopCD = 60 * 25;
     shake = 12;
@@ -454,7 +453,7 @@ function updatePlayer() {
 }
 
 function getAttackCD() {
-  return [340, 260, 380, 0, 380, 520, 520, 320, 240, 180][active];
+  return [340, 260, 380, 0, 320, 380, 520, 520, 240, 180][active];
 }
 
 function doAttack() {
@@ -464,10 +463,10 @@ function doAttack() {
     case 1: threadsAttack(a); break;
     case 2: breakerAttack(a); break;
     case 3: /* lluvia: continuo, en updateRain */ break;
-    case 4: timeStopAttack(a); break;
-    case 5: dashAttack(a); break;
-    case 6: vortexAttack(a); break;
-    case 7: bastionAttack(a); break;
+    case 4: bastionAttack(a); break;
+    case 5: timeStopAttack(a); break;
+    case 6: dashAttack(a); break;
+    case 7: vortexAttack(a); break;
     case 8: rewindFistsAttack(a); break;
     case 9: bubbleAttack(a); break;
   }
@@ -1426,7 +1425,7 @@ function drawUI() {
   // cooldowns
   ctx.fillStyle = '#fff';
   ctx.font = '12px monospace';
-  if (active === 4) {
+  if (active === 5) {
     if (timeStopTimer > 0) {
       ctx.fillStyle = '#c8f';
       ctx.fillText(`⏱ TIEMPO PARADO ${(timeStopTimer / 60).toFixed(1)}s`, 280, 33);
@@ -1447,7 +1446,7 @@ function drawUI() {
       ctx.fillText(`T Rebobinar: LISTO`, 280, 33);
     }
   }
-  if (active === 7) {
+  if (active === 4) {
     if (shieldActive) {
       ctx.fillStyle = '#a8f';
       ctx.fillText(`🛡 ESCUDO ${(shieldCharge / 60).toFixed(1)}s`, 280, 33);
@@ -1456,7 +1455,7 @@ function drawUI() {
       ctx.fillText(`Escudo CD: ${(shieldCD / 60).toFixed(1)}s`, 280, 33);
     } else {
       ctx.fillStyle = '#a8f';
-      ctx.fillText(`Escudo: quédate quieto (${(shieldCharge / 60).toFixed(0)}s)`, 280, 33);
+      ctx.fillText(`Escudo: quédate quieto (${(shieldCharge / 60).toFixed(1)}s)`, 280, 33);
     }
   }
 
