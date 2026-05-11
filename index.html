@@ -198,6 +198,7 @@ let wave = 0;
 let waveTimer = 0;
 let waveActive = false;
 let enemiesToSpawn = 0;
+let waveInitialSpawn = 0;
 let waveSpawnGap = 30;
 
 let timeStopTimer = 0;
@@ -299,9 +300,12 @@ function spawnEnemy(type) {
 function startWave() {
   wave++;
   waveActive = true;
-  enemiesToSpawn = Math.max(1, Math.floor((6 + wave * 4) * (enemySpawnMult || 1)));
-  const baseGap = Math.max(35, 70 - wave * 2);
-  waveSpawnGap = Math.max(6, Math.floor(baseGap / (enemySpawnMult || 1)));
+  const isBossWave = wave % 5 === 0;
+  const base = isBossWave ? (12 + wave * 5) : (18 + wave * 9);
+  enemiesToSpawn = Math.max(1, Math.floor(base * (enemySpawnMult || 1)));
+  waveInitialSpawn = enemiesToSpawn;
+  const baseGap = Math.max(10, 38 - wave * 1.5);
+  waveSpawnGap = Math.max(4, Math.floor(baseGap / (enemySpawnMult || 1)));
   waveTimer = 0;
 }
 
@@ -315,7 +319,7 @@ function updateWave() {
   if (enemiesToSpawn > 0 && waveTimer % waveSpawnGap === 0) {
     let type = 'grunt';
     const r = Math.random();
-    if (wave % 5 === 0 && enemiesToSpawn === 1) {
+    if (wave % 5 === 0 && enemiesToSpawn === waveInitialSpawn) {
       const bIdx = Math.floor(wave / 5) - 1;
       type = BOSS_CYCLE[bIdx % BOSS_CYCLE.length];
     }
