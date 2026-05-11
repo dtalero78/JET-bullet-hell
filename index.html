@@ -336,7 +336,8 @@ function updateWave() {
     spawnEnemy(type);
     enemiesToSpawn--;
   }
-  if (enemiesToSpawn === 0 && enemies.length === 0) {
+  const remaining = enemies.reduce((n, e) => n + (e.ally ? 0 : 1), 0);
+  if (enemiesToSpawn === 0 && remaining === 0) {
     waveActive = false;
     waveTimer = 0;
     if (wave % 5 === 0) player.maxHp += 5;
@@ -437,6 +438,7 @@ function doAttack() {
 
 // ---------------- Abilities ----------------
 function damageEnemy(e, dmg, color) {
+  if (e.ally) return; // aliados son inmunes
   // damage infinite is preserved (bubbles)
   let finalDmg = dmg >= 999999 ? dmg : dmg * playerDmgMult;
   if (e.armor) finalDmg = finalDmg * (1 - e.armor);
@@ -617,7 +619,9 @@ function doRewind() {
   player.iframe = Math.max(player.iframe, 90);
   if (rewindBuffer.length > 0) {
     const target = rewindBuffer[0];
+    const allies = enemies.filter(e => e.ally);
     enemies.length = 0;
+    allies.forEach(a => enemies.push(a));
     target.enemies.forEach(es => {
       enemies.push({
         id: es.id, x: es.x, y: es.y, r: es.r,
@@ -637,7 +641,7 @@ function updateRewindBuffer() {
   rewindFrame++;
   if (rewindFrame % 6 === 0) {
     rewindBuffer.push({
-      enemies: enemies.map(e => ({
+      enemies: enemies.filter(e => !e.ally).map(e => ({
         id: e.id, x: e.x, y: e.y, r: e.r, hp: e.hp, maxHp: e.maxHp,
         speed: e.speed, dmg: e.dmg, color: e.color, coins: e.coins,
         type: e.type, ranged: e.ranged
@@ -665,6 +669,34 @@ function updateEnemies() {
   enemies.forEach(e => {
     if (timeStopTimer > 0) return;
     if (e.frozen > 0) { e.frozen--; return; }
+
+    // ---- Ally AI ----
+    if (e.ally) {
+      let target = null, best = 1e9;
+      enemies.forEach(other => {
+        if (other === e || other.ally) return;
+        const d = dist(e, other);
+        if (d < best) { best = d; target = other; }
+      });
+      if (target) {
+        const a = angleBetween(e, target);
+        const sp = e.speed * 1.4;
+        e.vx = e.vx * 0.85 + Math.cos(a) * sp * 0.4;
+        e.vy = e.vy * 0.85 + Math.sin(a) * sp * 0.4;
+      } else {
+        e.vx *= 0.85; e.vy *= 0.85;
+      }
+      e.x += e.vx; e.y += e.vy;
+      e.x = Math.max(e.r, Math.min(W - e.r, e.x));
+      e.y = Math.max(e.r, Math.min(H - e.r, e.y));
+      enemies.forEach(other => {
+        if (other === e || other.ally) return;
+        if (dist(other, e) < e.r + other.r + 2) {
+          damageEnemy(other, 12, '#8ff');
+        }
+      });
+      return;
+    }
 
     // ---- Boss special abilities ----
     if (e.bossKind) {
@@ -839,8 +871,8 @@ function updateEnemies() {
   });
 
   for (let i = enemies.length - 1; i >= 0; i--) {
-    if (enemies[i].hp <= 0) {
-      const e = enemies[i];
+    const e = enemies[i];
+    if (e.hp <= 0 && !e.ally) {
       player.coins += e.coins;
       for (let p = 0; p < 12; p++) {
         particles.push({
@@ -849,9 +881,28 @@ function updateEnemies() {
           life: 30, max: 30, color: e.color, r: 3
         });
       }
-      // moneda flotante
       effects.push({ type: 'coin', x: e.x, y: e.y, value: e.coins, life: 50, max: 50 });
-      enemies.splice(i, 1);
+      // convertir en aliado por 30s
+      e.ally = true;
+      e.allyLife = 1800;
+      e.hp = 9999;
+      e.maxHp = 9999;
+      e.frozen = 0;
+      e.spinning = 0;
+      e.vortexTarget = null;
+      e.bossKind = null;
+      e.shootTimer = 0;
+      e.bossDashTimer = 0;
+      continue;
+    }
+    if (e.ally) {
+      e.allyLife--;
+      if (e.allyLife <= 0) {
+        for (let p = 0; p < 6; p++) {
+          particles.push({ x: e.x, y: e.y, vx: rand(-1,1), vy: -1, life: 30, max: 30, color: '#8ff', r: 3 });
+        }
+        enemies.splice(i, 1);
+      }
     }
   }
 }
@@ -1090,7 +1141,10 @@ function draw() {
   // enemies
   enemies.forEach(e => {
     ctx.save();
-    if (e.frozen > 0 || timeStopTimer > 0) {
+    if (e.ally) {
+      ctx.fillStyle = '#5cf';
+      ctx.globalAlpha = 0.5 + 0.5 * Math.min(1, e.allyLife / 60);
+    } else if (e.frozen > 0 || timeStopTimer > 0) {
       ctx.fillStyle = '#aaf';
     } else {
       ctx.fillStyle = e.color;
@@ -1110,14 +1164,26 @@ function draw() {
     }
     ctx.restore();
 
-    // hp bar
+    // barra: HP normal o timer de aliado
     const w = e.r * 2;
-    ctx.fillStyle = '#400';
-    ctx.fillRect(e.x - w / 2, e.y - e.r - 9, w, 4);
-    ctx.fillStyle = '#f44';
-    ctx.fillRect(e.x - w / 2, e.y - e.r - 9, w * Math.max(0, e.hp) / e.maxHp, 4);
+    if (e.ally) {
+      ctx.fillStyle = '#024';
+      ctx.fillRect(e.x - w / 2, e.y - e.r - 9, w, 4);
+      ctx.fillStyle = '#5cf';
+      ctx.fillRect(e.x - w / 2, e.y - e.r - 9, w * (e.allyLife / 1800), 4);
+      ctx.fillStyle = '#5cf';
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('ALIADO', e.x, e.y - e.r - 14);
+      ctx.textAlign = 'left';
+    } else {
+      ctx.fillStyle = '#400';
+      ctx.fillRect(e.x - w / 2, e.y - e.r - 9, w, 4);
+      ctx.fillStyle = '#f44';
+      ctx.fillRect(e.x - w / 2, e.y - e.r - 9, w * Math.max(0, e.hp) / e.maxHp, 4);
+    }
 
-    if (e.bossName) {
+    if (e.bossName && !e.ally) {
       ctx.fillStyle = '#fff';
       ctx.font = 'bold 13px monospace';
       ctx.textAlign = 'center';
