@@ -605,7 +605,7 @@ function arrowAttack(angle) {
     y: player.y + Math.sin(angle) * 18,
     vx: Math.cos(angle) * 14, vy: Math.sin(angle) * 14,
     r: 7, dmg: 160, life: 80, type: 'arrow', color: '#cf8',
-    angle: angle, hits: new Set(), pierce: 6, trail: []
+    angle: angle, hits: new Set(), pushed: new Set(), pierce: 6, trail: []
   });
 }
 
@@ -1044,16 +1044,21 @@ function updateProjectiles() {
         }
       });
     } else if (p.type === 'arrow') {
+      const pushR = 130;
+      const pushForce = 16;
       enemies.forEach(e => {
         if (e.ally) return;
+        // empuje en área (una vez por enemigo)
+        if (!p.pushed.has(e.id) && dist(e, p) < pushR + e.r) {
+          e.vx += Math.cos(p.angle) * pushForce;
+          e.vy += Math.sin(p.angle) * pushForce;
+          p.pushed.add(e.id);
+        }
+        // daño solo por contacto directo
         if (p.hits.has(e.id)) return;
         if (dist(e, p) < e.r + p.r) {
           damageEnemy(e, p.dmg, '#cf8');
           p.hits.add(e.id);
-          // empuje en la dirección de la flecha
-          const force = 18;
-          e.vx += Math.cos(p.angle) * force;
-          e.vy += Math.sin(p.angle) * force;
           p.pierce--;
         }
       });
@@ -1212,6 +1217,12 @@ function draw() {
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 3, 0, Math.PI * 2); ctx.stroke();
     }
     if (p.type === 'arrow') {
+      // halo del empuje de área
+      const grd = ctx.createRadialGradient(p.x, p.y, 20, p.x, p.y, 130);
+      grd.addColorStop(0, 'rgba(180, 240, 130, 0.22)');
+      grd.addColorStop(1, 'rgba(180, 240, 130, 0)');
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 130, 0, Math.PI * 2); ctx.fill();
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(p.angle);
