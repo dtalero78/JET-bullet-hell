@@ -254,13 +254,13 @@ const ENEMY_TYPES = {
   shooter: { hp: 38,  speed: 0.6, dmg: 8,  r: 14, color: '#a4d', coins: 8, ranged: true },
   brute:   { hp: 280, speed: 0.6, dmg: 32, r: 30, color: '#622', coins: 30 },
   // Bosses (each with unique ability)
-  boss:       { hp: 900,  speed: 0.4, dmg: 40, r: 44, color: '#f33', coins: 200,  ranged: true, bossKind: 'bulletmaster', bossName: 'TIRADOR' },
-  chronos:    { hp: 1400, speed: 0.5, dmg: 45, r: 50, color: '#48f', coins: 350,  ranged: true, bossKind: 'chronos',      bossName: 'CRONOS' },
-  vampire:    { hp: 1800, speed: 1.0, dmg: 50, r: 42, color: '#a22', coins: 500,                bossKind: 'vampire',     bossName: 'VÁMPIRO' },
-  summoner:   { hp: 2200, speed: 0.4, dmg: 38, r: 48, color: '#4a6', coins: 700,                bossKind: 'summoner',    bossName: 'INVOCADOR' },
-  mirror:     { hp: 2800, speed: 0.7, dmg: 50, r: 46, color: '#f8a', coins: 900,                bossKind: 'mirror',      bossName: 'ESPEJO' },
-  juggernaut: { hp: 6500, speed: 0.3, dmg: 70, r: 60, color: '#777', coins: 1500,               bossKind: 'juggernaut',  bossName: 'COLOSO', armor: 0.5 },
-  warlord:    { hp: 9000, speed: 0.5, dmg: 60, r: 50, color: '#f4f', coins: 2500, ranged: true, bossKind: 'warlord',     bossName: 'SEÑOR DE LA GUERRA' },
+  boss:       { hp: 2200,  speed: 0.4, dmg: 40, r: 44, color: '#f33', coins: 200,  ranged: true, bossKind: 'bulletmaster', bossName: 'TIRADOR' },
+  chronos:    { hp: 3500,  speed: 0.5, dmg: 45, r: 50, color: '#48f', coins: 350,  ranged: true, bossKind: 'chronos',      bossName: 'CRONOS' },
+  vampire:    { hp: 4500,  speed: 1.0, dmg: 50, r: 42, color: '#a22', coins: 500,                bossKind: 'vampire',     bossName: 'VÁMPIRO' },
+  summoner:   { hp: 5500,  speed: 0.4, dmg: 38, r: 48, color: '#4a6', coins: 700,                bossKind: 'summoner',    bossName: 'INVOCADOR' },
+  mirror:     { hp: 7000,  speed: 0.7, dmg: 50, r: 46, color: '#f8a', coins: 900,                bossKind: 'mirror',      bossName: 'ESPEJO' },
+  juggernaut: { hp: 16000, speed: 0.3, dmg: 70, r: 60, color: '#777', coins: 1500,               bossKind: 'juggernaut',  bossName: 'COLOSO', armor: 0.5 },
+  warlord:    { hp: 22000, speed: 0.5, dmg: 60, r: 50, color: '#f4f', coins: 2500, ranged: true, bossKind: 'warlord',     bossName: 'SEÑOR DE LA GUERRA' },
 };
 const BOSS_CYCLE = ['boss', 'chronos', 'vampire', 'summoner', 'mirror', 'juggernaut', 'warlord'];
 
@@ -329,7 +329,7 @@ function updateWave() {
   if (enemiesToSpawn === 0 && enemies.length === 0) {
     waveActive = false;
     waveTimer = 0;
-    player.maxHp += 50;
+    if (wave % 5 === 0) player.maxHp += 5;
     player.hp = player.maxHp;
     effects.push({ type: 'heal', life: 60, max: 60 });
   }
@@ -1164,7 +1164,7 @@ function draw() {
       ctx.fillStyle = `rgba(150, 255, 180, ${f.life / f.max})`;
       ctx.font = 'bold 32px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('+50 VIDA MÁXIMA · CURACIÓN TOTAL', W / 2, H / 2 - 80);
+      ctx.fillText(wave % 5 === 0 ? '+5 VIDA MÁXIMA · CURACIÓN TOTAL' : 'CURACIÓN TOTAL', W / 2, H / 2 - 80);
       ctx.textAlign = 'left';
     } else if (f.type === 'coin') {
       ctx.globalAlpha = f.life / f.max;
