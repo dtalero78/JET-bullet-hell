@@ -1707,7 +1707,6 @@ function restart() {
 // ---------------- Main loop ----------------
 function loop() {
   frame++;
-  consumeKeyPresses();
 
   if (gameStarted && !shopOpen && !paused && !gameOver) {
     updatePlayer();
@@ -1728,6 +1727,7 @@ function loop() {
   }
 
   draw();
+  consumeKeyPresses();
   requestAnimationFrame(loop);
 }
 
