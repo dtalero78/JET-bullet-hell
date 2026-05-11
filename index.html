@@ -57,7 +57,7 @@
 <body>
 <canvas id="game" width="1280" height="780"></canvas>
 <div id="shop"></div>
-<div id="help">WASD mover · Click atacar · 1-9, 0, - / Q E / rueda / hotbar para cambiar arma · B tienda · R/T poderes · ESC pausa</div>
+<div id="help">WASD mover · Click atacar · 1-9, 0, -, = / Q E / rueda / hotbar para cambiar arma · B tienda · R/T poderes · ESC pausa</div>
 
 <div id="title">
   <h1>BULLET HELL</h1>
@@ -68,7 +68,7 @@
     <button class="hard" data-mode="hard">DIFÍCIL</button>
     <button class="sandbox" data-mode="sandbox">SANDBOX</button>
   </div>
-  <p style="margin-top:30px; color:#556; font-size: 12px;">WASD mover · Click atacar · 1-9, 0, - cambiar · B tienda · R/T poderes · M panel sandbox</p>
+  <p style="margin-top:30px; color:#556; font-size: 12px;">WASD mover · Click atacar · 1-9, 0, -, = cambiar · B tienda · R/T poderes · M panel sandbox</p>
 </div>
 
 <div id="sandbox-panel">
@@ -136,9 +136,9 @@ canvas.addEventListener('click', e => {
   // hotbar click
   const p = getMousePos(e);
   const hbY = H - 70;
-  for (let i = 0; i < 11; i++) {
-    const x = 20 + i * 54;
-    if (p.x >= x && p.x <= x + 48 && p.y >= hbY && p.y <= hbY + 56) {
+  for (let i = 0; i < 12; i++) {
+    const x = 20 + i * 50;
+    if (p.x >= x && p.x <= x + 44 && p.y >= hbY && p.y <= hbY + 56) {
       if (owned.has(i)) active = i;
       return;
     }
@@ -176,17 +176,19 @@ const ABILITIES = [
     desc: 'Lluvia continua sobre el cursor. Mantén click para apuntar.', color: '#6cf' },
   { id: 'arrow',    name: '5. Flechas Perforantes',     cost: 300,
     desc: 'Flechas que atraviesan y empujan a los enemigos en su dirección.', color: '#cf8' },
-  { id: 'bastion',  name: '6. Bastión Inmóvil',         cost: 400,
+  { id: 'bastion',     name: '6. Bastión Inmóvil',         cost: 400,
     desc: 'Quédate quieto: cúpula azul-morado, inmunidad y reflejo (30s c/50s). Moverte pausa la carga.', color: '#a8f' },
-  { id: 'timestop', name: '7. Puños del Tiempo',        cost: 600,
+  { id: 'shortrewind', name: '7. Eco Temporal',            cost: 500,
+    desc: 'Puños ágiles + T: rebobina enemigos 6s cada 8s. Limpia balas enemigas.', color: '#b9f' },
+  { id: 'timestop',    name: '8. Puños del Tiempo',        cost: 600,
     desc: 'Puños + dedo perforante. R: paraliza el tiempo 10s cada 25s.', color: '#93f' },
-  { id: 'dash',     name: '8. Embestida Fulgurante',    cost: 900,
+  { id: 'dash',        name: '9. Embestida Fulgurante',    cost: 900,
     desc: 'Dash veloz que atraviesa enemigos. Los que mata se vuelven aliados 30s.', color: '#6fa' },
-  { id: 'vortex',   name: '9. Pistola Vórtice',         cost: 1200,
+  { id: 'vortex',      name: '10. Pistola Vórtice',        cost: 1200,
     desc: 'Atrae enemigos a un torbellino donde se dañan entre sí.', color: '#fc4' },
-  { id: 'rewind',   name: '10. Puños del Rebobinado',   cost: 3000,
+  { id: 'rewind',      name: '11. Puños del Rebobinado',   cost: 3000,
     desc: 'Puños devastadores + T: rebobina enemigos 18s. Cura y limpia balas.', color: '#84f' },
-  { id: 'bubble',   name: '11. Burbujas Infinitas',     cost: 7000,
+  { id: 'bubble',      name: '12. Burbujas Infinitas',     cost: 7000,
     desc: 'Burbujas con daño infinito. Atraviesan todos los enemigos.', color: '#9ff' },
 ];
 
@@ -210,6 +212,7 @@ let waveSpawnGap = 30;
 let timeStopTimer = 0;
 let timeStopCD = 0;
 let rewindCD = 0;
+let shortRewindCD = 0;
 let rewindBuffer = [];
 let rewindFrame = 0;
 
@@ -431,22 +434,28 @@ function updatePlayer() {
   }
   if (keyPressed['0'] && owned.has(9)) active = 9;
   if (keyPressed['-'] && owned.has(10)) active = 10;
+  if (keyPressed['='] && owned.has(11)) active = 11;
   if (keyPressed['q']) cycleAbility(-1);
   if (keyPressed['e']) cycleAbility(1);
 
-  if (active === 6 && keyPressed['r'] && timeStopCD <= 0) {
+  if (active === 7 && keyPressed['r'] && timeStopCD <= 0) {
     timeStopTimer = 60 * 10;
     timeStopCD = 60 * 25;
     shake = 12;
     effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 30, max: 30, r: 0, color: '#93f' });
   }
-  if (active === 9 && keyPressed['t'] && rewindCD <= 0) {
+  if (active === 10 && keyPressed['t'] && rewindCD <= 0) {
     doRewind();
     rewindCD = 60 * 18;
+  }
+  if (active === 6 && keyPressed['t'] && shortRewindCD <= 0) {
+    doShortRewind();
+    shortRewindCD = 60 * 8;
   }
 
   if (timeStopCD > 0) timeStopCD--;
   if (rewindCD > 0)   rewindCD--;
+  if (shortRewindCD > 0) shortRewindCD--;
   if (timeStopTimer > 0) timeStopTimer--;
 
   const cd = getAttackCD();
@@ -457,7 +466,7 @@ function updatePlayer() {
 }
 
 function getAttackCD() {
-  return [340, 260, 380, 0, 280, 320, 380, 520, 520, 240, 180][active];
+  return [340, 260, 380, 0, 280, 320, 280, 380, 520, 520, 240, 180][active];
 }
 
 function doAttack() {
@@ -469,11 +478,12 @@ function doAttack() {
     case 3: /* lluvia: continuo, en updateRain */ break;
     case 4: arrowAttack(a); break;
     case 5: bastionAttack(a); break;
-    case 6: timeStopAttack(a); break;
-    case 7: dashAttack(a); break;
-    case 8: vortexAttack(a); break;
-    case 9: rewindFistsAttack(a); break;
-    case 10: bubbleAttack(a); break;
+    case 6: shortRewindFistsAttack(a); break;
+    case 7: timeStopAttack(a); break;
+    case 8: dashAttack(a); break;
+    case 9: vortexAttack(a); break;
+    case 10: rewindFistsAttack(a); break;
+    case 11: bubbleAttack(a); break;
   }
 }
 
@@ -608,6 +618,44 @@ function arrowAttack(angle) {
     r: 7, dmg: 160, life: 80, type: 'arrow', color: '#cf8',
     angle: angle, hits: new Set(), pushed: new Set(), pierce: 6, trail: []
   });
+}
+
+// 7. Eco Temporal — puños ágiles + mini rebobinado 6s
+function shortRewindFistsAttack(angle) {
+  punchAttack(angle, 50, 280, 14, '#b9f');
+  for (let i = -1; i <= 1; i++) {
+    const a = angle + i * 0.18;
+    projectiles.push({
+      x: player.x, y: player.y,
+      vx: Math.cos(a) * 6, vy: Math.sin(a) * 6,
+      r: 5, dmg: 95, life: 50, type: 'echo', color: '#b9f', trail: []
+    });
+  }
+}
+function doShortRewind() {
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    if (projectiles[i].type === 'enemy') projectiles.splice(i, 1);
+  }
+  if (rewindBuffer.length > 0) {
+    const idx = Math.max(0, rewindBuffer.length - 60); // 6s = 60 snapshots (cada 6 frames)
+    const target = rewindBuffer[idx];
+    const allies = enemies.filter(e => e.ally);
+    enemies.length = 0;
+    allies.forEach(a => enemies.push(a));
+    target.enemies.forEach(es => {
+      enemies.push({
+        id: es.id, x: es.x, y: es.y, r: es.r,
+        hp: es.hp, maxHp: es.maxHp,
+        speed: es.speed, dmg: es.dmg, color: es.color, coins: es.coins,
+        type: es.type, ranged: es.ranged,
+        vx: 0, vy: 0, frozen: 0, spinning: 0, spinAngle: 0,
+        vortexTarget: null, shootTimer: 0, entered: true
+      });
+    });
+    rewindBuffer.length = idx + 1;
+  }
+  effects.push({ type: 'rewind', life: 30, max: 30 });
+  shake = 10;
 }
 
 // 6. Bastión Inmóvil — balas básicas (cuando no estás escudado)
@@ -1506,7 +1554,7 @@ function drawUI() {
   // cooldowns
   ctx.fillStyle = '#fff';
   ctx.font = '12px monospace';
-  if (active === 6) {
+  if (active === 7) {
     if (timeStopTimer > 0) {
       ctx.fillStyle = '#c8f';
       ctx.fillText(`⏱ TIEMPO PARADO ${(timeStopTimer / 60).toFixed(1)}s`, 280, 33);
@@ -1518,13 +1566,22 @@ function drawUI() {
       ctx.fillText(`R Paro: LISTO`, 280, 33);
     }
   }
-  if (active === 9) {
+  if (active === 10) {
     if (rewindCD > 0) {
       ctx.fillStyle = '#888';
       ctx.fillText(`T Rebobinar: ${(rewindCD / 60).toFixed(1)}s`, 280, 33);
     } else {
       ctx.fillStyle = '#a8f';
       ctx.fillText(`T Rebobinar: LISTO`, 280, 33);
+    }
+  }
+  if (active === 6) {
+    if (shortRewindCD > 0) {
+      ctx.fillStyle = '#888';
+      ctx.fillText(`T Eco 6s: ${(shortRewindCD / 60).toFixed(1)}s`, 280, 33);
+    } else {
+      ctx.fillStyle = '#b9f';
+      ctx.fillText(`T Eco 6s: LISTO`, 280, 33);
     }
   }
   if (active === 5) {
@@ -1543,25 +1600,25 @@ function drawUI() {
   // hotbar
   const hbY = H - 70;
   ABILITIES.forEach((ab, i) => {
-    const x = 20 + i * 54;
+    const x = 20 + i * 50;
     const isOwned = owned.has(i);
     const isActive = active === i;
     ctx.fillStyle = isOwned ? (isActive ? '#335' : '#223') : '#111';
-    ctx.fillRect(x, hbY, 48, 56);
+    ctx.fillRect(x, hbY, 44, 56);
     ctx.strokeStyle = isActive ? '#fff' : (isOwned ? '#557' : '#333');
     ctx.lineWidth = isActive ? 3 : 1;
-    ctx.strokeRect(x, hbY, 48, 56);
+    ctx.strokeRect(x, hbY, 44, 56);
     ctx.lineWidth = 1;
     ctx.fillStyle = isOwned ? '#fff' : '#555';
     ctx.font = 'bold 10px monospace';
-    const keyLabel = i === 9 ? '0' : (i === 10 ? '-' : String(i + 1));
+    const keyLabel = i === 9 ? '0' : (i === 10 ? '-' : (i === 11 ? '=' : String(i + 1)));
     ctx.fillText(keyLabel, x + 4, hbY + 12);
     ctx.fillStyle = isOwned ? ab.color : '#333';
-    ctx.beginPath(); ctx.arc(x + 24, hbY + 32, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + 22, hbY + 32, 9, 0, Math.PI * 2); ctx.fill();
     if (!isOwned) {
       ctx.fillStyle = '#888';
       ctx.font = '9px monospace';
-      ctx.fillText(`${abilityCost(ab)}`, x + 10, hbY + 50);
+      ctx.fillText(`${abilityCost(ab)}`, x + 8, hbY + 50);
     }
   });
 
@@ -1693,7 +1750,7 @@ function restart() {
   player.x = W / 2; player.y = H / 2; player.hp = 100; player.maxHp = 100;
   player.coins = 0; player.iframe = 0;
   wave = 0; waveTimer = 0; waveActive = false; enemiesToSpawn = 0;
-  timeStopTimer = 0; timeStopCD = 0; rewindCD = 0;
+  timeStopTimer = 0; timeStopCD = 0; rewindCD = 0; shortRewindCD = 0;
   shieldCharge = SHIELD_MAX; shieldCD = 0; shieldActive = false;
   dashTimer = 0; dashHits = new Set();
   gameOver = false; paused = false; shopOpen = false;
