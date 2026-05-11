@@ -171,7 +171,7 @@ const ABILITIES = [
   { id: 'threads',  name: '2. Puños & Hilos',           cost: 25,
     desc: 'Puños cuerpo a cuerpo + hilos que viajan y dañan.', color: '#fa4' },
   { id: 'dash',     name: '3. Embestida Fulgurante',    cost: 50,
-    desc: 'Click: dash hacia adelante atravesando y dañando enemigos.', color: '#6fa' },
+    desc: 'Dash veloz que atraviesa enemigos. Los que mata se vuelven aliados 30s.', color: '#6fa' },
   { id: 'breaker',  name: '4. Puños Rompedores',        cost: 120,
     desc: 'Puños demoledores + proyectiles que perforan enemigos.', color: '#f84' },
   { id: 'rain',     name: '5. Lluvia Mortal',           cost: 250,
@@ -364,16 +364,18 @@ function updatePlayer() {
     player.y += (dy / m) * player.speed;
   }
   if (dashTimer > 0) {
-    const sp = 18;
+    const sp = 32;
     player.x += Math.cos(dashAngle) * sp;
     player.y += Math.sin(dashAngle) * sp;
     enemies.forEach(e => {
+      if (e.ally) return;
       if (dashHits.has(e.id)) return;
-      if (dist(player, e) < player.r + e.r + 10) {
+      if (dist(player, e) < player.r + e.r + 12) {
         damageEnemy(e, 220, '#6fa');
         dashHits.add(e.id);
         e.vx += Math.cos(dashAngle) * 16;
         e.vy += Math.sin(dashAngle) * 16;
+        if (e.hp <= 0) convertToAlly(e);
       }
     });
     for (let p = 0; p < 3; p++) {
@@ -548,14 +550,14 @@ function updateRain() {
   }
 }
 
-// 5. Embestida Fulgurante — dash con daño
+// 3. Embestida Fulgurante — dash con daño (mata = aliado 30s)
 function dashAttack(angle) {
   if (dashTimer > 0) return;
-  dashTimer = 9;
+  dashTimer = 14;
   dashAngle = angle;
   dashHits = new Set();
-  player.iframe = Math.max(player.iframe, 14);
-  effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 14, max: 14, r: 0, color: '#6fa' });
+  player.iframe = Math.max(player.iframe, 20);
+  effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 18, max: 18, r: 0, color: '#6fa' });
 }
 
 // 6. Puños del Tiempo — puño + dedo perforante (morado)
@@ -872,7 +874,17 @@ function updateEnemies() {
 
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
-    if (e.hp <= 0 && !e.ally) {
+    if (e.ally) {
+      e.allyLife--;
+      if (e.allyLife <= 0) {
+        for (let p = 0; p < 6; p++) {
+          particles.push({ x: e.x, y: e.y, vx: rand(-1,1), vy: -1, life: 30, max: 30, color: '#8ff', r: 3 });
+        }
+        enemies.splice(i, 1);
+      }
+      continue;
+    }
+    if (e.hp <= 0) {
       player.coins += e.coins;
       for (let p = 0; p < 12; p++) {
         particles.push({
@@ -882,29 +894,24 @@ function updateEnemies() {
         });
       }
       effects.push({ type: 'coin', x: e.x, y: e.y, value: e.coins, life: 50, max: 50 });
-      // convertir en aliado por 30s
-      e.ally = true;
-      e.allyLife = 1800;
-      e.hp = 9999;
-      e.maxHp = 9999;
-      e.frozen = 0;
-      e.spinning = 0;
-      e.vortexTarget = null;
-      e.bossKind = null;
-      e.shootTimer = 0;
-      e.bossDashTimer = 0;
-      continue;
-    }
-    if (e.ally) {
-      e.allyLife--;
-      if (e.allyLife <= 0) {
-        for (let p = 0; p < 6; p++) {
-          particles.push({ x: e.x, y: e.y, vx: rand(-1,1), vy: -1, life: 30, max: 30, color: '#8ff', r: 3 });
-        }
-        enemies.splice(i, 1);
-      }
+      enemies.splice(i, 1);
     }
   }
+}
+
+function convertToAlly(e) {
+  player.coins += e.coins;
+  effects.push({ type: 'coin', x: e.x, y: e.y, value: e.coins, life: 50, max: 50 });
+  e.ally = true;
+  e.allyLife = 1800;
+  e.hp = 9999;
+  e.maxHp = 9999;
+  e.frozen = 0;
+  e.spinning = 0;
+  e.vortexTarget = null;
+  e.bossKind = null;
+  e.shootTimer = 0;
+  e.bossDashTimer = 0;
 }
 
 function updateProjectiles() {
