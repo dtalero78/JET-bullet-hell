@@ -191,7 +191,7 @@ const ABILITIES = [
   { id: 'rewind',      name: '12. Puños del Rebobinado',   cost: 3000,
     desc: 'Puños devastadores + T: rebobina enemigos 18s. Cura y limpia balas.', color: '#84f' },
   { id: 'bubble',      name: '13. Burbujas Infinitas',     cost: 7000,
-    desc: 'Burbujas con daño infinito. Atraviesan todos los enemigos.', color: '#9ff' },
+    desc: '9 burbujas teledirigidas con daño infinito. Al expirar se multiplican en 5 más.', color: '#9ff' },
 ];
 
 const owned = new Set([0]); // start with whip
@@ -325,7 +325,7 @@ function startWave() {
   wave++;
   waveActive = true;
   const isBossWave = wave % 5 === 0;
-  const base = isBossWave ? (12 + wave * 5) : (18 + wave * 9);
+  const base = isBossWave ? (17 + wave * 5) : (23 + wave * 9);
   enemiesToSpawn = Math.max(1, Math.floor(base * (enemySpawnMult || 1)));
   waveInitialSpawn = enemiesToSpawn;
   const baseGap = Math.max(10, 38 - wave * 1.5);
@@ -477,7 +477,7 @@ function updatePlayer() {
 }
 
 function getAttackCD() {
-  return [340, 260, 380, 0, 280, 320, 280, 520, 380, 520, 380, 240, 180][active];
+  return [340, 260, 380, 0, 280, 320, 280, 520, 380, 520, 380, 240, 110][active];
 }
 
 function doAttack() {
@@ -833,15 +833,15 @@ function updateRewindBuffer() {
   }
 }
 
-// 8. Burbujas Infinitas
+// 13. Burbujas Infinitas — teledirigidas y se multiplican
 function bubbleAttack(angle) {
-  for (let i = -1; i <= 1; i++) {
-    const a = angle + i * 0.12;
+  for (let i = 0; i < 9; i++) {
+    const a = angle + (i - 4) * 0.10;
     projectiles.push({
       x: player.x, y: player.y,
-      vx: Math.cos(a) * 6.5, vy: Math.sin(a) * 6.5,
-      r: 14, dmg: 999999, life: 140, type: 'bubble', color: '#9ff', trail: [],
-      hits: new Set()
+      vx: Math.cos(a) * 8.5, vy: Math.sin(a) * 8.5,
+      r: 20, dmg: 999999, life: 240, type: 'bubble', color: '#9ff', trail: [],
+      hits: new Set(), target: null, split: 1
     });
   }
 }
@@ -1157,6 +1157,23 @@ function updateProjectiles() {
 
     let consumed = false;
     if (p.type === 'bubble') {
+      // homing total
+      if (!p.target || !enemies.includes(p.target) || p.target.ally) {
+        let nearest = null, best = 1e9;
+        enemies.forEach(e => {
+          if (e.ally) return;
+          if (p.hits.has(e.id)) return;
+          const d = dist(e, p);
+          if (d < best) { best = d; nearest = e; }
+        });
+        p.target = nearest;
+      }
+      if (p.target) {
+        const ang = angleBetween(p, p.target);
+        const sp = 9;
+        p.vx = p.vx * 0.88 + Math.cos(ang) * sp * 0.34;
+        p.vy = p.vy * 0.88 + Math.sin(ang) * sp * 0.34;
+      }
       enemies.forEach(e => {
         if (p.hits.has(e.id)) return;
         if (dist(e, p) < e.r + p.r) {
@@ -1252,6 +1269,21 @@ function updateProjectiles() {
     if (p.life <= 0 || p.x < -60 || p.x > W + 60 || p.y < -60 || p.y > H + 60) {
       if (p.type === 'vortex') createVortex(p.x, p.y);
       if (p.type === 'bomb' && p.life <= 0) explodeBomb(p.x, p.y);
+      // burbujas grandes paren 5 burbujas hijas que también persiguen
+      if (p.type === 'bubble' && p.split > 0 && p.life <= 0) {
+        for (let s = 0; s < 5; s++) {
+          const a = (s / 5) * Math.PI * 2 + rand(-0.2, 0.2);
+          projectiles.push({
+            x: p.x, y: p.y,
+            vx: Math.cos(a) * 6, vy: Math.sin(a) * 6,
+            r: 13, dmg: 999999, life: 150, type: 'bubble', color: '#9ff', trail: [],
+            hits: new Set(), target: null, split: 0
+          });
+        }
+        for (let pp = 0; pp < 8; pp++) {
+          particles.push({ x: p.x, y: p.y, vx: rand(-4,4), vy: rand(-4,4), life: 22, max: 22, color: '#9ff', r: 3 });
+        }
+      }
       projectiles.splice(i, 1);
     }
   }
