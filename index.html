@@ -57,7 +57,7 @@
 <body>
 <canvas id="game" width="1280" height="780"></canvas>
 <div id="shop"></div>
-<div id="help">WASD mover · Click atacar · 1-8 / Q E / rueda / hotbar para cambiar arma · B tienda · R/T poderes · ESC pausa</div>
+<div id="help">WASD mover · Click atacar · 1-9 / Q E / rueda / hotbar para cambiar arma · B tienda · R/T poderes · ESC pausa</div>
 
 <div id="title">
   <h1>BULLET HELL</h1>
@@ -68,7 +68,7 @@
     <button class="hard" data-mode="hard">DIFÍCIL</button>
     <button class="sandbox" data-mode="sandbox">SANDBOX</button>
   </div>
-  <p style="margin-top:30px; color:#556; font-size: 12px;">WASD mover · Click atacar · 1-8 cambiar · B tienda · R/T poderes · M panel sandbox</p>
+  <p style="margin-top:30px; color:#556; font-size: 12px;">WASD mover · Click atacar · 1-9 cambiar · B tienda · R/T poderes · M panel sandbox</p>
 </div>
 
 <div id="sandbox-panel">
@@ -136,8 +136,8 @@ canvas.addEventListener('click', e => {
   // hotbar click
   const p = getMousePos(e);
   const hbY = H - 70;
-  for (let i = 0; i < 8; i++) {
-    const x = 20 + i * 64;
+  for (let i = 0; i < 9; i++) {
+    const x = 20 + i * 62;
     if (p.x >= x && p.x <= x + 56 && p.y >= hbY && p.y <= hbY + 56) {
       if (owned.has(i)) active = i;
       return;
@@ -174,13 +174,15 @@ const ABILITIES = [
     desc: 'Puños demoledores + proyectiles que perforan enemigos.', color: '#f84' },
   { id: 'rain',     name: '4. Lluvia Mortal',           cost: 200,
     desc: 'Lluvia continua sobre el cursor. Mantén click para apuntar.', color: '#6cf' },
-  { id: 'timestop', name: '5. Puños del Tiempo',        cost: 500,
+  { id: 'dash',     name: '5. Embestida Fulgurante',    cost: 350,
+    desc: 'Click: dash hacia adelante atravesando y dañando enemigos.', color: '#6fa' },
+  { id: 'timestop', name: '6. Puños del Tiempo',        cost: 500,
     desc: 'Puños + dedo perforante. R: paraliza el tiempo 10s cada 25s.', color: '#93f' },
-  { id: 'vortex',   name: '6. Pistola Vórtice',         cost: 1200,
+  { id: 'vortex',   name: '7. Pistola Vórtice',         cost: 1200,
     desc: 'Atrae enemigos a un torbellino donde se dañan entre sí.', color: '#fc4' },
-  { id: 'rewind',   name: '7. Puños del Rebobinado',    cost: 3000,
+  { id: 'rewind',   name: '8. Puños del Rebobinado',    cost: 3000,
     desc: 'Puños devastadores + T: rebobina enemigos 18s. Cura y limpia balas.', color: '#84f' },
-  { id: 'bubble',   name: '8. Burbujas Infinitas',      cost: 7000,
+  { id: 'bubble',   name: '9. Burbujas Infinitas',      cost: 7000,
     desc: 'Burbujas con daño infinito. Atraviesan todos los enemigos.', color: '#9ff' },
 ];
 
@@ -206,6 +208,10 @@ let timeStopCD = 0;
 let rewindCD = 0;
 let rewindBuffer = [];
 let rewindFrame = 0;
+
+let dashTimer = 0;
+let dashAngle = 0;
+let dashHits = new Set();
 
 let shopOpen = false;
 let paused = false;
@@ -356,23 +362,45 @@ function updatePlayer() {
     player.x += (dx / m) * player.speed;
     player.y += (dy / m) * player.speed;
   }
+  if (dashTimer > 0) {
+    const sp = 18;
+    player.x += Math.cos(dashAngle) * sp;
+    player.y += Math.sin(dashAngle) * sp;
+    enemies.forEach(e => {
+      if (dashHits.has(e.id)) return;
+      if (dist(player, e) < player.r + e.r + 10) {
+        damageEnemy(e, 220, '#6fa');
+        dashHits.add(e.id);
+        e.vx += Math.cos(dashAngle) * 16;
+        e.vy += Math.sin(dashAngle) * 16;
+      }
+    });
+    for (let p = 0; p < 3; p++) {
+      particles.push({
+        x: player.x + rand(-8, 8), y: player.y + rand(-8, 8),
+        vx: -Math.cos(dashAngle) * 2 + rand(-1, 1), vy: -Math.sin(dashAngle) * 2 + rand(-1, 1),
+        life: 16, max: 16, color: '#6fa', r: 4
+      });
+    }
+    dashTimer--;
+  }
   player.x = Math.max(player.r, Math.min(W - player.r, player.x));
   player.y = Math.max(player.r, Math.min(H - player.r, player.y));
   player.iframe = Math.max(0, player.iframe - 1);
 
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 9; i++) {
     if (keyPressed[String(i + 1)] && owned.has(i)) active = i;
   }
   if (keyPressed['q']) cycleAbility(-1);
   if (keyPressed['e']) cycleAbility(1);
 
-  if (active === 4 && keyPressed['r'] && timeStopCD <= 0) {
+  if (active === 5 && keyPressed['r'] && timeStopCD <= 0) {
     timeStopTimer = 60 * 10;
     timeStopCD = 60 * 25;
     shake = 12;
     effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 30, max: 30, r: 0, color: '#93f' });
   }
-  if (active === 6 && keyPressed['t'] && rewindCD <= 0) {
+  if (active === 7 && keyPressed['t'] && rewindCD <= 0) {
     doRewind();
     rewindCD = 60 * 18;
   }
@@ -389,7 +417,7 @@ function updatePlayer() {
 }
 
 function getAttackCD() {
-  return [340, 260, 380, 0, 380, 520, 240, 180][active];
+  return [340, 260, 380, 0, 520, 380, 520, 240, 180][active];
 }
 
 function doAttack() {
@@ -399,10 +427,11 @@ function doAttack() {
     case 1: threadsAttack(a); break;
     case 2: breakerAttack(a); break;
     case 3: /* lluvia: continuo, en updateRain */ break;
-    case 4: timeStopAttack(a); break;
-    case 5: vortexAttack(a); break;
-    case 6: rewindFistsAttack(a); break;
-    case 7: bubbleAttack(a); break;
+    case 4: dashAttack(a); break;
+    case 5: timeStopAttack(a); break;
+    case 6: vortexAttack(a); break;
+    case 7: rewindFistsAttack(a); break;
+    case 8: bubbleAttack(a); break;
   }
 }
 
@@ -517,7 +546,17 @@ function updateRain() {
   }
 }
 
-// 5. Puños del Tiempo — puño + dedo perforante (morado)
+// 5. Embestida Fulgurante — dash con daño
+function dashAttack(angle) {
+  if (dashTimer > 0) return;
+  dashTimer = 9;
+  dashAngle = angle;
+  dashHits = new Set();
+  player.iframe = Math.max(player.iframe, 14);
+  effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 14, max: 14, r: 0, color: '#6fa' });
+}
+
+// 6. Puños del Tiempo — puño + dedo perforante (morado)
 function timeStopAttack(angle) {
   punchAttack(angle, 42, 110, 10, '#93f');
   // Dedo perforante morado
@@ -1223,7 +1262,7 @@ function drawUI() {
   // cooldowns
   ctx.fillStyle = '#fff';
   ctx.font = '12px monospace';
-  if (active === 4) {
+  if (active === 5) {
     if (timeStopTimer > 0) {
       ctx.fillStyle = '#c8f';
       ctx.fillText(`⏱ TIEMPO PARADO ${(timeStopTimer / 60).toFixed(1)}s`, 280, 33);
@@ -1235,7 +1274,7 @@ function drawUI() {
       ctx.fillText(`R Paro: LISTO`, 280, 33);
     }
   }
-  if (active === 6) {
+  if (active === 7) {
     if (rewindCD > 0) {
       ctx.fillStyle = '#888';
       ctx.fillText(`T Rebobinar: ${(rewindCD / 60).toFixed(1)}s`, 280, 33);
@@ -1248,7 +1287,7 @@ function drawUI() {
   // hotbar
   const hbY = H - 70;
   ABILITIES.forEach((ab, i) => {
-    const x = 20 + i * 64;
+    const x = 20 + i * 62;
     const isOwned = owned.has(i);
     const isActive = active === i;
     ctx.fillStyle = isOwned ? (isActive ? '#335' : '#223') : '#111';
