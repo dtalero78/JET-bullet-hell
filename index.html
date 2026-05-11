@@ -248,19 +248,19 @@ function aimAngle() { return Math.atan2(mouse.y - player.y, mouse.x - player.x);
 
 // ---------------- Enemies ----------------
 const ENEMY_TYPES = {
-  grunt:   { hp: 25,  speed: 0.9, dmg: 5,  r: 12, color: '#d44', coins: 2 },
-  fast:    { hp: 14,  speed: 1.8, dmg: 4,  r: 9,  color: '#dc4', coins: 4 },
-  tank:    { hp: 110, speed: 0.5, dmg: 11, r: 24, color: '#844', coins: 12 },
-  shooter: { hp: 38,  speed: 0.6, dmg: 3,  r: 14, color: '#a4d', coins: 8, ranged: true },
-  brute:   { hp: 280, speed: 0.6, dmg: 14, r: 30, color: '#622', coins: 30 },
+  grunt:   { hp: 25,  speed: 0.9, dmg: 12, r: 12, color: '#d44', coins: 2 },
+  fast:    { hp: 14,  speed: 1.8, dmg: 10, r: 9,  color: '#dc4', coins: 4 },
+  tank:    { hp: 110, speed: 0.5, dmg: 25, r: 24, color: '#844', coins: 12 },
+  shooter: { hp: 38,  speed: 0.6, dmg: 8,  r: 14, color: '#a4d', coins: 8, ranged: true },
+  brute:   { hp: 280, speed: 0.6, dmg: 32, r: 30, color: '#622', coins: 30 },
   // Bosses (each with unique ability)
-  boss:       { hp: 900,  speed: 0.4, dmg: 18, r: 44, color: '#f33', coins: 200,  ranged: true, bossKind: 'bulletmaster', bossName: 'TIRADOR' },
-  chronos:    { hp: 1400, speed: 0.5, dmg: 20, r: 50, color: '#48f', coins: 350,  ranged: true, bossKind: 'chronos',      bossName: 'CRONOS' },
-  vampire:    { hp: 1800, speed: 1.0, dmg: 22, r: 42, color: '#a22', coins: 500,                bossKind: 'vampire',     bossName: 'VÁMPIRO' },
-  summoner:   { hp: 2200, speed: 0.4, dmg: 16, r: 48, color: '#4a6', coins: 700,                bossKind: 'summoner',    bossName: 'INVOCADOR' },
-  mirror:     { hp: 2800, speed: 0.7, dmg: 22, r: 46, color: '#f8a', coins: 900,                bossKind: 'mirror',      bossName: 'ESPEJO' },
-  juggernaut: { hp: 6500, speed: 0.3, dmg: 32, r: 60, color: '#777', coins: 1500,               bossKind: 'juggernaut',  bossName: 'COLOSO', armor: 0.5 },
-  warlord:    { hp: 9000, speed: 0.5, dmg: 28, r: 50, color: '#f4f', coins: 2500, ranged: true, bossKind: 'warlord',     bossName: 'SEÑOR DE LA GUERRA' },
+  boss:       { hp: 900,  speed: 0.4, dmg: 40, r: 44, color: '#f33', coins: 200,  ranged: true, bossKind: 'bulletmaster', bossName: 'TIRADOR' },
+  chronos:    { hp: 1400, speed: 0.5, dmg: 45, r: 50, color: '#48f', coins: 350,  ranged: true, bossKind: 'chronos',      bossName: 'CRONOS' },
+  vampire:    { hp: 1800, speed: 1.0, dmg: 50, r: 42, color: '#a22', coins: 500,                bossKind: 'vampire',     bossName: 'VÁMPIRO' },
+  summoner:   { hp: 2200, speed: 0.4, dmg: 38, r: 48, color: '#4a6', coins: 700,                bossKind: 'summoner',    bossName: 'INVOCADOR' },
+  mirror:     { hp: 2800, speed: 0.7, dmg: 50, r: 46, color: '#f8a', coins: 900,                bossKind: 'mirror',      bossName: 'ESPEJO' },
+  juggernaut: { hp: 6500, speed: 0.3, dmg: 70, r: 60, color: '#777', coins: 1500,               bossKind: 'juggernaut',  bossName: 'COLOSO', armor: 0.5 },
+  warlord:    { hp: 9000, speed: 0.5, dmg: 60, r: 50, color: '#f4f', coins: 2500, ranged: true, bossKind: 'warlord',     bossName: 'SEÑOR DE LA GUERRA' },
 };
 const BOSS_CYCLE = ['boss', 'chronos', 'vampire', 'summoner', 'mirror', 'juggernaut', 'warlord'];
 
