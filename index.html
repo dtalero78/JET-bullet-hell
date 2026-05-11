@@ -180,10 +180,10 @@ const ABILITIES = [
     desc: 'Quédate quieto: cúpula azul-morado, inmunidad y reflejo (30s c/50s). Moverte pausa la carga.', color: '#a8f' },
   { id: 'shortrewind', name: '7. Eco Temporal',            cost: 500,
     desc: 'Puños ágiles + T: rebobina enemigos 6s cada 8s. Limpia balas enemigas.', color: '#b9f' },
-  { id: 'timestop',    name: '8. Puños del Tiempo',        cost: 600,
-    desc: 'Puños + dedo perforante. R: paraliza el tiempo 10s cada 25s.', color: '#93f' },
-  { id: 'dash',        name: '9. Embestida Fulgurante',    cost: 900,
+  { id: 'dash',        name: '8. Embestida Fulgurante',    cost: 900,
     desc: 'Dash veloz que atraviesa enemigos. Los que mata se vuelven aliados 30s.', color: '#6fa' },
+  { id: 'timestop',    name: '9. Puños del Tiempo',        cost: 600,
+    desc: 'Puños + dedo perforante. R: paraliza el tiempo 10s cada 25s.', color: '#93f' },
   { id: 'vortex',      name: '10. Pistola Vórtice',        cost: 1200,
     desc: 'Atrae enemigos a un torbellino donde se dañan entre sí.', color: '#fc4' },
   { id: 'detonate',    name: '11. Asalto Detonante',       cost: 2000,
@@ -490,7 +490,7 @@ function updatePlayer() {
   if (keyPressed['q']) cycleAbility(-1);
   if (keyPressed['e']) cycleAbility(1);
 
-  if (active === 7 && keyPressed['r'] && timeStopCD <= 0) {
+  if (active === 8 && keyPressed['r'] && timeStopCD <= 0) {
     timeStopTimer = 60 * 10;
     timeStopCD = 60 * 25;
     shake = 12;
@@ -518,7 +518,7 @@ function updatePlayer() {
 }
 
 function getAttackCD() {
-  return [340, 260, 380, 0, 280, 320, 280, 380, 520, 520, 800, 240, 180][active];
+  return [340, 260, 380, 0, 280, 320, 280, 520, 380, 520, 800, 240, 180][active];
 }
 
 function doAttack() {
@@ -531,8 +531,8 @@ function doAttack() {
     case 4: arrowAttack(a); break;
     case 5: bastionAttack(a); break;
     case 6: shortRewindFistsAttack(a); break;
-    case 7: timeStopAttack(a); break;
-    case 8: dashAttack(a); break;
+    case 7: dashAttack(a); break;
+    case 8: timeStopAttack(a); break;
     case 9: vortexAttack(a); break;
     case 10: detonateAttack(a); break;
     case 11: rewindFistsAttack(a); break;
@@ -1662,7 +1662,7 @@ function drawUI() {
   // cooldowns
   ctx.fillStyle = '#fff';
   ctx.font = '12px monospace';
-  if (active === 7) {
+  if (active === 8) {
     if (timeStopTimer > 0) {
       ctx.fillStyle = '#c8f';
       ctx.fillText(`⏱ TIEMPO PARADO ${(timeStopTimer / 60).toFixed(1)}s`, 280, 33);
