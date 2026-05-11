@@ -170,14 +170,14 @@ const ABILITIES = [
     desc: 'Arco eléctrico que encadena daño entre enemigos.', color: '#c4f' },
   { id: 'threads',  name: '2. Puños & Hilos',           cost: 25,
     desc: 'Puños cuerpo a cuerpo + hilos que viajan y dañan.', color: '#fa4' },
-  { id: 'dash',     name: '3. Embestida Fulgurante',    cost: 50,
-    desc: 'Dash veloz que atraviesa enemigos. Los que mata se vuelven aliados 30s.', color: '#6fa' },
-  { id: 'breaker',  name: '4. Puños Rompedores',        cost: 120,
+  { id: 'breaker',  name: '3. Puños Rompedores',        cost: 120,
     desc: 'Puños demoledores + proyectiles que perforan enemigos.', color: '#f84' },
-  { id: 'rain',     name: '5. Lluvia Mortal',           cost: 250,
+  { id: 'rain',     name: '4. Lluvia Mortal',           cost: 250,
     desc: 'Lluvia continua sobre el cursor. Mantén click para apuntar.', color: '#6cf' },
-  { id: 'timestop', name: '6. Puños del Tiempo',        cost: 500,
+  { id: 'timestop', name: '5. Puños del Tiempo',        cost: 500,
     desc: 'Puños + dedo perforante. R: paraliza el tiempo 10s cada 25s.', color: '#93f' },
+  { id: 'dash',     name: '6. Embestida Fulgurante',    cost: 900,
+    desc: 'Dash veloz que atraviesa enemigos. Los que mata se vuelven aliados 30s.', color: '#6fa' },
   { id: 'vortex',   name: '7. Pistola Vórtice',         cost: 1200,
     desc: 'Atrae enemigos a un torbellino donde se dañan entre sí.', color: '#fc4' },
   { id: 'rewind',   name: '8. Puños del Rebobinado',    cost: 3000,
@@ -261,13 +261,13 @@ const ENEMY_TYPES = {
   shooter: { hp: 38,  speed: 0.6, dmg: 8,  r: 14, color: '#a4d', coins: 8, ranged: true },
   brute:   { hp: 280, speed: 0.6, dmg: 32, r: 30, color: '#622', coins: 30 },
   // Bosses (each with unique ability)
-  boss:       { hp: 2200,  speed: 0.4, dmg: 40, r: 44, color: '#f33', coins: 200,  ranged: true, bossKind: 'bulletmaster', bossName: 'TIRADOR' },
-  chronos:    { hp: 3500,  speed: 0.5, dmg: 45, r: 50, color: '#48f', coins: 350,  ranged: true, bossKind: 'chronos',      bossName: 'CRONOS' },
-  vampire:    { hp: 4500,  speed: 1.0, dmg: 50, r: 42, color: '#a22', coins: 500,                bossKind: 'vampire',     bossName: 'VÁMPIRO' },
-  summoner:   { hp: 5500,  speed: 0.4, dmg: 38, r: 48, color: '#4a6', coins: 700,                bossKind: 'summoner',    bossName: 'INVOCADOR' },
-  mirror:     { hp: 7000,  speed: 0.7, dmg: 50, r: 46, color: '#f8a', coins: 900,                bossKind: 'mirror',      bossName: 'ESPEJO' },
-  juggernaut: { hp: 16000, speed: 0.3, dmg: 70, r: 60, color: '#777', coins: 1500,               bossKind: 'juggernaut',  bossName: 'COLOSO', armor: 0.5 },
-  warlord:    { hp: 22000, speed: 0.5, dmg: 60, r: 50, color: '#f4f', coins: 2500, ranged: true, bossKind: 'warlord',     bossName: 'SEÑOR DE LA GUERRA' },
+  boss:       { hp: 7000,   speed: 0.4, dmg: 40, r: 44, color: '#f33', coins: 200,  ranged: true, bossKind: 'bulletmaster', bossName: 'TIRADOR' },
+  chronos:    { hp: 11000,  speed: 0.5, dmg: 45, r: 50, color: '#48f', coins: 350,  ranged: true, bossKind: 'chronos',      bossName: 'CRONOS' },
+  vampire:    { hp: 14000,  speed: 1.0, dmg: 50, r: 42, color: '#a22', coins: 500,                bossKind: 'vampire',     bossName: 'VÁMPIRO' },
+  summoner:   { hp: 17000,  speed: 0.4, dmg: 38, r: 48, color: '#4a6', coins: 700,                bossKind: 'summoner',    bossName: 'INVOCADOR' },
+  mirror:     { hp: 22000,  speed: 0.7, dmg: 50, r: 46, color: '#f8a', coins: 900,                bossKind: 'mirror',      bossName: 'ESPEJO' },
+  juggernaut: { hp: 50000,  speed: 0.3, dmg: 70, r: 60, color: '#777', coins: 1500,               bossKind: 'juggernaut',  bossName: 'COLOSO', armor: 0.5 },
+  warlord:    { hp: 70000,  speed: 0.5, dmg: 60, r: 50, color: '#f4f', coins: 2500, ranged: true, bossKind: 'warlord',     bossName: 'SEÑOR DE LA GUERRA' },
 };
 const BOSS_CYCLE = ['boss', 'chronos', 'vampire', 'summoner', 'mirror', 'juggernaut', 'warlord'];
 
@@ -397,7 +397,7 @@ function updatePlayer() {
   if (keyPressed['q']) cycleAbility(-1);
   if (keyPressed['e']) cycleAbility(1);
 
-  if (active === 5 && keyPressed['r'] && timeStopCD <= 0) {
+  if (active === 4 && keyPressed['r'] && timeStopCD <= 0) {
     timeStopTimer = 60 * 10;
     timeStopCD = 60 * 25;
     shake = 12;
@@ -420,7 +420,7 @@ function updatePlayer() {
 }
 
 function getAttackCD() {
-  return [340, 260, 520, 380, 0, 380, 520, 240, 180][active];
+  return [340, 260, 380, 0, 380, 520, 520, 240, 180][active];
 }
 
 function doAttack() {
@@ -428,10 +428,10 @@ function doAttack() {
   switch (active) {
     case 0: whipAttack(a); break;
     case 1: threadsAttack(a); break;
-    case 2: dashAttack(a); break;
-    case 3: breakerAttack(a); break;
-    case 4: /* lluvia: continuo, en updateRain */ break;
-    case 5: timeStopAttack(a); break;
+    case 2: breakerAttack(a); break;
+    case 3: /* lluvia: continuo, en updateRain */ break;
+    case 4: timeStopAttack(a); break;
+    case 5: dashAttack(a); break;
     case 6: vortexAttack(a); break;
     case 7: rewindFistsAttack(a); break;
     case 8: bubbleAttack(a); break;
@@ -532,7 +532,7 @@ function breakerAttack(angle) {
 // 4. Lluvia (continua mientras click)
 let rainCounter = 0;
 function updateRain() {
-  if (active !== 4 || !mouse.down) return;
+  if (active !== 3 || !mouse.down) return;
   rainCounter++;
   if (rainCounter % 2 === 0) {
     const rx = mouse.x + rand(-90, 90);
@@ -694,7 +694,7 @@ function updateEnemies() {
       enemies.forEach(other => {
         if (other === e || other.ally) return;
         if (dist(other, e) < e.r + other.r + 2) {
-          damageEnemy(other, 12, '#8ff');
+          damageEnemy(other, 1, '#8ff');
         }
       });
       return;
@@ -1077,7 +1077,7 @@ function draw() {
   });
 
   // rain target indicator
-  if (active === 4) {
+  if (active === 3) {
     ctx.strokeStyle = 'rgba(120, 200, 255, 0.6)';
     ctx.setLineDash([6, 6]);
     ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 80, 0, Math.PI * 2); ctx.stroke();
@@ -1335,7 +1335,7 @@ function drawUI() {
   // cooldowns
   ctx.fillStyle = '#fff';
   ctx.font = '12px monospace';
-  if (active === 5) {
+  if (active === 4) {
     if (timeStopTimer > 0) {
       ctx.fillStyle = '#c8f';
       ctx.fillText(`⏱ TIEMPO PARADO ${(timeStopTimer / 60).toFixed(1)}s`, 280, 33);
