@@ -309,6 +309,7 @@ function spawnEnemy(type) {
     bossDashTimer: 0,
     bossSplits: 0,
     isClone: false,
+    entered: false,
   });
 }
 
@@ -804,7 +805,7 @@ function updateEnemies() {
               vx: 0, vy: 0, frozen: 0, spinning: 0, spinAngle: 0,
               vortexTarget: null, shootTimer: 0,
               bossKind: null, bossName: null, armor: 0,
-              bossTimer: 0, bossDashTimer: 0, bossSplits: 0, isClone: true
+              bossTimer: 0, bossDashTimer: 0, bossSplits: 0, isClone: true, entered: true
             });
           }
           effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 22, max: 22, r: 0, color: '#4a6' });
@@ -819,7 +820,7 @@ function updateEnemies() {
               ...e, id: nextEnemyId++,
               x: e.x + rand(-60, 60), y: e.y + rand(-60, 60),
               hp: e.maxHp * 0.35, maxHp: e.maxHp * 0.35,
-              isClone: true, bossSplits: 999, bossTimer: 0, vx: 0, vy: 0
+              isClone: true, bossSplits: 999, bossTimer: 0, vx: 0, vy: 0, entered: true
             });
           }
           e.bossSplits = 1;
@@ -830,7 +831,7 @@ function updateEnemies() {
               ...e, id: nextEnemyId++,
               x: e.x + rand(-60, 60), y: e.y + rand(-60, 60),
               hp: e.maxHp * 0.25, maxHp: e.maxHp * 0.25,
-              isClone: true, bossSplits: 999, bossTimer: 0, vx: 0, vy: 0
+              isClone: true, bossSplits: 999, bossTimer: 0, vx: 0, vy: 0, entered: true
             });
           }
           e.bossSplits = 2;
@@ -888,6 +889,15 @@ function updateEnemies() {
     e.vy = e.vy * 0.85 + (ddy / m) * eSpd * 0.4;
     e.x += e.vx;
     e.y += e.vy;
+    if (!e.entered) {
+      if (e.x >= 0 && e.x <= W && e.y >= 0 && e.y <= H) e.entered = true;
+    }
+    if (e.entered) {
+      if (e.x < e.r) { e.x = e.r; if (e.vx < 0) e.vx = -e.vx * 0.4; }
+      if (e.x > W - e.r) { e.x = W - e.r; if (e.vx > 0) e.vx = -e.vx * 0.4; }
+      if (e.y < e.r) { e.y = e.r; if (e.vy < 0) e.vy = -e.vy * 0.4; }
+      if (e.y > H - e.r) { e.y = H - e.r; if (e.vy > 0) e.vy = -e.vy * 0.4; }
+    }
 
     if (e.ranged && e.spinning <= 0) {
       e.shootTimer++;
@@ -1044,8 +1054,8 @@ function updateProjectiles() {
         }
       });
     } else if (p.type === 'arrow') {
-      const pushR = 130;
-      const pushForce = 16;
+      const pushR = 150;
+      const pushForce = 38;
       enemies.forEach(e => {
         if (e.ally) return;
         // empuje en área (una vez por enemigo)
