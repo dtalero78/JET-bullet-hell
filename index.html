@@ -682,17 +682,18 @@ function whipAttack(angle) {
 }
 
 // melee punch
-function punchAttack(angle, range, dmg, knock, color) {
+function punchAttack(angle, range, dmg, knock, color, hitR) {
   const px = player.x + Math.cos(angle) * range;
   const py = player.y + Math.sin(angle) * range;
+  const r = hitR || 32;
   enemies.forEach(e => {
-    if (Math.hypot(e.x - px, e.y - py) < 32 + e.r) {
+    if (Math.hypot(e.x - px, e.y - py) < r + e.r) {
       damageEnemy(e, dmg, color);
       e.vx += Math.cos(angle) * knock;
       e.vy += Math.sin(angle) * knock;
     }
   });
-  effects.push({ type: 'punch', x: px, y: py, life: 10, max: 10, color: color || '#fc8' });
+  effects.push({ type: 'punch', x: px, y: py, life: 10, max: 10, color: color || '#fc8', r });
 }
 
 // 2. Hilos
@@ -723,15 +724,14 @@ function processBreakerCombo() {
   breakerTimer--;
   if (breakerTimer <= 0) {
     const a = breakerAngle + rand(-0.08, 0.08);
-    punchAttack(a, 42, 95, 7, '#f8c');
-    const tx = player.x + Math.cos(a) * 42;
-    const ty = player.y + Math.sin(a) * 42;
-    effects.push({ type: 'punch', x: tx, y: ty, life: 7, max: 7, color: '#f8c' });
-    for (let p = 0; p < 3; p++) {
+    punchAttack(a, 48, 95, 8, '#f6b', 60);
+    const tx = player.x + Math.cos(a) * 48;
+    const ty = player.y + Math.sin(a) * 48;
+    for (let p = 0; p < 7; p++) {
       particles.push({
-        x: tx + rand(-3,3), y: ty + rand(-3,3),
-        vx: rand(-1,1), vy: rand(-1,1),
-        life: 14, max: 14, color: '#f8c', r: 2
+        x: tx + rand(-10,10), y: ty + rand(-10,10),
+        vx: rand(-2.5,2.5), vy: rand(-2.5,2.5),
+        life: 22, max: 22, color: rand(0,1) > 0.5 ? '#f6b' : '#fbd', r: 3
       });
     }
     breakerCombo--;
@@ -2306,12 +2306,14 @@ function draw() {
       ctx.lineTo(f.x2, f.y2);
       ctx.stroke();
     } else if (f.type === 'punch') {
+      const rOut = (f.r || 28) * 1.05;
+      const rIn = (f.r || 28) * 0.65;
       ctx.strokeStyle = f.color || `rgba(255, 200, 80, ${f.life / f.max})`;
       ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.arc(f.x, f.y, 28, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(f.x, f.y, rOut, 0, Math.PI * 2); ctx.stroke();
       ctx.strokeStyle = 'rgba(255,255,255,0.8)';
       ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(f.x, f.y, 18, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(f.x, f.y, rIn, 0, Math.PI * 2); ctx.stroke();
     } else if (f.type === 'shockwave') {
       const alpha = f.life / f.max;
       if (f.color) {
