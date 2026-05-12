@@ -218,7 +218,7 @@ const ABILITIES = [
   { id: 'spirit',      name: '9. Espíritu Eléctrico',      cost: 470,
     desc: 'Rayo que salta entre enemigos. Poco daño pero los paraliza 0.5s.', color: '#8ef' },
   { id: 'bounty',      name: '10. Lluvia Dorada',          cost: 750,
-    desc: 'Marca 10 enemigos: daño = 35% de su HP, y al morir sueltan ese oro como bono.', color: '#fc4' },
+    desc: 'Marca 10 enemigos: 35% HP de daño y bounty del 8% que sueltan al morir.', color: '#fc4' },
   { id: 'shortrewind', name: '11. Eco Temporal',           cost: 500,
     desc: 'Puños ágiles + T: rebobina enemigos 6s cada 8s. Limpia balas enemigas.', color: '#b9f' },
   { id: 'timestop',    name: '12. Puños del Tiempo',       cost: 600,
@@ -727,9 +727,10 @@ function bountyAttack(angle) {
     .slice(0, 10);
   if (targets.length === 0) return;
   targets.forEach(e => {
-    const amount = Math.max(3, Math.ceil(e.maxHp * 0.35));
-    damageEnemy(e, amount, '#fc4');
-    e.markCoins = (e.markCoins || 0) + amount;
+    const damage = Math.max(3, Math.ceil(e.maxHp * 0.35));
+    const bounty = Math.max(1, Math.ceil(e.maxHp * 0.08));
+    damageEnemy(e, damage, '#fc4');
+    e.markCoins = (e.markCoins || 0) + bounty;
     // lluvia de monedas
     for (let p = 0; p < 8; p++) {
       particles.push({
@@ -738,7 +739,7 @@ function bountyAttack(angle) {
         life: 30, max: 30, color: rand(0,1) > 0.4 ? '#fc4' : '#fea', r: 3
       });
     }
-    effects.push({ type: 'coinmark', x: e.x, y: e.y - 26, value: amount, life: 50, max: 50 });
+    effects.push({ type: 'coinmark', x: e.x, y: e.y - 26, value: bounty, life: 50, max: 50 });
   });
   shake = Math.max(shake, 6);
 }
