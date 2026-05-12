@@ -2572,95 +2572,115 @@ function draw() {
     ctx.fillRect(0, 0, W, H);
   } else if (bubbleUltPhase === 2) {
     const progress = 1 - bubbleUltTimer / 180;
-    // fondo oscuro tipo manga
-    ctx.fillStyle = `rgba(8, 8, 20, ${0.78 + 0.15 * progress})`;
+    // fondo casi negro pleno
+    ctx.fillStyle = `rgba(5, 5, 15, 0.93)`;
     ctx.fillRect(0, 0, W, H);
-    const fx = W * 0.30, fy = H * 0.58;
-    // líneas de velocidad (concentration lines)
-    ctx.strokeStyle = `rgba(255, 255, 255, ${0.15 + 0.12 * Math.sin(frame * 0.3)})`;
+
+    // división visual: panel izquierdo para héroe, derecho para texto
+    const heroCenterX = W * 0.26;
+    const heroCenterY = H * 0.55;
+    const heroR = player.r * 5;
+
+    // líneas de velocidad LIMITADAS al área del héroe (no cruzan al texto)
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(heroCenterX, heroCenterY, 420, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.22})`;
     ctx.lineWidth = 2;
-    for (let i = 0; i < 36; i++) {
-      const ang = (i / 36) * Math.PI * 2 + (frame * 0.005);
-      const d1 = 140 + (i % 3) * 12;
-      const d2 = 1100;
+    for (let i = 0; i < 26; i++) {
+      const ang = (i / 26) * Math.PI * 2 + frame * 0.004;
+      const d1 = heroR * 2.6;
+      const d2 = 420;
       ctx.beginPath();
-      ctx.moveTo(fx + Math.cos(ang) * d1, fy + Math.sin(ang) * d1);
-      ctx.lineTo(fx + Math.cos(ang) * d2, fy + Math.sin(ang) * d2);
+      ctx.moveTo(heroCenterX + Math.cos(ang) * d1, heroCenterY + Math.sin(ang) * d1);
+      ctx.lineTo(heroCenterX + Math.cos(ang) * d2, heroCenterY + Math.sin(ang) * d2);
       ctx.stroke();
     }
-    // viñeta
-    const vig = ctx.createRadialGradient(fx, fy, 100, fx, fy, 760);
-    vig.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    vig.addColorStop(1, 'rgba(0, 0, 0, 0.85)');
-    ctx.fillStyle = vig;
-    ctx.fillRect(0, 0, W, H);
-    // jugador gigante (pose heroica)
-    const heroR = player.r * (4 + progress * 0.5);
-    // aura azul detrás
-    const aura = ctx.createRadialGradient(fx, fy, heroR * 0.6, fx, fy, heroR * 2.6);
-    aura.addColorStop(0, 'rgba(100, 180, 255, 0.5)');
-    aura.addColorStop(1, 'rgba(40, 100, 200, 0)');
+    ctx.restore();
+
+    // aura azul detrás del héroe
+    const aura = ctx.createRadialGradient(heroCenterX, heroCenterY, heroR * 0.5, heroCenterX, heroCenterY, heroR * 3);
+    aura.addColorStop(0, 'rgba(140, 210, 255, 0.55)');
+    aura.addColorStop(0.5, 'rgba(60, 130, 220, 0.25)');
+    aura.addColorStop(1, 'rgba(20, 60, 160, 0)');
     ctx.fillStyle = aura;
-    ctx.beginPath(); ctx.arc(fx, fy, heroR * 2.6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(heroCenterX, heroCenterY, heroR * 3, 0, Math.PI * 2); ctx.fill();
+
+    // HÉROE gigante
     ctx.fillStyle = '#9cf';
-    ctx.beginPath(); ctx.arc(fx, fy, heroR, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(heroCenterX, heroCenterY, heroR, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 5;
-    ctx.beginPath(); ctx.arc(fx, fy, heroR, 0, Math.PI * 2); ctx.stroke();
-    // brillo en el "ojo"
+    ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.arc(heroCenterX, heroCenterY, heroR, 0, Math.PI * 2); ctx.stroke();
+    // ojo brillante
     ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(fx - heroR * 0.35, fy - heroR * 0.4, heroR * 0.18, 0, Math.PI * 2); ctx.fill();
-    // BURBUJA Soft & Wet GO BEYOND — pequeña pero icónica frente al puño
-    const bx = fx + heroR * 0.9 + 30;
-    const by = fy - heroR * 0.3;
-    const br = (4 + progress * 28);
-    const bg = ctx.createRadialGradient(bx - br * 0.3, by - br * 0.3, 0, bx, by, br * 1.4);
-    bg.addColorStop(0, `rgba(255, 255, 255, ${0.95 * progress})`);
-    bg.addColorStop(0.4, `rgba(200, 240, 255, ${0.6 * progress})`);
-    bg.addColorStop(1, `rgba(120, 200, 255, 0)`);
+    ctx.beginPath(); ctx.arc(heroCenterX - heroR * 0.32, heroCenterY - heroR * 0.38, heroR * 0.22, 0, Math.PI * 2); ctx.fill();
+
+    // BURBUJA Soft & Wet GO BEYOND (grande y muy visible)
+    const bx = heroCenterX + heroR + 50;
+    const by = heroCenterY - heroR * 0.15;
+    const br = 8 + progress * 60;
+    const bg = ctx.createRadialGradient(bx - br * 0.3, by - br * 0.3, 0, bx, by, br * 1.6);
+    bg.addColorStop(0, `rgba(255, 255, 255, ${progress})`);
+    bg.addColorStop(0.35, `rgba(220, 245, 255, ${0.85 * progress})`);
+    bg.addColorStop(0.75, `rgba(130, 210, 255, ${0.4 * progress})`);
+    bg.addColorStop(1, `rgba(100, 180, 255, 0)`);
     ctx.fillStyle = bg;
-    ctx.beginPath(); ctx.arc(bx, by, br * 1.4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = `rgba(180, 230, 255, ${0.6 * progress})`;
+    ctx.beginPath(); ctx.arc(bx, by, br * 1.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = `rgba(210, 240, 255, ${0.55 * progress})`;
     ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = `rgba(255, 255, 255, ${progress})`;
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.stroke();
-    // highlight de la burbuja
-    ctx.fillStyle = `rgba(255, 255, 255, ${0.95 * progress})`;
-    ctx.beginPath(); ctx.arc(bx - br * 0.4, by - br * 0.45, br * 0.22, 0, Math.PI * 2); ctx.fill();
-    // mini reflejo
-    ctx.fillStyle = `rgba(255, 255, 255, ${0.6 * progress})`;
-    ctx.beginPath(); ctx.arc(bx + br * 0.25, by + br * 0.4, br * 0.1, 0, Math.PI * 2); ctx.fill();
-    // "GO BEYOND" gigante, dramático
-    const pulse = 0.88 + 0.12 * Math.sin(frame * 0.35);
-    ctx.save();
-    ctx.font = 'bold 180px monospace';
-    ctx.textAlign = 'center';
-    ctx.shadowColor = 'rgba(255, 50, 80, 1)';
-    ctx.shadowBlur = 36;
-    ctx.fillStyle = `rgba(220, 25, 55, ${pulse})`;
-    const tx = W * 0.70;
-    const ty = H * 0.38;
-    ctx.fillText('GO', tx, ty);
-    ctx.fillText('BEYOND', tx, ty + 160);
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = `rgba(255, 255, 255, ${pulse * 0.85})`;
     ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.stroke();
+    // highlight
+    ctx.fillStyle = `rgba(255, 255, 255, ${progress})`;
+    ctx.beginPath(); ctx.arc(bx - br * 0.4, by - br * 0.45, br * 0.26, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = `rgba(255, 255, 255, ${0.7 * progress})`;
+    ctx.beginPath(); ctx.arc(bx + br * 0.3, by + br * 0.45, br * 0.12, 0, Math.PI * 2); ctx.fill();
+
+    // PANEL DERECHO para el texto (oscuro sólido para legibilidad)
+    const panelX = W * 0.50;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.fillRect(panelX, 0, W - panelX, H);
+    // barra roja superior y inferior (estilo manga panel)
+    ctx.fillStyle = 'rgba(200, 30, 60, 0.85)';
+    ctx.fillRect(panelX, 0, W - panelX, 8);
+    ctx.fillRect(panelX, H - 8, W - panelX, 8);
+
+    // "GO BEYOND" en el panel derecho
+    const pulse = 0.9 + 0.1 * Math.sin(frame * 0.35);
+    const tx = W * 0.75;
+    const ty = H * 0.38;
+    ctx.save();
+    ctx.font = 'bold 200px monospace';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(255, 60, 80, 1)';
+    ctx.shadowBlur = 50;
+    ctx.fillStyle = `rgba(225, 30, 55, ${pulse})`;
+    ctx.fillText('GO', tx, ty);
+    ctx.fillText('BEYOND', tx, ty + 180);
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${pulse})`;
+    ctx.lineWidth = 7;
     ctx.strokeText('GO', tx, ty);
-    ctx.strokeText('BEYOND', tx, ty + 160);
+    ctx.strokeText('BEYOND', tx, ty + 180);
     ctx.restore();
     ctx.textAlign = 'left';
-    // "ji-ZUN!" subtítulo manga al inicio del impacto
-    if (progress > 0.75) {
-      const sa = (progress - 0.75) * 4;
+
+    // subtítulo manga "—DON!" al final
+    if (progress > 0.65) {
+      const sa = Math.min(1, (progress - 0.65) * 3);
       ctx.save();
-      ctx.font = 'bold 42px monospace';
+      ctx.font = 'bold 64px monospace';
       ctx.textAlign = 'center';
-      ctx.fillStyle = `rgba(255, 235, 100, ${sa})`;
-      ctx.strokeStyle = `rgba(80, 0, 0, ${sa})`;
-      ctx.lineWidth = 4;
-      ctx.strokeText('—DON!', W * 0.50, H * 0.88);
-      ctx.fillText('—DON!', W * 0.50, H * 0.88);
+      ctx.shadowColor = 'rgba(255, 60, 0, 0.9)';
+      ctx.shadowBlur = 18;
+      ctx.fillStyle = `rgba(255, 220, 60, ${sa})`;
+      ctx.strokeStyle = `rgba(60, 0, 0, ${sa})`;
+      ctx.lineWidth = 6;
+      ctx.strokeText('DON!!', W * 0.30, H * 0.93);
+      ctx.fillText('DON!!', W * 0.30, H * 0.93);
       ctx.restore();
       ctx.textAlign = 'left';
     }
