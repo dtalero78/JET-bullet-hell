@@ -169,9 +169,9 @@ canvas.addEventListener('click', e => {
   // hotbar click
   const p = getMousePos(e);
   const hbY = H - 70;
-  for (let i = 0; i < 17; i++) {
-    const x = 20 + i * 38;
-    if (p.x >= x && p.x <= x + 32 && p.y >= hbY && p.y <= hbY + 56) {
+  for (let i = 0; i < 18; i++) {
+    const x = 20 + i * 36;
+    if (p.x >= x && p.x <= x + 30 && p.y >= hbY && p.y <= hbY + 56) {
       if (owned.has(i)) active = i;
       return;
     }
@@ -229,9 +229,11 @@ const ABILITIES = [
     desc: 'Atrae enemigos a un torbellino donde se dañan entre sí.', color: '#f6c' },
   { id: 'detonate',    name: '15. Asalto Detonante',       cost: 2000,
     desc: 'Bombas azules teledirigidas con daño en área. G: detona todos los enemigos (CD 2min).', color: '#4af' },
-  { id: 'rewind',      name: '16. Puños del Rebobinado',   cost: 3000,
+  { id: 'smoke',       name: '16. Cortina de Humo',        cost: 2500,
+    desc: 'Bombas de humo que dañan. H: niebla total 5s — invulnerable, rápido, dañas a todos.', color: '#bbb' },
+  { id: 'rewind',      name: '17. Puños del Rebobinado',   cost: 3000,
     desc: 'Puños devastadores + T: rebobina enemigos 18s. Cura y limpia balas.', color: '#84f' },
-  { id: 'bubble',      name: '17. Burbujas Infinitas',     cost: 10500000,
+  { id: 'bubble',      name: '18. Burbujas Infinitas',     cost: 10500000,
     desc: '9 burbujas teledirigidas con daño infinito. Al expirar se multiplican en 5 más.', color: '#9ff' },
 ];
 
@@ -268,6 +270,10 @@ let detonateAllCD = 0;
 let flurryQueue = 0;
 let flurryTimer = 0;
 let flurryAngle = 0;
+
+let smokeFogTimer = 0;
+let smokeFogCD = 0;
+const smokeClouds = [];
 
 const SHIELD_MAX = 30 * 60;
 const SHIELD_CD_MAX = 50 * 60;
@@ -423,11 +429,25 @@ function updatePlayer() {
   if (keys['d'] || keys['arrowright']) dx++;
   if (dx || dy) {
     const m = Math.hypot(dx, dy);
-    const sp = player.speed * (active === 6 ? 1.6 : 1);
+    let mult = 1;
+    if (active === 6) mult *= 1.6;
+    if (smokeFogTimer > 0) mult *= 2.6;
+    const sp = player.speed * mult;
     player.x += (dx / m) * sp;
     player.y += (dy / m) * sp;
   }
   processFlurry();
+  if (smokeFogTimer > 0) {
+    player.iframe = Math.max(player.iframe, 3);
+    enemies.forEach(e => {
+      if (e.ally) return;
+      damageEnemy(e, 30, '#fff');
+      if (frame % 10 === 0) {
+        effects.push({ type: 'punch', x: e.x, y: e.y, life: 6, max: 6, color: '#bbb' });
+      }
+    });
+    smokeFogTimer--;
+  }
   // Bastión Inmóvil: equipado en slot 6 (idx 5)
   const moving = !!(dx || dy);
   if (active === 5) {
@@ -492,6 +512,7 @@ function updatePlayer() {
   if (keyPressed['\\'] && owned.has(14)) active = 14;
   if (keyPressed['/'] && owned.has(15)) active = 15;
   if (keyPressed[';'] && owned.has(16)) active = 16;
+  if (keyPressed["'"] && owned.has(17)) active = 17;
   if (keyPressed['q']) cycleAbility(-1);
   if (keyPressed['e']) cycleAbility(1);
 
@@ -501,9 +522,15 @@ function updatePlayer() {
     shake = 12;
     effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 30, max: 30, r: 0, color: '#93f' });
   }
-  if (active === 15 && keyPressed['t'] && rewindCD <= 0) {
+  if (active === 16 && keyPressed['t'] && rewindCD <= 0) {
     doRewind();
     rewindCD = 60 * 18;
+  }
+  if (active === 15 && keyPressed['h'] && smokeFogCD <= 0) {
+    smokeFogTimer = 60 * 5;
+    smokeFogCD = 60 * 30;
+    shake = 16;
+    effects.push({ type: 'flash', life: 24, max: 24, color: '#888' });
   }
   if (active === 10 && keyPressed['t'] && shortRewindCD <= 0) {
     doShortRewind();
@@ -518,6 +545,7 @@ function updatePlayer() {
   if (rewindCD > 0)   rewindCD--;
   if (shortRewindCD > 0) shortRewindCD--;
   if (detonateAllCD > 0) detonateAllCD--;
+  if (smokeFogCD > 0) smokeFogCD--;
   if (timeStopTimer > 0) timeStopTimer--;
 
   const cd = getAttackCD();
@@ -528,7 +556,7 @@ function updatePlayer() {
 }
 
 function getAttackCD() {
-  return [340, 260, 380, 0, 280, 320, 600, 300, 280, 700, 280, 380, 520, 520, 380, 240, 110][active];
+  return [340, 260, 380, 0, 280, 320, 600, 300, 280, 700, 280, 380, 520, 520, 380, 320, 240, 110][active];
 }
 
 function doAttack() {
@@ -549,8 +577,9 @@ function doAttack() {
     case 12: dashAttack(a); break;
     case 13: vortexAttack(a); break;
     case 14: detonateAttack(a); break;
-    case 15: rewindFistsAttack(a); break;
-    case 16: bubbleAttack(a); break;
+    case 15: smokeAttack(a); break;
+    case 16: rewindFistsAttack(a); break;
+    case 17: bubbleAttack(a); break;
   }
 }
 
@@ -822,6 +851,47 @@ function updateFires() {
       });
     }
     if (f.life <= 0) fires.splice(i, 1);
+  }
+}
+
+// 16. Cortina de Humo — bombas de humo + niebla total
+function smokeAttack(angle) {
+  projectiles.push({
+    x: player.x + Math.cos(angle) * 18,
+    y: player.y + Math.sin(angle) * 18,
+    vx: Math.cos(angle) * 6.5, vy: Math.sin(angle) * 6.5,
+    r: 7, dmg: 80, life: 80, type: 'smoke', color: '#bbb', trail: []
+  });
+}
+function createSmokeCloud(x, y) {
+  smokeClouds.push({ x, y, life: 240, max: 240, r: 100 });
+  for (let p = 0; p < 14; p++) {
+    particles.push({
+      x: x + rand(-10, 10), y: y + rand(-10, 10),
+      vx: rand(-2, 2), vy: rand(-2, -0.5),
+      life: 35, max: 35, color: '#999', r: 4
+    });
+  }
+}
+function updateSmokeClouds() {
+  for (let i = smokeClouds.length - 1; i >= 0; i--) {
+    const c = smokeClouds[i];
+    c.life--;
+    enemies.forEach(e => {
+      if (e.ally) return;
+      if (dist(e, c) < c.r + e.r) damageEnemy(e, 1.6, '#aaa');
+    });
+    if (frame % 3 === 0) {
+      const a = Math.random() * Math.PI * 2;
+      const rr = Math.random() * c.r;
+      particles.push({
+        x: c.x + Math.cos(a) * rr,
+        y: c.y + Math.sin(a) * rr,
+        vx: rand(-0.5, 0.5), vy: -1 - Math.random(),
+        life: 40, max: 40, color: Math.random() > 0.5 ? '#888' : '#bbb', r: 5
+      });
+    }
+    if (c.life <= 0) smokeClouds.splice(i, 1);
   }
 }
 
@@ -1385,6 +1455,19 @@ function updateProjectiles() {
           p.hits.add(e.id);
         }
       });
+    } else if (p.type === 'smoke') {
+      let hit = false;
+      enemies.forEach(e => {
+        if (e.ally || hit) return;
+        if (dist(e, p) < e.r + p.r) {
+          damageEnemy(e, p.dmg, '#aaa');
+          hit = true;
+        }
+      });
+      if (hit) {
+        createSmokeCloud(p.x, p.y);
+        consumed = true;
+      }
     } else if (p.type === 'firebullet') {
       let hit = false;
       enemies.forEach(e => {
@@ -1487,6 +1570,7 @@ function updateProjectiles() {
       if (p.type === 'vortex') createVortex(p.x, p.y);
       if (p.type === 'bomb' && p.life <= 0) explodeBomb(p.x, p.y);
       if (p.type === 'firebullet' && p.life <= 0) createFire(p.x, p.y);
+      if (p.type === 'smoke' && p.life <= 0) createSmokeCloud(p.x, p.y);
       // burbujas grandes paren 5 burbujas hijas que también persiguen
       if (p.type === 'bubble' && p.split > 0 && p.life <= 0) {
         for (let s = 0; s < 5; s++) {
@@ -1579,6 +1663,19 @@ function draw() {
     ctx.restore();
   });
 
+  // nubes de humo
+  smokeClouds.forEach(c => {
+    const fade = Math.min(1, c.life / 60);
+    const pulse = Math.sin(frame * 0.1 + c.x * 0.01) * 4;
+    const r = c.r + pulse;
+    const grd = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, r);
+    grd.addColorStop(0, `rgba(180, 180, 180, ${0.55 * fade})`);
+    grd.addColorStop(0.6, `rgba(140, 140, 140, ${0.35 * fade})`);
+    grd.addColorStop(1, 'rgba(120, 120, 120, 0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, Math.PI * 2); ctx.fill();
+  });
+
   // hogueras
   fires.forEach(f => {
     const fade = Math.min(1, f.life / 60); // fade en el último segundo
@@ -1638,6 +1735,18 @@ function draw() {
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 3, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (p.type === 'smoke') {
+      const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 2);
+      grd.addColorStop(0, 'rgba(200, 200, 200, 0.7)');
+      grd.addColorStop(1, 'rgba(160, 160, 160, 0)');
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#bbb';
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#ddd';
+      ctx.lineWidth = 1;
+      ctx.stroke();
     }
     if (p.type === 'firebullet') {
       const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 2.5);
@@ -1928,6 +2037,20 @@ function draw() {
     }
   });
 
+  // smoke fog overlay
+  if (smokeFogTimer > 0) {
+    ctx.fillStyle = `rgba(160, 160, 160, ${0.35 + 0.05 * Math.sin(frame * 0.3)})`;
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = 'rgba(220, 220, 220, 0.8)';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(2, 2, W - 4, H - 4);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`NIEBLA TOTAL — ${(smokeFogTimer / 60).toFixed(1)}s`, W / 2, 30);
+    ctx.textAlign = 'left';
+  }
+
   // time stop overlay
   if (timeStopTimer > 0) {
     ctx.fillStyle = 'rgba(150, 200, 255, 0.08)';
@@ -1993,13 +2116,25 @@ function drawUI() {
       ctx.fillText(`G Detonar todo: LISTO`, 280, 33);
     }
   }
-  if (active === 15) {
+  if (active === 16) {
     if (rewindCD > 0) {
       ctx.fillStyle = '#888';
       ctx.fillText(`T Rebobinar: ${(rewindCD / 60).toFixed(1)}s`, 280, 33);
     } else {
       ctx.fillStyle = '#a8f';
       ctx.fillText(`T Rebobinar: LISTO`, 280, 33);
+    }
+  }
+  if (active === 15) {
+    if (smokeFogTimer > 0) {
+      ctx.fillStyle = '#fff';
+      ctx.fillText(`🌫 NIEBLA ${(smokeFogTimer / 60).toFixed(1)}s`, 280, 33);
+    } else if (smokeFogCD > 0) {
+      ctx.fillStyle = '#888';
+      ctx.fillText(`H Niebla: ${(smokeFogCD / 60).toFixed(0)}s`, 280, 33);
+    } else {
+      ctx.fillStyle = '#ccc';
+      ctx.fillText(`H Niebla: LISTO`, 280, 33);
     }
   }
   if (active === 10) {
@@ -2031,21 +2166,21 @@ function drawUI() {
   // hotbar
   const hbY = H - 70;
   ABILITIES.forEach((ab, i) => {
-    const x = 20 + i * 38;
+    const x = 20 + i * 36;
     const isOwned = owned.has(i);
     const isActive = active === i;
     ctx.fillStyle = isOwned ? (isActive ? '#335' : '#223') : '#111';
-    ctx.fillRect(x, hbY, 32, 56);
+    ctx.fillRect(x, hbY, 30, 56);
     ctx.strokeStyle = isActive ? '#fff' : (isOwned ? '#557' : '#333');
     ctx.lineWidth = isActive ? 3 : 1;
-    ctx.strokeRect(x, hbY, 32, 56);
+    ctx.strokeRect(x, hbY, 30, 56);
     ctx.lineWidth = 1;
     ctx.fillStyle = isOwned ? '#fff' : '#555';
     ctx.font = 'bold 10px monospace';
-    const keyLabels = ['1','2','3','4','5','6','7','8','9','0','-','=',']','[','\\','/',';'];
+    const keyLabels = ['1','2','3','4','5','6','7','8','9','0','-','=',']','[','\\','/',';',"'"];
     ctx.fillText(keyLabels[i] || '?', x + 2, hbY + 12);
     ctx.fillStyle = isOwned ? ab.color : '#333';
-    ctx.beginPath(); ctx.arc(x + 16, hbY + 32, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + 15, hbY + 32, 6, 0, Math.PI * 2); ctx.fill();
     if (!isOwned) {
       ctx.fillStyle = '#888';
       ctx.font = '8px monospace';
@@ -2187,6 +2322,7 @@ function restart() {
   dashTimer = 0; dashHits = new Set();
   detonateAllCD = 0;
   flurryQueue = 0; flurryTimer = 0;
+  smokeFogTimer = 0; smokeFogCD = 0; smokeClouds.length = 0;
   gameOver = false; paused = false; shopOpen = false;
   shopEl.style.display = 'none';
   sandboxPanel.style.display = 'none';
@@ -2208,6 +2344,7 @@ function loop() {
     updateProjectiles();
     updateVortexFields();
     updateFires();
+    updateSmokeClouds();
     updateParticles();
     updateEffects();
     updateWave();
