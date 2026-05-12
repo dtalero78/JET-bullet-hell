@@ -64,7 +64,7 @@
 <body>
 <canvas id="game" width="1280" height="780"></canvas>
 <div id="shop"></div>
-<div id="help">WASD mover · Click atacar · 1-9, 0, -, =, ] / Q E / rueda / hotbar para cambiar arma · B tienda · R/T poderes · ESC pausa</div>
+<div id="help">WASD mover · Click atacar · 1-9, 0, -, =, ], [ / Q E / rueda / hotbar para cambiar arma · B tienda · R/T/G poderes · ESC pausa</div>
 
 <div id="title">
   <h1>BULLET HELL</h1>
@@ -75,7 +75,7 @@
     <button class="hard" data-mode="hard">DIFÍCIL</button>
     <button class="sandbox" data-mode="sandbox">SANDBOX</button>
   </div>
-  <p style="margin-top:30px; color:#556; font-size: 12px;">WASD mover · Click atacar · 1-9, 0, -, =, ] cambiar · B tienda · R/T poderes · M panel sandbox</p>
+  <p style="margin-top:30px; color:#556; font-size: 12px;">WASD mover · Click atacar · 1-9, 0, -, =, ], [ cambiar · B tienda · R/T/G poderes · M panel sandbox</p>
 </div>
 
 <div id="sandbox-panel">
@@ -169,9 +169,9 @@ canvas.addEventListener('click', e => {
   // hotbar click
   const p = getMousePos(e);
   const hbY = H - 70;
-  for (let i = 0; i < 13; i++) {
-    const x = 20 + i * 46;
-    if (p.x >= x && p.x <= x + 40 && p.y >= hbY && p.y <= hbY + 56) {
+  for (let i = 0; i < 14; i++) {
+    const x = 20 + i * 44;
+    if (p.x >= x && p.x <= x + 38 && p.y >= hbY && p.y <= hbY + 56) {
       if (owned.has(i)) active = i;
       return;
     }
@@ -211,19 +211,21 @@ const ABILITIES = [
     desc: 'Flechas que atraviesan y empujan a los enemigos en su dirección.', color: '#cf8' },
   { id: 'bastion',     name: '6. Bastión Inmóvil',         cost: 400,
     desc: 'Quédate quieto: cúpula azul-morado, inmunidad y reflejo (30s c/50s). Moverte pausa la carga.', color: '#a8f' },
-  { id: 'shortrewind', name: '7. Eco Temporal',            cost: 500,
+  { id: 'firebullet',  name: '7. Bala Incendiaria',        cost: 450,
+    desc: 'Bala que crea una hoguera donde cae. El fuego dura 10s y daña a quien lo pise.', color: '#f73' },
+  { id: 'shortrewind', name: '8. Eco Temporal',            cost: 500,
     desc: 'Puños ágiles + T: rebobina enemigos 6s cada 8s. Limpia balas enemigas.', color: '#b9f' },
-  { id: 'dash',        name: '8. Embestida Fulgurante',    cost: 900,
-    desc: 'Dash veloz que atraviesa enemigos. Los que mata se vuelven aliados 30s.', color: '#6fa' },
   { id: 'timestop',    name: '9. Puños del Tiempo',        cost: 600,
     desc: 'Puños + dedo perforante. R: paraliza el tiempo 10s cada 25s.', color: '#93f' },
-  { id: 'vortex',      name: '10. Pistola Vórtice',        cost: 1200,
+  { id: 'dash',        name: '10. Embestida Fulgurante',   cost: 900,
+    desc: 'Dash veloz que atraviesa enemigos. Los que mata se vuelven aliados 30s.', color: '#6fa' },
+  { id: 'vortex',      name: '11. Pistola Vórtice',        cost: 1200,
     desc: 'Atrae enemigos a un torbellino donde se dañan entre sí.', color: '#fc4' },
-  { id: 'detonate',    name: '11. Asalto Detonante',       cost: 2000,
+  { id: 'detonate',    name: '12. Asalto Detonante',       cost: 2000,
     desc: 'Bombas azules teledirigidas con daño en área. G: detona todos los enemigos (CD 2min).', color: '#4af' },
-  { id: 'rewind',      name: '12. Puños del Rebobinado',   cost: 3000,
+  { id: 'rewind',      name: '13. Puños del Rebobinado',   cost: 3000,
     desc: 'Puños devastadores + T: rebobina enemigos 18s. Cura y limpia balas.', color: '#84f' },
-  { id: 'bubble',      name: '13. Burbujas Infinitas',     cost: 7000,
+  { id: 'bubble',      name: '14. Burbujas Infinitas',     cost: 7000,
     desc: '9 burbujas teledirigidas con daño infinito. Al expirar se multiplican en 5 más.', color: '#9ff' },
 ];
 
@@ -235,6 +237,7 @@ const projectiles = [];
 const particles = [];
 const effects = [];
 const vortexFields = [];
+const fires = [];
 
 let nextEnemyId = 1;
 let wave = 0;
@@ -474,6 +477,7 @@ function updatePlayer() {
   if (keyPressed['-'] && owned.has(10)) active = 10;
   if (keyPressed['='] && owned.has(11)) active = 11;
   if (keyPressed[']'] && owned.has(12)) active = 12;
+  if (keyPressed['['] && owned.has(13)) active = 13;
   if (keyPressed['q']) cycleAbility(-1);
   if (keyPressed['e']) cycleAbility(1);
 
@@ -483,15 +487,15 @@ function updatePlayer() {
     shake = 12;
     effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 30, max: 30, r: 0, color: '#93f' });
   }
-  if (active === 11 && keyPressed['t'] && rewindCD <= 0) {
+  if (active === 12 && keyPressed['t'] && rewindCD <= 0) {
     doRewind();
     rewindCD = 60 * 18;
   }
-  if (active === 6 && keyPressed['t'] && shortRewindCD <= 0) {
+  if (active === 7 && keyPressed['t'] && shortRewindCD <= 0) {
     doShortRewind();
     shortRewindCD = 60 * 8;
   }
-  if (active === 10 && keyPressed['g'] && detonateAllCD <= 0) {
+  if (active === 11 && keyPressed['g'] && detonateAllCD <= 0) {
     detonateAllEnemies();
     detonateAllCD = 60 * 120;
   }
@@ -510,7 +514,7 @@ function updatePlayer() {
 }
 
 function getAttackCD() {
-  return [340, 260, 380, 0, 280, 320, 280, 520, 380, 520, 380, 240, 110][active];
+  return [340, 260, 380, 0, 280, 320, 300, 280, 380, 520, 520, 380, 240, 110][active];
 }
 
 function doAttack() {
@@ -522,13 +526,14 @@ function doAttack() {
     case 3: /* lluvia: continuo, en updateRain */ break;
     case 4: arrowAttack(a); break;
     case 5: bastionAttack(a); break;
-    case 6: shortRewindFistsAttack(a); break;
-    case 7: dashAttack(a); break;
+    case 6: fireAttack(a); break;
+    case 7: shortRewindFistsAttack(a); break;
     case 8: timeStopAttack(a); break;
-    case 9: vortexAttack(a); break;
-    case 10: detonateAttack(a); break;
-    case 11: rewindFistsAttack(a); break;
-    case 12: bubbleAttack(a); break;
+    case 9: dashAttack(a); break;
+    case 10: vortexAttack(a); break;
+    case 11: detonateAttack(a); break;
+    case 12: rewindFistsAttack(a); break;
+    case 13: bubbleAttack(a); break;
   }
 }
 
@@ -663,6 +668,50 @@ function arrowAttack(angle) {
     r: 7, dmg: 160, life: 80, type: 'arrow', color: '#cf8',
     angle: angle, hits: new Set(), pushed: new Set(), pierce: 6, trail: []
   });
+}
+
+// 7. Bala Incendiaria — bala que deja hoguera por 10s
+function fireAttack(angle) {
+  projectiles.push({
+    x: player.x + Math.cos(angle) * 18,
+    y: player.y + Math.sin(angle) * 18,
+    vx: Math.cos(angle) * 9, vy: Math.sin(angle) * 9,
+    r: 7, dmg: 120, life: 90, type: 'firebullet', color: '#f73', trail: []
+  });
+}
+
+function createFire(x, y) {
+  fires.push({ x, y, life: 600, max: 600, r: 70 });
+  shake = Math.max(shake, 6);
+  for (let p = 0; p < 10; p++) {
+    particles.push({
+      x, y,
+      vx: rand(-3, 3), vy: rand(-3, 3),
+      life: 25, max: 25, color: rand(0,1) > 0.5 ? '#f73' : '#fc4', r: 3
+    });
+  }
+}
+
+function updateFires() {
+  for (let i = fires.length - 1; i >= 0; i--) {
+    const f = fires[i];
+    f.life--;
+    enemies.forEach(e => {
+      if (e.ally) return;
+      if (dist(e, f) < f.r + e.r) damageEnemy(e, 2.2, '#f73');
+    });
+    if (frame % 2 === 0) {
+      const a = Math.random() * Math.PI * 2;
+      const rr = Math.random() * f.r;
+      particles.push({
+        x: f.x + Math.cos(a) * rr,
+        y: f.y + Math.sin(a) * rr,
+        vx: rand(-0.5, 0.5), vy: -2 - Math.random() * 2.5,
+        life: 28, max: 28, color: Math.random() > 0.45 ? '#f73' : '#fc4', r: 3
+      });
+    }
+    if (f.life <= 0) fires.splice(i, 1);
+  }
 }
 
 // 11. Asalto Detonante — bombas teledirigidas + detonación total
@@ -1214,6 +1263,19 @@ function updateProjectiles() {
           p.hits.add(e.id);
         }
       });
+    } else if (p.type === 'firebullet') {
+      let hit = false;
+      enemies.forEach(e => {
+        if (e.ally || hit) return;
+        if (dist(e, p) < e.r + p.r) {
+          damageEnemy(e, p.dmg, '#f73');
+          hit = true;
+        }
+      });
+      if (hit) {
+        createFire(p.x, p.y);
+        consumed = true;
+      }
     } else if (p.type === 'bomb') {
       // homing
       if (!p.target || !enemies.includes(p.target) || p.target.ally) {
@@ -1302,6 +1364,7 @@ function updateProjectiles() {
     if (p.life <= 0 || p.x < -60 || p.x > W + 60 || p.y < -60 || p.y > H + 60) {
       if (p.type === 'vortex') createVortex(p.x, p.y);
       if (p.type === 'bomb' && p.life <= 0) explodeBomb(p.x, p.y);
+      if (p.type === 'firebullet' && p.life <= 0) createFire(p.x, p.y);
       // burbujas grandes paren 5 burbujas hijas que también persiguen
       if (p.type === 'bubble' && p.split > 0 && p.life <= 0) {
         for (let s = 0; s < 5; s++) {
@@ -1394,6 +1457,22 @@ function draw() {
     ctx.restore();
   });
 
+  // hogueras
+  fires.forEach(f => {
+    const fade = Math.min(1, f.life / 60); // fade en el último segundo
+    const pulse = Math.sin(frame * 0.18 + f.x * 0.01) * 4;
+    const r = f.r + pulse;
+    const grd = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, r);
+    grd.addColorStop(0, `rgba(255, 220, 80, ${0.7 * fade})`);
+    grd.addColorStop(0.5, `rgba(255, 130, 40, ${0.45 * fade})`);
+    grd.addColorStop(1, 'rgba(255, 100, 30, 0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(f.x, f.y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = `rgba(255, 200, 100, ${0.4 * fade})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(f.x, f.y, f.r * 0.6, 0, Math.PI * 2); ctx.stroke();
+  });
+
   // rain target indicator
   if (active === 3) {
     ctx.strokeStyle = 'rgba(120, 200, 255, 0.6)';
@@ -1437,6 +1516,17 @@ function draw() {
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 3, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (p.type === 'firebullet') {
+      const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 2.5);
+      grd.addColorStop(0, 'rgba(255, 220, 80, 0.7)');
+      grd.addColorStop(1, 'rgba(255, 100, 40, 0)');
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fc4';
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#f73';
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 0.6, 0, Math.PI * 2); ctx.fill();
     }
     if (p.type === 'bomb') {
       const r = p.r + Math.sin(frame * 0.35) * 2;
@@ -1757,7 +1847,7 @@ function drawUI() {
       ctx.fillText(`R Paro: LISTO`, 280, 33);
     }
   }
-  if (active === 10) {
+  if (active === 11) {
     if (detonateAllCD > 0) {
       ctx.fillStyle = '#888';
       ctx.fillText(`G Detonar todo: ${(detonateAllCD / 60).toFixed(0)}s`, 280, 33);
@@ -1766,7 +1856,7 @@ function drawUI() {
       ctx.fillText(`G Detonar todo: LISTO`, 280, 33);
     }
   }
-  if (active === 11) {
+  if (active === 12) {
     if (rewindCD > 0) {
       ctx.fillStyle = '#888';
       ctx.fillText(`T Rebobinar: ${(rewindCD / 60).toFixed(1)}s`, 280, 33);
@@ -1775,7 +1865,7 @@ function drawUI() {
       ctx.fillText(`T Rebobinar: LISTO`, 280, 33);
     }
   }
-  if (active === 6) {
+  if (active === 7) {
     if (shortRewindCD > 0) {
       ctx.fillStyle = '#888';
       ctx.fillText(`T Eco 6s: ${(shortRewindCD / 60).toFixed(1)}s`, 280, 33);
@@ -1800,25 +1890,25 @@ function drawUI() {
   // hotbar
   const hbY = H - 70;
   ABILITIES.forEach((ab, i) => {
-    const x = 20 + i * 46;
+    const x = 20 + i * 44;
     const isOwned = owned.has(i);
     const isActive = active === i;
     ctx.fillStyle = isOwned ? (isActive ? '#335' : '#223') : '#111';
-    ctx.fillRect(x, hbY, 40, 56);
+    ctx.fillRect(x, hbY, 38, 56);
     ctx.strokeStyle = isActive ? '#fff' : (isOwned ? '#557' : '#333');
     ctx.lineWidth = isActive ? 3 : 1;
-    ctx.strokeRect(x, hbY, 40, 56);
+    ctx.strokeRect(x, hbY, 38, 56);
     ctx.lineWidth = 1;
     ctx.fillStyle = isOwned ? '#fff' : '#555';
     ctx.font = 'bold 10px monospace';
-    const keyLabels = ['1','2','3','4','5','6','7','8','9','0','-','=',']'];
+    const keyLabels = ['1','2','3','4','5','6','7','8','9','0','-','=',']','['];
     ctx.fillText(keyLabels[i] || '?', x + 3, hbY + 12);
     ctx.fillStyle = isOwned ? ab.color : '#333';
-    ctx.beginPath(); ctx.arc(x + 20, hbY + 32, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + 19, hbY + 32, 8, 0, Math.PI * 2); ctx.fill();
     if (!isOwned) {
       ctx.fillStyle = '#888';
       ctx.font = '8px monospace';
-      ctx.fillText(`${abilityCost(ab)}`, x + 6, hbY + 50);
+      ctx.fillText(`${abilityCost(ab)}`, x + 5, hbY + 50);
     }
   });
 
@@ -1944,6 +2034,7 @@ function restart() {
   particles.length = 0;
   effects.length = 0;
   vortexFields.length = 0;
+  fires.length = 0;
   rewindBuffer.length = 0;
   owned.clear(); owned.add(0);
   active = 0;
@@ -1974,6 +2065,7 @@ function loop() {
     }
     updateProjectiles();
     updateVortexFields();
+    updateFires();
     updateParticles();
     updateEffects();
     updateWave();
