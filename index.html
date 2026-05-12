@@ -230,7 +230,7 @@ const ABILITIES = [
   { id: 'mirage',      name: '15. Espejismo Dorado',       cost: 1000,
     desc: 'Balas doradas. K: bala que atraviesa todo y convierte enemigos en señuelos que reflejan.', color: '#fd0' },
   { id: 'vortex',      name: '16. Pistola Vórtice',        cost: 1200,
-    desc: 'Atrae enemigos a un torbellino donde se dañan entre sí.', color: '#f6c' },
+    desc: 'Rayos dorados que atraviesan todo. V: bala pequeña + golden ratio, todo se para 2s.', color: '#fd6' },
   { id: 'detonate',    name: '17. Asalto Detonante',       cost: 2000,
     desc: 'Bombas azules teledirigidas con daño en área. G: detona todos los enemigos (CD 2min).', color: '#4af' },
   { id: 'smoke',       name: '18. Cortina de Humo',        cost: 2500,
@@ -287,6 +287,10 @@ let preKillCredits = 0;
 
 let mirageCD = 0;
 const decoys = [];
+
+let vortexUltCD = 0;
+let goldenRatioTimer = 0;
+let whiteFlashTimer = 0;
 
 const SHIELD_MAX = 30 * 60;
 const SHIELD_CD_MAX = 50 * 60;
@@ -563,6 +567,20 @@ function updatePlayer() {
     shake = 10;
     effects.push({ type: 'flash', life: 18, max: 18, color: '#4f8' });
   }
+  if (active === 15 && keyPressed['v'] && vortexUltCD <= 0) {
+    const ang = aimAngle();
+    projectiles.push({
+      x: player.x + Math.cos(ang) * 18, y: player.y + Math.sin(ang) * 18,
+      vx: Math.cos(ang) * 14, vy: Math.sin(ang) * 14,
+      r: 7, hitR: 55, dmg: 999999, life: 240, type: 'phibullet', color: '#fff',
+      hits: new Set(), trail: []
+    });
+    vortexUltCD = 60 * 90;
+    goldenRatioTimer = 120;
+    whiteFlashTimer = 180;
+    timeStopTimer = Math.max(timeStopTimer, 120);
+    shake = 28;
+  }
   if (active === 14 && keyPressed['k'] && mirageCD <= 0) {
     const ang = aimAngle();
     projectiles.push({
@@ -587,6 +605,9 @@ function updatePlayer() {
   if (smokeFogCD > 0) smokeFogCD--;
   if (webModeCD > 0) webModeCD--;
   if (mirageCD > 0) mirageCD--;
+  if (vortexUltCD > 0) vortexUltCD--;
+  if (goldenRatioTimer > 0) goldenRatioTimer--;
+  if (whiteFlashTimer > 0) whiteFlashTimer--;
   if (redModeTimer > 0) { redModeTimer--; player.iframe = 999; }
   if (timeStopTimer > 0) timeStopTimer--;
 
@@ -1145,10 +1166,12 @@ function timeStopAttack(angle) {
 
 // 6. Vórtice
 function vortexAttack(angle) {
+  // rayo dorado de luz que atraviesa todo
   projectiles.push({
-    x: player.x, y: player.y,
-    vx: Math.cos(angle) * 7, vy: Math.sin(angle) * 7,
-    r: 10, dmg: 250, life: 120, type: 'vortex', color: '#fc4', trail: []
+    x: player.x + Math.cos(angle) * 18, y: player.y + Math.sin(angle) * 18,
+    vx: Math.cos(angle) * 16, vy: Math.sin(angle) * 16,
+    r: 7, dmg: 240, life: 110, type: 'goldenray', color: '#fd6',
+    hits: new Set(), angle, trail: []
   });
 }
 function createVortex(x, y) {
@@ -1663,6 +1686,25 @@ function updateProjectiles() {
           p.hits.add(e.id);
         }
       });
+    } else if (p.type === 'goldenray') {
+      enemies.forEach(e => {
+        if (e.ally) return;
+        if (p.hits.has(e.id)) return;
+        if (dist(e, p) < e.r + p.r) {
+          damageEnemy(e, p.dmg, '#fd6');
+          p.hits.add(e.id);
+        }
+      });
+    } else if (p.type === 'phibullet') {
+      enemies.forEach(e => {
+        if (e.ally) return;
+        if (p.hits.has(e.id)) return;
+        const hr = p.hitR || p.r;
+        if (dist(e, p) < e.r + hr) {
+          damageEnemy(e, p.dmg, '#fff');
+          p.hits.add(e.id);
+        }
+      });
     } else if (p.type === 'transmute') {
       enemies.forEach(e => {
         if (e.ally || e.preview) return;
@@ -1967,6 +2009,38 @@ function draw() {
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 3, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (p.type === 'goldenray') {
+      // rayo dorado (haz alargado)
+      const len = 24;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle || Math.atan2(p.vy, p.vx));
+      const grd = ctx.createLinearGradient(-len, 0, len, 0);
+      grd.addColorStop(0, 'rgba(255,220,80,0)');
+      grd.addColorStop(0.5, 'rgba(255,240,160,0.9)');
+      grd.addColorStop(1, 'rgba(255,255,200,0.6)');
+      ctx.fillStyle = grd;
+      ctx.fillRect(-len, -p.r * 0.7, len * 2, p.r * 1.4);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(-len * 0.6, -p.r * 0.3, len * 1.2, p.r * 0.6);
+      ctx.restore();
+    }
+    if (p.type === 'phibullet') {
+      const r = p.r + Math.sin(frame * 0.4) * 1.5;
+      const halo = (p.hitR || p.r) * 0.4;
+      // halo grande (visualiza la hitbox)
+      const grd0 = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, halo);
+      grd0.addColorStop(0, 'rgba(255, 240, 200, 0.55)');
+      grd0.addColorStop(1, 'rgba(255, 220, 120, 0)');
+      ctx.fillStyle = grd0;
+      ctx.beginPath(); ctx.arc(p.x, p.y, halo, 0, Math.PI * 2); ctx.fill();
+      // bala pequeña
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#fd6';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r + 1, 0, Math.PI * 2); ctx.stroke();
     }
     if (p.type === 'goldbullet') {
       const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 2.2);
@@ -2378,6 +2452,39 @@ function draw() {
     ctx.textAlign = 'left';
   }
 
+  // golden ratio sobre el jugador
+  if (goldenRatioTimer > 0) {
+    const alpha = goldenRatioTimer / 120;
+    const cx = player.x;
+    const cy = player.y - 60;
+    ctx.save();
+    ctx.strokeStyle = `rgba(255, 215, 0, ${alpha})`;
+    ctx.lineWidth = 3;
+    ctx.shadowColor = `rgba(255, 220, 80, ${alpha})`;
+    ctx.shadowBlur = 14;
+    ctx.beginPath();
+    const b = 0.30635; // golden spiral growth
+    const a = 1.5;
+    const rot = (1 - alpha) * Math.PI * 2;
+    for (let t = 0; t < 8 * Math.PI; t += 0.08) {
+      const r = a * Math.exp(b * t);
+      if (r > 60) break;
+      const x = cx + r * Math.cos(t + rot);
+      const y = cy + r * Math.sin(t + rot);
+      if (t === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // flash blanco del Phi
+  if (whiteFlashTimer > 0) {
+    const a = (whiteFlashTimer / 180) * 0.92;
+    ctx.fillStyle = `rgba(255, 255, 255, ${a})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+
   // carmesí inmortal overlay (encima del time stop normal)
   if (redModeTimer > 0) {
     ctx.fillStyle = `rgba(220, 30, 60, ${0.12 + 0.04 * Math.sin(frame * 0.2)})`;
@@ -2471,6 +2578,15 @@ function drawUI() {
     if (preKillCredits > 0) {
       ctx.fillStyle = '#f8a';
       ctx.fillText(`Pre-kills: ${preKillCredits}`, 440, 33);
+    }
+  }
+  if (active === 15) {
+    if (vortexUltCD > 0) {
+      ctx.fillStyle = '#888';
+      ctx.fillText(`V Phi: ${(vortexUltCD / 60).toFixed(0)}s`, 280, 33);
+    } else {
+      ctx.fillStyle = '#fd6';
+      ctx.fillText(`V Phi: LISTO`, 280, 33);
     }
   }
   if (active === 14) {
@@ -2700,6 +2816,7 @@ function restart() {
   webModeTimer = 0; webModeCD = 0;
   redModeTimer = 0; preKillCredits = 0;
   mirageCD = 0; decoys.length = 0;
+  vortexUltCD = 0; goldenRatioTimer = 0; whiteFlashTimer = 0;
   gameOver = false; paused = false; shopOpen = false;
   shopEl.style.display = 'none';
   sandboxPanel.style.display = 'none';
