@@ -204,7 +204,7 @@ const ABILITIES = [
   { id: 'threads',  name: '2. Puños & Hilos',           cost: 25,
     desc: 'Puños cuerpo a cuerpo + hilos que viajan y dañan.', color: '#fa4' },
   { id: 'breaker',  name: '3. Puños Rompedores',        cost: 120,
-    desc: 'Puños demoledores + proyectiles que perforan enemigos.', color: '#f84' },
+    desc: 'Ráfaga de 4 puños rosados rápidos en línea.', color: '#f8c' },
   { id: 'rain',     name: '4. Lluvia Mortal',           cost: 250,
     desc: 'Lluvia continua sobre el cursor. Mantén click para apuntar.', color: '#6cf' },
   { id: 'arrow',    name: '5. Flechas Perforantes',     cost: 300,
@@ -455,6 +455,7 @@ function updatePlayer() {
     player.y += (dy / m) * sp;
   }
   processFlurry();
+  processBreakerCombo();
   if (smokeFogTimer > 0) {
     player.iframe = Math.max(player.iframe, 3);
     enemies.forEach(e => {
@@ -597,7 +598,7 @@ function updatePlayer() {
 }
 
 function getAttackCD() {
-  return [340, 260, 380, 0, 280, 320, 600, 300, 200, 280, 700, 280, 380, 520, 250, 520, 380, 320, 240, 110][active];
+  return [340, 260, 500, 0, 280, 320, 600, 300, 200, 280, 700, 280, 380, 520, 250, 520, 380, 320, 240, 110][active];
 }
 
 function doAttack() {
@@ -707,14 +708,35 @@ function threadsAttack(angle) {
   }
 }
 
-// 3. Rompedores
+// 3. Puños Rompedores — ráfaga rosa de 4 puños rápidos
+let breakerCombo = 0;
+let breakerTimer = 0;
+let breakerAngle = 0;
 function breakerAttack(angle) {
-  punchAttack(angle, 42, 180, 9, '#f84');
-  projectiles.push({
-    x: player.x, y: player.y,
-    vx: Math.cos(angle) * 8.5, vy: Math.sin(angle) * 8.5,
-    r: 11, dmg: 240, life: 80, type: 'breaker', color: '#f84', breaks: 4, trail: []
-  });
+  if (breakerCombo > 0) return;
+  breakerCombo = 4;
+  breakerTimer = 0;
+  breakerAngle = angle;
+}
+function processBreakerCombo() {
+  if (breakerCombo <= 0) return;
+  breakerTimer--;
+  if (breakerTimer <= 0) {
+    const a = breakerAngle + rand(-0.08, 0.08);
+    punchAttack(a, 42, 95, 7, '#f8c');
+    const tx = player.x + Math.cos(a) * 42;
+    const ty = player.y + Math.sin(a) * 42;
+    effects.push({ type: 'punch', x: tx, y: ty, life: 7, max: 7, color: '#f8c' });
+    for (let p = 0; p < 3; p++) {
+      particles.push({
+        x: tx + rand(-3,3), y: ty + rand(-3,3),
+        vx: rand(-1,1), vy: rand(-1,1),
+        life: 14, max: 14, color: '#f8c', r: 2
+      });
+    }
+    breakerCombo--;
+    breakerTimer = 4;
+  }
 }
 
 // 4. Lluvia (continua mientras click)
@@ -2671,6 +2693,7 @@ function restart() {
   dashTimer = 0; dashHits = new Set();
   detonateAllCD = 0;
   flurryQueue = 0; flurryTimer = 0;
+  breakerCombo = 0; breakerTimer = 0;
   smokeFogTimer = 0; smokeFogCD = 0; smokeClouds.length = 0;
   webModeTimer = 0; webModeCD = 0;
   redModeTimer = 0; preKillCredits = 0;
