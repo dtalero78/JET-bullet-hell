@@ -50,8 +50,15 @@
   #sandbox-panel button:hover { filter: brightness(1.2); }
   #sandbox-panel label { display: block; margin: 8px 0 4px 0; color: #cca; }
   #sandbox-panel input[type=range] { width: 100%; }
+  #sandbox-panel input[type=number], #sandbox-panel select {
+    background: #112; color: #fff; border: 1px solid #557; border-radius: 3px;
+    padding: 4px; font-family: monospace; font-size: 13px;
+  }
+  #sandbox-panel input[type=number] { width: 70px; }
+  #sandbox-panel select { width: 100%; }
   #sandbox-panel .val { color: #ff4; font-weight: bold; }
-  #sandbox-panel .row { display: flex; gap: 4px; flex-wrap: wrap; }
+  #sandbox-panel .row { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+  #sandbox-panel hr { border: 0; border-top: 1px dashed #557; margin: 10px 0; }
 </style>
 </head>
 <body>
@@ -91,6 +98,32 @@
   <input type="range" id="sb-edmg" min="0" max="5" step="0.05" value="1">
   <label>Spawn de enemigos: <span class="val" id="sb-rate-v">1.0×</span></label>
   <input type="range" id="sb-rate" min="0" max="3" step="0.05" value="1">
+  <hr>
+  <label>Invocar enemigos:</label>
+  <select id="sb-enemy-type">
+    <optgroup label="Normales">
+      <option value="grunt">Grunt (común)</option>
+      <option value="fast">Fast (veloz)</option>
+      <option value="tank">Tank</option>
+      <option value="shooter">Shooter (rango)</option>
+      <option value="brute">Brute</option>
+    </optgroup>
+    <optgroup label="Jefes">
+      <option value="boss">TIRADOR</option>
+      <option value="chronos">CRONOS</option>
+      <option value="vampire">VÁMPIRO</option>
+      <option value="summoner">INVOCADOR</option>
+      <option value="mirror">ESPEJO</option>
+      <option value="juggernaut">COLOSO</option>
+      <option value="warlord">SEÑOR DE LA GUERRA</option>
+    </optgroup>
+  </select>
+  <div class="row" style="margin-top:6px;">
+    <span>Cantidad:</span>
+    <input type="number" id="sb-spawn-count" min="1" max="500" value="5">
+    <button id="sb-spawn-btn">Invocar</button>
+    <button id="sb-kill-all">Matar todos</button>
+  </div>
   <div style="color:#776; margin-top:8px; font-size:11px;">M para abrir/cerrar este panel</div>
 </div>
 
@@ -1998,6 +2031,18 @@ bindSlider('sb-pdmg', 'sb-pdmg-v', v => { if (mode === 'sandbox') playerDmgMult 
 bindSlider('sb-espd', 'sb-espd-v', v => { if (mode === 'sandbox') enemySpeedMult = v; });
 bindSlider('sb-edmg', 'sb-edmg-v', v => { if (mode === 'sandbox') enemyDmgMult = v; });
 bindSlider('sb-rate', 'sb-rate-v', v => { if (mode === 'sandbox') enemySpawnMult = v; });
+
+document.getElementById('sb-spawn-btn').addEventListener('click', () => {
+  const type = document.getElementById('sb-enemy-type').value;
+  const raw = parseInt(document.getElementById('sb-spawn-count').value) || 1;
+  const count = Math.max(1, Math.min(500, raw));
+  for (let i = 0; i < count; i++) spawnEnemy(type);
+});
+document.getElementById('sb-kill-all').addEventListener('click', () => {
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    if (!enemies[i].ally) enemies.splice(i, 1);
+  }
+});
 
 loop();
 </script>
