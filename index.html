@@ -64,7 +64,7 @@
 <body>
 <canvas id="game" width="1280" height="780"></canvas>
 <div id="shop"></div>
-<div id="help">WASD mover · Click atacar · 1-9, 0, -, =, ], [, \, / · Q E / rueda / hotbar · B tienda · R/T/G poderes · ESC pausa</div>
+<div id="help">WASD mover · Click atacar · 1-9, 0, -, =, ], [, \, /, ; · Q E / rueda / hotbar · B tienda · R/T/G poderes · ESC pausa</div>
 
 <div id="title">
   <h1>BULLET HELL</h1>
@@ -169,9 +169,9 @@ canvas.addEventListener('click', e => {
   // hotbar click
   const p = getMousePos(e);
   const hbY = H - 70;
-  for (let i = 0; i < 16; i++) {
-    const x = 20 + i * 40;
-    if (p.x >= x && p.x <= x + 34 && p.y >= hbY && p.y <= hbY + 56) {
+  for (let i = 0; i < 17; i++) {
+    const x = 20 + i * 38;
+    if (p.x >= x && p.x <= x + 32 && p.y >= hbY && p.y <= hbY + 56) {
       if (owned.has(i)) active = i;
       return;
     }
@@ -217,19 +217,21 @@ const ABILITIES = [
     desc: 'Bala que crea una hoguera donde cae. El fuego dura 10s y daña a quien lo pise.', color: '#f73' },
   { id: 'spirit',      name: '9. Espíritu Eléctrico',      cost: 470,
     desc: 'Rayo que salta entre enemigos. Poco daño pero los paraliza 0.5s.', color: '#8ef' },
-  { id: 'shortrewind', name: '10. Eco Temporal',           cost: 500,
+  { id: 'bounty',      name: '10. Lluvia Dorada',          cost: 750,
+    desc: 'Marca 10 enemigos: daño = 35% de su HP, y al morir sueltan ese oro como bono.', color: '#fc4' },
+  { id: 'shortrewind', name: '11. Eco Temporal',           cost: 500,
     desc: 'Puños ágiles + T: rebobina enemigos 6s cada 8s. Limpia balas enemigas.', color: '#b9f' },
-  { id: 'timestop',    name: '11. Puños del Tiempo',       cost: 600,
+  { id: 'timestop',    name: '12. Puños del Tiempo',       cost: 600,
     desc: 'Puños + dedo perforante. R: paraliza el tiempo 10s cada 25s.', color: '#93f' },
-  { id: 'dash',        name: '12. Embestida Fulgurante',   cost: 900,
+  { id: 'dash',        name: '13. Embestida Fulgurante',   cost: 900,
     desc: 'Dash veloz que atraviesa enemigos. Los que mata se vuelven aliados 30s.', color: '#6fa' },
-  { id: 'vortex',      name: '13. Pistola Vórtice',        cost: 1200,
-    desc: 'Atrae enemigos a un torbellino donde se dañan entre sí.', color: '#fc4' },
-  { id: 'detonate',    name: '14. Asalto Detonante',       cost: 2000,
+  { id: 'vortex',      name: '14. Pistola Vórtice',        cost: 1200,
+    desc: 'Atrae enemigos a un torbellino donde se dañan entre sí.', color: '#f6c' },
+  { id: 'detonate',    name: '15. Asalto Detonante',       cost: 2000,
     desc: 'Bombas azules teledirigidas con daño en área. G: detona todos los enemigos (CD 2min).', color: '#4af' },
-  { id: 'rewind',      name: '15. Puños del Rebobinado',   cost: 3000,
+  { id: 'rewind',      name: '16. Puños del Rebobinado',   cost: 3000,
     desc: 'Puños devastadores + T: rebobina enemigos 18s. Cura y limpia balas.', color: '#84f' },
-  { id: 'bubble',      name: '16. Burbujas Infinitas',     cost: 10500000,
+  { id: 'bubble',      name: '17. Burbujas Infinitas',     cost: 10500000,
     desc: '9 burbujas teledirigidas con daño infinito. Al expirar se multiplican en 5 más.', color: '#9ff' },
 ];
 
@@ -489,24 +491,25 @@ function updatePlayer() {
   if (keyPressed['['] && owned.has(13)) active = 13;
   if (keyPressed['\\'] && owned.has(14)) active = 14;
   if (keyPressed['/'] && owned.has(15)) active = 15;
+  if (keyPressed[';'] && owned.has(16)) active = 16;
   if (keyPressed['q']) cycleAbility(-1);
   if (keyPressed['e']) cycleAbility(1);
 
-  if (active === 10 && keyPressed['r'] && timeStopCD <= 0) {
+  if (active === 11 && keyPressed['r'] && timeStopCD <= 0) {
     timeStopTimer = 60 * 10;
     timeStopCD = 60 * 25;
     shake = 12;
     effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 30, max: 30, r: 0, color: '#93f' });
   }
-  if (active === 14 && keyPressed['t'] && rewindCD <= 0) {
+  if (active === 15 && keyPressed['t'] && rewindCD <= 0) {
     doRewind();
     rewindCD = 60 * 18;
   }
-  if (active === 9 && keyPressed['t'] && shortRewindCD <= 0) {
+  if (active === 10 && keyPressed['t'] && shortRewindCD <= 0) {
     doShortRewind();
     shortRewindCD = 60 * 8;
   }
-  if (active === 13 && keyPressed['g'] && detonateAllCD <= 0) {
+  if (active === 14 && keyPressed['g'] && detonateAllCD <= 0) {
     detonateAllEnemies();
     detonateAllCD = 60 * 120;
   }
@@ -525,7 +528,7 @@ function updatePlayer() {
 }
 
 function getAttackCD() {
-  return [340, 260, 380, 0, 280, 320, 600, 300, 280, 280, 380, 520, 520, 380, 240, 110][active];
+  return [340, 260, 380, 0, 280, 320, 600, 300, 280, 700, 280, 380, 520, 520, 380, 240, 110][active];
 }
 
 function doAttack() {
@@ -540,13 +543,14 @@ function doAttack() {
     case 6: flurryAttack(a); break;
     case 7: fireAttack(a); break;
     case 8: spiritAttack(a); break;
-    case 9: shortRewindFistsAttack(a); break;
-    case 10: timeStopAttack(a); break;
-    case 11: dashAttack(a); break;
-    case 12: vortexAttack(a); break;
-    case 13: detonateAttack(a); break;
-    case 14: rewindFistsAttack(a); break;
-    case 15: bubbleAttack(a); break;
+    case 9: bountyAttack(a); break;
+    case 10: shortRewindFistsAttack(a); break;
+    case 11: timeStopAttack(a); break;
+    case 12: dashAttack(a); break;
+    case 13: vortexAttack(a); break;
+    case 14: detonateAttack(a); break;
+    case 15: rewindFistsAttack(a); break;
+    case 16: bubbleAttack(a); break;
   }
 }
 
@@ -713,6 +717,30 @@ function processFlurry() {
     flurryQueue--;
     flurryTimer = 3;
   }
+}
+
+// 10. Lluvia Dorada — marca 10 enemigos: daño = 35% HP, sueltan ese oro al morir
+function bountyAttack(angle) {
+  const targets = enemies
+    .filter(e => !e.ally)
+    .sort((a, b) => dist(a, player) - dist(b, player))
+    .slice(0, 10);
+  if (targets.length === 0) return;
+  targets.forEach(e => {
+    const amount = Math.max(3, Math.ceil(e.maxHp * 0.35));
+    damageEnemy(e, amount, '#fc4');
+    e.markCoins = (e.markCoins || 0) + amount;
+    // lluvia de monedas
+    for (let p = 0; p < 8; p++) {
+      particles.push({
+        x: e.x + rand(-16, 16), y: e.y - 80 - rand(0, 60),
+        vx: rand(-1, 1), vy: 6 + rand(0, 3),
+        life: 30, max: 30, color: rand(0,1) > 0.4 ? '#fc4' : '#fea', r: 3
+      });
+    }
+    effects.push({ type: 'coinmark', x: e.x, y: e.y - 26, value: amount, life: 50, max: 50 });
+  });
+  shake = Math.max(shake, 6);
 }
 
 // 9. Espíritu Eléctrico — rayo encadenado que paraliza
@@ -1238,7 +1266,8 @@ function updateEnemies() {
       continue;
     }
     if (e.hp <= 0) {
-      player.coins += e.coins;
+      const bonus = e.markCoins || 0;
+      player.coins += e.coins + bonus;
       for (let p = 0; p < 12; p++) {
         particles.push({
           x: e.x, y: e.y,
@@ -1247,6 +1276,16 @@ function updateEnemies() {
         });
       }
       effects.push({ type: 'coin', x: e.x, y: e.y, value: e.coins, life: 50, max: 50 });
+      if (bonus > 0) {
+        effects.push({ type: 'coin', x: e.x, y: e.y - 22, value: bonus, life: 80, max: 80 });
+        for (let p = 0; p < 16; p++) {
+          particles.push({
+            x: e.x, y: e.y,
+            vx: rand(-6, 6), vy: rand(-6, 6),
+            life: 40, max: 40, color: '#fc4', r: 3
+          });
+        }
+      }
       enemies.splice(i, 1);
     }
   }
@@ -1733,6 +1772,13 @@ function draw() {
       ctx.fillRect(e.x - w / 2, e.y - e.r - 9, w * Math.max(0, e.hp) / e.maxHp, 4);
     }
 
+    if (e.markCoins && !e.ally) {
+      ctx.fillStyle = '#fc4';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('💰' + e.markCoins, e.x, e.y - e.r - 22);
+      ctx.textAlign = 'left';
+    }
     if (e.bossName && !e.ally) {
       ctx.fillStyle = '#fff';
       ctx.font = 'bold 13px monospace';
@@ -1870,6 +1916,14 @@ function draw() {
       ctx.font = 'bold 13px monospace';
       ctx.fillText('+' + f.value, f.x - 10, f.y);
       ctx.globalAlpha = 1;
+    } else if (f.type === 'coinmark') {
+      ctx.globalAlpha = f.life / f.max;
+      ctx.fillStyle = '#fc4';
+      ctx.font = 'bold 14px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('💰' + f.value, f.x, f.y);
+      ctx.textAlign = 'left';
+      ctx.globalAlpha = 1;
     }
   });
 
@@ -1917,7 +1971,7 @@ function drawUI() {
   // cooldowns
   ctx.fillStyle = '#fff';
   ctx.font = '12px monospace';
-  if (active === 10) {
+  if (active === 11) {
     if (timeStopTimer > 0) {
       ctx.fillStyle = '#c8f';
       ctx.fillText(`⏱ TIEMPO PARADO ${(timeStopTimer / 60).toFixed(1)}s`, 280, 33);
@@ -1929,7 +1983,7 @@ function drawUI() {
       ctx.fillText(`R Paro: LISTO`, 280, 33);
     }
   }
-  if (active === 13) {
+  if (active === 14) {
     if (detonateAllCD > 0) {
       ctx.fillStyle = '#888';
       ctx.fillText(`G Detonar todo: ${(detonateAllCD / 60).toFixed(0)}s`, 280, 33);
@@ -1938,7 +1992,7 @@ function drawUI() {
       ctx.fillText(`G Detonar todo: LISTO`, 280, 33);
     }
   }
-  if (active === 14) {
+  if (active === 15) {
     if (rewindCD > 0) {
       ctx.fillStyle = '#888';
       ctx.fillText(`T Rebobinar: ${(rewindCD / 60).toFixed(1)}s`, 280, 33);
@@ -1947,7 +2001,7 @@ function drawUI() {
       ctx.fillText(`T Rebobinar: LISTO`, 280, 33);
     }
   }
-  if (active === 9) {
+  if (active === 10) {
     if (shortRewindCD > 0) {
       ctx.fillStyle = '#888';
       ctx.fillText(`T Eco 6s: ${(shortRewindCD / 60).toFixed(1)}s`, 280, 33);
@@ -1976,25 +2030,25 @@ function drawUI() {
   // hotbar
   const hbY = H - 70;
   ABILITIES.forEach((ab, i) => {
-    const x = 20 + i * 40;
+    const x = 20 + i * 38;
     const isOwned = owned.has(i);
     const isActive = active === i;
     ctx.fillStyle = isOwned ? (isActive ? '#335' : '#223') : '#111';
-    ctx.fillRect(x, hbY, 34, 56);
+    ctx.fillRect(x, hbY, 32, 56);
     ctx.strokeStyle = isActive ? '#fff' : (isOwned ? '#557' : '#333');
     ctx.lineWidth = isActive ? 3 : 1;
-    ctx.strokeRect(x, hbY, 34, 56);
+    ctx.strokeRect(x, hbY, 32, 56);
     ctx.lineWidth = 1;
     ctx.fillStyle = isOwned ? '#fff' : '#555';
     ctx.font = 'bold 10px monospace';
-    const keyLabels = ['1','2','3','4','5','6','7','8','9','0','-','=',']','[','\\','/'];
+    const keyLabels = ['1','2','3','4','5','6','7','8','9','0','-','=',']','[','\\','/',';'];
     ctx.fillText(keyLabels[i] || '?', x + 2, hbY + 12);
     ctx.fillStyle = isOwned ? ab.color : '#333';
-    ctx.beginPath(); ctx.arc(x + 17, hbY + 32, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + 16, hbY + 32, 6, 0, Math.PI * 2); ctx.fill();
     if (!isOwned) {
       ctx.fillStyle = '#888';
       ctx.font = '8px monospace';
-      ctx.fillText(`${abilityCost(ab)}`, x + 3, hbY + 50);
+      ctx.fillText(`${abilityCost(ab)}`, x + 2, hbY + 50);
     }
   });
 
