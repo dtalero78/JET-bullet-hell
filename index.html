@@ -169,8 +169,8 @@ canvas.addEventListener('click', e => {
   // hotbar click
   const p = getMousePos(e);
   const hbY = H - 70;
-  for (let i = 0; i < 20; i++) {
-    const x = 20 + i * 32;
+  for (let i = 0; i < 21; i++) {
+    const x = 20 + i * 31;
     if (p.x >= x && p.x <= x + 26 && p.y >= hbY && p.y <= hbY + 56) {
       if (owned.has(i)) active = i;
       return;
@@ -239,6 +239,8 @@ const ABILITIES = [
     desc: 'Balas rojas potentes. T: 30s inmortal + tiempo parado, enemigos futuros aparecen en centro.', color: '#d02' },
   { id: 'bubble',      name: '20. Burbujas Infinitas',     cost: 4500,
     desc: 'Puños fuertes. N: balas que paralizan/ciegan/resbalan. L: ejército de clones con burbujas mortales (CD 2min).', color: '#9ff' },
+  { id: 'wonder',      name: '21. Wonder of U',            cost: 4500,
+    desc: 'Rocas teledirigidas que se pegan (+daño con el tiempo). N: tira carros. X: calamidad mata todo (CD 2min).', color: '#c30' },
 ];
 
 const owned = new Set([0]); // start with whip
@@ -297,6 +299,11 @@ let bubbleUltCD = 0;
 let bubbleUltPhase = 0; // 0=idle, 1=blue screen, 2=clones forming
 let bubbleUltTimer = 0;
 let bubbleUltClones = [];
+
+let wonderCarsMode = false;
+let wonderUltCD = 0;
+let wonderUltPhase = 0;
+let wonderUltTimer = 0;
 
 const SHIELD_MAX = 30 * 60;
 const SHIELD_CD_MAX = 50 * 60;
@@ -544,6 +551,7 @@ function updatePlayer() {
   if (keyPressed["'"] && owned.has(17)) active = 17;
   if (keyPressed[','] && owned.has(18)) active = 18;
   if (keyPressed['.'] && owned.has(19)) active = 19;
+  if (keyPressed['`'] && owned.has(20)) active = 20;
   if (keyPressed['q']) cycleAbility(-1);
   if (keyPressed['e']) cycleAbility(1);
 
@@ -576,6 +584,16 @@ function updatePlayer() {
   if (active === 19 && keyPressed['n']) {
     bubbleBulletMode = !bubbleBulletMode;
     effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 14, max: 14, r: 0, color: '#9ff' });
+  }
+  if (active === 20 && keyPressed['n']) {
+    wonderCarsMode = !wonderCarsMode;
+    effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 14, max: 14, r: 0, color: '#c30' });
+  }
+  if (active === 20 && keyPressed['x'] && wonderUltCD <= 0) {
+    wonderUltCD = 60 * 120;
+    wonderUltPhase = 1;
+    wonderUltTimer = 60;
+    shake = 24;
   }
   if (active === 19 && keyPressed['l'] && bubbleUltCD <= 0) {
     bubbleUltCD = 60 * 120;
@@ -635,6 +653,33 @@ function updatePlayer() {
   if (goldenRatioTimer > 0) goldenRatioTimer--;
   if (whiteFlashTimer > 0) whiteFlashTimer--;
   if (bubbleUltCD > 0) bubbleUltCD--;
+  if (wonderUltCD > 0) wonderUltCD--;
+  if (wonderUltPhase === 1) {
+    wonderUltTimer--;
+    if (wonderUltTimer <= 0) {
+      wonderUltPhase = 2;
+      wonderUltTimer = 180;
+      timeStopTimer = Math.max(timeStopTimer, 200);
+    }
+  } else if (wonderUltPhase === 2) {
+    wonderUltTimer--;
+    if (wonderUltTimer <= 0) {
+      enemies.forEach(e => {
+        if (e.ally) return;
+        effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 30, max: 30, r: 0, color: '#c30' });
+        for (let p = 0; p < 10; p++) {
+          particles.push({
+            x: e.x, y: e.y,
+            vx: rand(-8, 8), vy: rand(-8, 8),
+            life: 32, max: 32, color: rand(0,1) > 0.4 ? '#c30' : '#fc6', r: 4
+          });
+        }
+        damageEnemy(e, 999999, '#c30');
+      });
+      wonderUltPhase = 0;
+      shake = 28;
+    }
+  }
   if (bubbleUltPhase === 1) {
     bubbleUltTimer--;
     if (bubbleUltTimer <= 0) {
@@ -674,7 +719,7 @@ function updatePlayer() {
 }
 
 function getAttackCD() {
-  return [340, 260, 500, 0, 280, 320, 600, 300, 200, 280, 700, 280, 380, 520, 250, 520, 380, 320, 240, 110][active];
+  return [340, 260, 500, 0, 280, 320, 600, 300, 200, 280, 700, 280, 380, 520, 250, 520, 380, 320, 240, 110, 320][active];
 }
 
 function doAttack() {
@@ -700,6 +745,7 @@ function doAttack() {
     case 17: smokeAttack(a); break;
     case 18: rewindFistsAttack(a); break;
     case 19: bubbleAttack(a); break;
+    case 20: wonderAttack(a); break;
   }
 }
 
@@ -1330,6 +1376,25 @@ function updateRewindBuffer() {
   }
 }
 
+// 21. Wonder of U — rocas teledirigidas / carros + ultimate calamidad
+function wonderAttack(angle) {
+  if (wonderCarsMode) {
+    projectiles.push({
+      x: player.x + Math.cos(angle) * 18, y: player.y + Math.sin(angle) * 18,
+      vx: Math.cos(angle) * 6.5, vy: Math.sin(angle) * 6.5,
+      r: 22, dmg: 1600, life: 140, type: 'car', color: '#a85',
+      angle, rotation: rand(-0.2, 0.2), trail: []
+    });
+  } else {
+    projectiles.push({
+      x: player.x + Math.cos(angle) * 14, y: player.y + Math.sin(angle) * 14,
+      vx: Math.cos(angle) * 7, vy: Math.sin(angle) * 7,
+      r: 7, dmg: 70, life: 160, type: 'rock', color: '#a85',
+      target: null, trail: []
+    });
+  }
+}
+
 // 20. Burbujas Infinitas — puños/balas (toggle N) + ultimate clones (L)
 function bubbleAttack(angle) {
   if (bubbleBulletMode) {
@@ -1357,6 +1422,14 @@ function updateEnemies() {
   enemies.forEach(e => {
     if (timeStopTimer > 0) return;
     if (e.frozen > 0) { e.frozen--; return; }
+    // rocas pegadas: más tiempo = más daño
+    if (e.rocks && e.rocks.length > 0) {
+      e.rocks = e.rocks.filter(r => {
+        r.ticks++;
+        damageEnemy(e, 0.25 + r.ticks * 0.012, '#a85');
+        return r.ticks < 600;
+      });
+    }
     if (e.paralyzed > 0) { e.paralyzed--; e.vx *= 0.9; e.vy *= 0.9; return; }
     if (e.sliding > 0) {
       e.sliding--;
@@ -1792,6 +1865,52 @@ function updateProjectiles() {
         }
       });
       if (hit) consumed = true;
+    } else if (p.type === 'rock') {
+      // homing
+      if (!p.target || !enemies.includes(p.target) || p.target.ally) {
+        let nearest = null, best = 1e9;
+        enemies.forEach(e => {
+          if (e.ally) return;
+          const d = dist(e, p);
+          if (d < best) { best = d; nearest = e; }
+        });
+        p.target = nearest;
+      }
+      if (p.target) {
+        const ang = angleBetween(p, p.target);
+        const sp = 8;
+        p.vx = p.vx * 0.84 + Math.cos(ang) * sp * 0.32;
+        p.vy = p.vy * 0.84 + Math.sin(ang) * sp * 0.32;
+      }
+      // colisión: se pega
+      let stuck = false;
+      enemies.forEach(e => {
+        if (e.ally || stuck) return;
+        if (dist(e, p) < e.r + p.r) {
+          damageEnemy(e, p.dmg, '#a85');
+          if (!e.rocks) e.rocks = [];
+          e.rocks.push({
+            ticks: 0,
+            ox: rand(-e.r * 0.7, e.r * 0.7),
+            oy: rand(-e.r * 0.7, e.r * 0.7)
+          });
+          stuck = true;
+        }
+      });
+      if (stuck) consumed = true;
+    } else if (p.type === 'car') {
+      p.rotation = (p.rotation || 0) + 0.06;
+      enemies.forEach(e => {
+        if (e.ally) return;
+        if (p.hits && p.hits.has(e.id)) return;
+        if (dist(e, p) < e.r + p.r) {
+          damageEnemy(e, p.dmg, '#a85');
+          e.vx += Math.cos(p.angle) * 16;
+          e.vy += Math.sin(p.angle) * 16;
+          if (!p.hits) p.hits = new Set();
+          p.hits.add(e.id);
+        }
+      });
     } else if (p.type === 'goldenray') {
       enemies.forEach(e => {
         if (e.ally) return;
@@ -2116,6 +2235,54 @@ function draw() {
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 3, 0, Math.PI * 2); ctx.stroke();
     }
+    if (p.type === 'rock') {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(frame * 0.08);
+      ctx.fillStyle = '#8a6b3a';
+      ctx.beginPath();
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * Math.PI * 2;
+        const rr = p.r + ((i + 1) % 3 === 0 ? -2 : 2);
+        const x = Math.cos(a) * rr;
+        const y = Math.sin(a) * rr;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#5a3e1f';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.beginPath(); ctx.arc(-p.r * 0.3, -p.r * 0.3, p.r * 0.2, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    if (p.type === 'car') {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate((p.angle || 0) + (p.rotation || 0));
+      // carrocería
+      ctx.fillStyle = '#c33';
+      ctx.fillRect(-p.r, -p.r * 0.55, p.r * 2, p.r * 1.1);
+      // techo
+      ctx.fillStyle = '#822';
+      ctx.fillRect(-p.r * 0.6, -p.r * 0.55, p.r * 1.2, p.r * 0.4);
+      // ventanas
+      ctx.fillStyle = '#9cf';
+      ctx.fillRect(-p.r * 0.55, -p.r * 0.5, p.r * 0.5, p.r * 0.3);
+      ctx.fillRect(p.r * 0.05, -p.r * 0.5, p.r * 0.5, p.r * 0.3);
+      // ruedas
+      ctx.fillStyle = '#111';
+      ctx.beginPath(); ctx.arc(-p.r * 0.6, p.r * 0.55, p.r * 0.28, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(p.r * 0.6, p.r * 0.55, p.r * 0.28, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#666';
+      ctx.beginPath(); ctx.arc(-p.r * 0.6, p.r * 0.55, p.r * 0.13, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(p.r * 0.6, p.r * 0.55, p.r * 0.13, 0, Math.PI * 2); ctx.fill();
+      // luces
+      ctx.fillStyle = '#ff8';
+      ctx.fillRect(p.r * 0.85, -p.r * 0.35, p.r * 0.15, p.r * 0.2);
+      ctx.restore();
+    }
     if (p.type === 'goldenray') {
       // rayo dorado (haz alargado)
       const len = 24;
@@ -2347,6 +2514,16 @@ function draw() {
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 5, 0, Math.PI * 2); ctx.stroke();
     }
+    if (e.rocks && e.rocks.length > 0) {
+      e.rocks.forEach(r => {
+        const grow = 3 + Math.min(5, r.ticks / 100);
+        ctx.fillStyle = '#8a6b3a';
+        ctx.beginPath(); ctx.arc(e.x + r.ox, e.y + r.oy, grow, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#5a3e1f';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      });
+    }
     if (e.markCoins && !e.ally) {
       ctx.fillStyle = '#fc4';
       ctx.font = 'bold 11px monospace';
@@ -2563,6 +2740,125 @@ function draw() {
     ctx.textAlign = 'center';
     ctx.fillText(`NIEBLA TOTAL — ${(smokeFogTimer / 60).toFixed(1)}s`, W / 2, 30);
     ctx.textAlign = 'left';
+  }
+
+  // Wonder of U ultimate cutscene
+  if (wonderUltPhase === 1) {
+    const t = 1 - wonderUltTimer / 60;
+    ctx.fillStyle = `rgba(140, 10, 20, ${t * 0.85})`;
+    ctx.fillRect(0, 0, W, H);
+  } else if (wonderUltPhase === 2) {
+    const progress = 1 - wonderUltTimer / 180;
+    // Fondo rojo intenso
+    ctx.fillStyle = `rgba(110, 8, 14, 0.97)`;
+    ctx.fillRect(0, 0, W, H);
+    // Callejón con perspectiva — punto de fuga arriba-centro
+    const vpx = W / 2, vpy = H * 0.42;
+    // sombras laterales (paredes)
+    ctx.fillStyle = `rgba(50, 4, 8, 0.7)`;
+    ctx.beginPath();
+    ctx.moveTo(0, 0); ctx.lineTo(vpx - 90, vpy); ctx.lineTo(vpx - 90, H); ctx.lineTo(0, H);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(W, 0); ctx.lineTo(vpx + 90, vpy); ctx.lineTo(vpx + 90, H); ctx.lineTo(W, H);
+    ctx.closePath(); ctx.fill();
+    // líneas del piso convergiendo
+    ctx.strokeStyle = `rgba(0, 0, 0, 0.85)`;
+    ctx.lineWidth = 2;
+    for (let i = -7; i <= 7; i++) {
+      if (i === 0) continue;
+      const x0 = W / 2 + i * 90;
+      ctx.beginPath();
+      ctx.moveTo(x0, H);
+      ctx.lineTo(vpx, vpy);
+      ctx.stroke();
+    }
+    // edificios en paredes — outlines sketchy
+    ctx.strokeStyle = `rgba(0, 0, 0, 0.95)`;
+    ctx.lineWidth = 3;
+    for (let s = -1; s <= 1; s += 2) {
+      for (let i = 0; i < 5; i++) {
+        const xF = (s < 0) ? (i * 80) : (W - (i + 1) * 80);
+        const yT = (vpy * 0.4) + i * 30;
+        const xR = (s < 0) ? Math.max(0, vpx - 110 - (5 - i) * 6) : Math.min(W, vpx + 110 + (5 - i) * 6);
+        // building outline (simplified rectangle)
+        ctx.strokeRect(Math.min(xF, xR), yT, Math.abs(xR - xF), H - yT);
+        // ventanas
+        for (let w = 0; w < 2; w++) {
+          for (let h = 0; h < 3; h++) {
+            const wx = Math.min(xF, xR) + 18 + w * 30;
+            const wy = yT + 15 + h * 35;
+            ctx.strokeRect(wx, wy, 18, 22);
+          }
+        }
+      }
+    }
+    // luz amarilla brillante al fondo del callejón
+    const lightG = ctx.createRadialGradient(vpx, vpy + 40, 5, vpx, vpy + 40, 280);
+    lightG.addColorStop(0, 'rgba(255, 240, 160, 1)');
+    lightG.addColorStop(0.4, 'rgba(255, 180, 60, 0.7)');
+    lightG.addColorStop(1, 'rgba(255, 100, 30, 0)');
+    ctx.fillStyle = lightG;
+    ctx.beginPath(); ctx.arc(vpx, vpy + 40, 280, 0, Math.PI * 2); ctx.fill();
+    // farol rojo colgante arriba
+    const lampY = 90;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(vpx - 2, 0, 4, lampY - 30);
+    ctx.fillStyle = `rgba(255, 60, 30, ${0.9 + 0.1 * Math.sin(frame * 0.3)})`;
+    ctx.beginPath(); ctx.arc(vpx, lampY, 38, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(vpx, lampY, 38, 0, Math.PI * 2); ctx.stroke();
+    // glow del farol
+    const lampGlow = ctx.createRadialGradient(vpx, lampY, 10, vpx, lampY, 180);
+    lampGlow.addColorStop(0, 'rgba(255, 80, 30, 0.45)');
+    lampGlow.addColorStop(1, 'rgba(255, 60, 20, 0)');
+    ctx.fillStyle = lampGlow;
+    ctx.beginPath(); ctx.arc(vpx, lampY, 180, 0, Math.PI * 2); ctx.fill();
+    // Jugador en ROJO BRILLANTE (silueta heroica)
+    const heroX = W / 2, heroY = H * 0.72;
+    const heroR = player.r * (3 + progress * 0.8);
+    const heroGlow = ctx.createRadialGradient(heroX, heroY, heroR, heroX, heroY, heroR * 3.2);
+    heroGlow.addColorStop(0, 'rgba(255, 50, 30, 0.7)');
+    heroGlow.addColorStop(1, 'rgba(255, 0, 0, 0)');
+    ctx.fillStyle = heroGlow;
+    ctx.beginPath(); ctx.arc(heroX, heroY, heroR * 3.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#f23';
+    ctx.beginPath(); ctx.arc(heroX, heroY, heroR, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(heroX, heroY, heroR, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(heroX - heroR * 0.3, heroY - heroR * 0.35, heroR * 0.22, 0, Math.PI * 2); ctx.fill();
+    // "WONDER OF U" — texto dramático
+    const pulse = 0.88 + 0.12 * Math.sin(frame * 0.35);
+    ctx.save();
+    ctx.font = 'bold 90px monospace';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0, 0, 0, 1)';
+    ctx.shadowBlur = 22;
+    ctx.fillStyle = `rgba(255, 230, 90, ${pulse})`;
+    ctx.fillText('WONDER OF U', W / 2, H * 0.94);
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = `rgba(0, 0, 0, 0.95)`;
+    ctx.lineWidth = 5;
+    ctx.strokeText('WONDER OF U', W / 2, H * 0.94);
+    ctx.restore();
+    ctx.textAlign = 'left';
+    // "CALAMIDAD" pequeño arriba
+    if (progress > 0.4) {
+      const a = Math.min(1, (progress - 0.4) * 2);
+      ctx.save();
+      ctx.font = 'bold 32px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = `rgba(255, 240, 240, ${a})`;
+      ctx.strokeStyle = `rgba(0, 0, 0, ${a})`;
+      ctx.lineWidth = 4;
+      ctx.strokeText('— CALAMIDAD —', W / 2, 40);
+      ctx.fillText('— CALAMIDAD —', W / 2, 40);
+      ctx.restore();
+      ctx.textAlign = 'left';
+    }
   }
 
   // Burbujas Infinitas ultimate
@@ -2825,6 +3121,17 @@ function drawUI() {
       ctx.fillText(`L Clones: LISTO`, 440, 33);
     }
   }
+  if (active === 20) {
+    ctx.fillStyle = wonderCarsMode ? '#c30' : '#a85';
+    ctx.fillText(`N ${wonderCarsMode ? 'CARROS' : 'ROCAS'}`, 280, 33);
+    if (wonderUltCD > 0) {
+      ctx.fillStyle = '#888';
+      ctx.fillText(`X Calamidad: ${(wonderUltCD / 60).toFixed(0)}s`, 440, 33);
+    } else {
+      ctx.fillStyle = '#c30';
+      ctx.fillText(`X Calamidad: LISTO`, 440, 33);
+    }
+  }
   if (active === 15) {
     if (vortexUltCD > 0) {
       ctx.fillStyle = '#888';
@@ -2900,7 +3207,7 @@ function drawUI() {
   // hotbar
   const hbY = H - 70;
   ABILITIES.forEach((ab, i) => {
-    const x = 20 + i * 32;
+    const x = 20 + i * 31;
     const isOwned = owned.has(i);
     const isActive = active === i;
     ctx.fillStyle = isOwned ? (isActive ? '#335' : '#223') : '#111';
@@ -2911,7 +3218,7 @@ function drawUI() {
     ctx.lineWidth = 1;
     ctx.fillStyle = isOwned ? '#fff' : '#555';
     ctx.font = 'bold 9px monospace';
-    const keyLabels = ['1','2','3','4','5','6','7','8','9','0','-','=',']','[','\\','/',';',"'",',','.'];
+    const keyLabels = ['1','2','3','4','5','6','7','8','9','0','-','=',']','[','\\','/',';',"'",',','.','`'];
     ctx.fillText(keyLabels[i] || '?', x + 2, hbY + 11);
     ctx.fillStyle = isOwned ? ab.color : '#333';
     ctx.beginPath(); ctx.arc(x + 13, hbY + 32, 5, 0, Math.PI * 2); ctx.fill();
@@ -3064,6 +3371,7 @@ function restart() {
   vortexUltCD = 0; goldenRatioTimer = 0; whiteFlashTimer = 0;
   bubbleBulletMode = false; bubbleUltCD = 0; bubbleUltPhase = 0; bubbleUltTimer = 0;
   bubbleUltClones = [];
+  wonderCarsMode = false; wonderUltCD = 0; wonderUltPhase = 0; wonderUltTimer = 0;
   gameOver = false; paused = false; shopOpen = false;
   shopEl.style.display = 'none';
   sandboxPanel.style.display = 'none';
