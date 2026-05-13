@@ -229,13 +229,13 @@ const ABILITIES = [
     desc: 'Dash veloz que atraviesa enemigos. Los que mata se vuelven aliados 30s.', color: '#6fa' },
   { id: 'mirage',      name: '15. Espejismo Dorado',       cost: 1000,
     desc: 'Balas doradas. K: bala que atraviesa todo y convierte enemigos en señuelos que reflejan.', color: '#fd0' },
-  { id: 'vortex',      name: '16. Pistola Vórtice',        cost: 1200,
-    desc: 'Rayos dorados que atraviesan todo. V: bala pequeña + golden ratio, todo se para 2s.', color: '#fd6' },
-  { id: 'detonate',    name: '17. Asalto Detonante',       cost: 2000,
+  { id: 'vortex',      name: '16. Pistola Vórtice',        cost: 3000,
+    desc: 'Rayos dorados que atraviesan todo. V: cutscene Tusk Act 4 + Golden Ratio mata todo (CD 90s).', color: '#fd6' },
+  { id: 'detonate',    name: '17. Asalto Detonante',       cost: 1200,
     desc: 'Bombas azules teledirigidas con daño en área. G: detona todos los enemigos (CD 2min).', color: '#4af' },
   { id: 'smoke',       name: '18. Cortina de Humo',        cost: 2500,
     desc: 'Bombas de humo que dañan. H: niebla total 5s — invulnerable, rápido, dañas a todos.', color: '#bbb' },
-  { id: 'rewind',      name: '19. Carmesí Inmortal',       cost: 3000,
+  { id: 'rewind',      name: '19. Carmesí Inmortal',       cost: 2000,
     desc: 'Balas rojas potentes. T: 30s inmortal + tiempo parado, enemigos futuros aparecen en centro.', color: '#d02' },
   { id: 'bubble',      name: '20. Burbujas Infinitas',     cost: 4500,
     desc: 'Puños fuertes. N: balas que paralizan/ciegan/resbalan. L: ejército de clones con burbujas mortales (CD 2min).', color: '#9ff' },
@@ -291,6 +291,8 @@ let mirageCD = 0;
 const decoys = [];
 
 let vortexUltCD = 0;
+let vortexUltPhase = 0;
+let vortexUltTimer = 0;
 let goldenRatioTimer = 0;
 let whiteFlashTimer = 0;
 
@@ -484,9 +486,9 @@ function updatePlayer() {
     });
     smokeFogTimer--;
   }
-  // Bastión Inmóvil: equipado en slot 6 (idx 5)
+  // Bastión Inmóvil: equipado en slot 7 (idx 6)
   const moving = !!(dx || dy);
-  if (active === 5) {
+  if (active === 6) {
     if (shieldCD > 0) {
       shieldCD--;
       shieldActive = false;
@@ -612,18 +614,10 @@ function updatePlayer() {
     }
   }
   if (active === 15 && keyPressed['v'] && vortexUltCD <= 0) {
-    const ang = aimAngle();
-    projectiles.push({
-      x: player.x + Math.cos(ang) * 18, y: player.y + Math.sin(ang) * 18,
-      vx: Math.cos(ang) * 14, vy: Math.sin(ang) * 14,
-      r: 7, hitR: 55, dmg: 999999, life: 240, type: 'phibullet', color: '#fff',
-      hits: new Set(), trail: []
-    });
     vortexUltCD = 60 * 90;
-    goldenRatioTimer = 120;
-    whiteFlashTimer = 180;
-    timeStopTimer = Math.max(timeStopTimer, 120);
-    shake = 28;
+    vortexUltPhase = 1;
+    vortexUltTimer = 60;
+    shake = 22;
   }
   if (active === 14 && keyPressed['k'] && mirageCD <= 0) {
     const ang = aimAngle();
@@ -650,6 +644,35 @@ function updatePlayer() {
   if (webModeCD > 0) webModeCD--;
   if (mirageCD > 0) mirageCD--;
   if (vortexUltCD > 0) vortexUltCD--;
+  if (vortexUltPhase === 1) {
+    vortexUltTimer--;
+    if (vortexUltTimer <= 0) {
+      vortexUltPhase = 2;
+      vortexUltTimer = 180;
+      timeStopTimer = Math.max(timeStopTimer, 200);
+    }
+  } else if (vortexUltPhase === 2) {
+    vortexUltTimer--;
+    if (vortexUltTimer <= 0) {
+      // Phase 3: phi bullet barrer + white flash + matar todo
+      whiteFlashTimer = 90;
+      enemies.forEach(e => {
+        if (e.ally) return;
+        effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 36, max: 36, r: 0, color: '#fd6' });
+        effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 24, max: 24, r: 0, color: '#fff' });
+        for (let p = 0; p < 14; p++) {
+          particles.push({
+            x: e.x, y: e.y,
+            vx: rand(-10, 10), vy: rand(-10, 10),
+            life: 40, max: 40, color: rand(0,1) > 0.5 ? '#fd6' : '#fff', r: 4
+          });
+        }
+        damageEnemy(e, 999999, '#fd6');
+      });
+      vortexUltPhase = 0;
+      shake = 30;
+    }
+  }
   if (goldenRatioTimer > 0) goldenRatioTimer--;
   if (whiteFlashTimer > 0) whiteFlashTimer--;
   if (bubbleUltCD > 0) bubbleUltCD--;
@@ -2742,6 +2765,123 @@ function draw() {
     ctx.textAlign = 'left';
   }
 
+  // Pistola Vórtice ultimate — TUSK ACT 4
+  if (vortexUltPhase === 1) {
+    const t = 1 - vortexUltTimer / 60;
+    ctx.fillStyle = `rgba(40, 25, 5, ${t * 0.85})`;
+    ctx.fillRect(0, 0, W, H);
+  } else if (vortexUltPhase === 2) {
+    const progress = 1 - vortexUltTimer / 180;
+    // fondo negro-dorado
+    ctx.fillStyle = `rgba(12, 8, 2, 0.97)`;
+    ctx.fillRect(0, 0, W, H);
+    const cx = W / 2, cy = H * 0.5;
+    // rayos de luz dorada desde el centro
+    ctx.strokeStyle = `rgba(255, 200, 60, ${0.25 + 0.1 * Math.sin(frame * 0.2)})`;
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 48; i++) {
+      const ang = (i / 48) * Math.PI * 2 + frame * 0.008;
+      const d1 = 100;
+      const d2 = 1300;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(ang) * d1, cy + Math.sin(ang) * d1);
+      ctx.lineTo(cx + Math.cos(ang) * d2, cy + Math.sin(ang) * d2);
+      ctx.stroke();
+    }
+    // espirales del GOLDEN RATIO multicapa
+    for (let s = 0; s < 4; s++) {
+      const startScale = 2 + s * 5;
+      const rotOff = frame * (0.006 - s * 0.001) + s * Math.PI / 2;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(rotOff);
+      ctx.strokeStyle = `rgba(255, ${200 + s * 12}, ${60 + s * 25}, ${0.75 - s * 0.15})`;
+      ctx.lineWidth = 4 - s * 0.7;
+      ctx.shadowColor = `rgba(255, 200, 60, 0.9)`;
+      ctx.shadowBlur = 22;
+      ctx.beginPath();
+      const b = 0.30635; // ln(phi) / (pi/2)
+      for (let tt = 0; tt < 7 * Math.PI; tt += 0.04) {
+        const r = startScale * Math.exp(b * tt);
+        if (r > 360) break;
+        const x = r * Math.cos(tt);
+        const y = r * Math.sin(tt);
+        if (tt === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+    // bala dorada central — la Bala del Infinito
+    const bulletR = 6 + progress * 36;
+    const bGrd = ctx.createRadialGradient(cx, cy, 0, cx, cy, bulletR * 3);
+    bGrd.addColorStop(0, `rgba(255, 255, 220, ${progress})`);
+    bGrd.addColorStop(0.4, `rgba(255, 230, 100, ${0.85 * progress})`);
+    bGrd.addColorStop(1, `rgba(255, 200, 50, 0)`);
+    ctx.fillStyle = bGrd;
+    ctx.beginPath(); ctx.arc(cx, cy, bulletR * 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(cx, cy, bulletR, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#fd6';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(cx, cy, bulletR, 0, Math.PI * 2); ctx.stroke();
+    // bala girando — añadir un anillo de pequeñas balas orbitando
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + frame * 0.12;
+      const r = bulletR * 2.6;
+      const bx = cx + Math.cos(a) * r;
+      const by = cy + Math.sin(a) * r;
+      ctx.fillStyle = `rgba(255, 235, 120, ${progress})`;
+      ctx.beginPath(); ctx.arc(bx, by, 4, 0, Math.PI * 2); ctx.fill();
+    }
+    // héroe en silueta dorada abajo
+    const pX = W * 0.18, pY = H * 0.78;
+    const pR = 55;
+    const pGrd = ctx.createRadialGradient(pX, pY, pR * 0.5, pX, pY, pR * 2.4);
+    pGrd.addColorStop(0, 'rgba(255, 200, 60, 0.6)');
+    pGrd.addColorStop(1, 'rgba(255, 150, 30, 0)');
+    ctx.fillStyle = pGrd;
+    ctx.beginPath(); ctx.arc(pX, pY, pR * 2.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fd6';
+    ctx.beginPath(); ctx.arc(pX, pY, pR, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(pX, pY, pR, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(pX - pR * 0.3, pY - pR * 0.36, pR * 0.22, 0, Math.PI * 2); ctx.fill();
+    // TUSK ACT 4 — texto dramático
+    const pulse = 0.9 + 0.1 * Math.sin(frame * 0.35);
+    ctx.save();
+    ctx.font = 'bold 130px monospace';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(255, 180, 30, 0.95)';
+    ctx.shadowBlur = 38;
+    ctx.fillStyle = `rgba(255, 220, 90, ${pulse})`;
+    ctx.fillText('TUSK', W * 0.74, H * 0.34);
+    ctx.fillText('ACT 4', W * 0.74, H * 0.58);
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = `rgba(0, 0, 0, 0.9)`;
+    ctx.lineWidth = 6;
+    ctx.strokeText('TUSK', W * 0.74, H * 0.34);
+    ctx.strokeText('ACT 4', W * 0.74, H * 0.58);
+    ctx.restore();
+    ctx.textAlign = 'left';
+    // subtítulo
+    if (progress > 0.3) {
+      const a = Math.min(1, (progress - 0.3) * 2);
+      ctx.save();
+      ctx.font = 'bold 28px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = `rgba(255, 230, 130, ${a})`;
+      ctx.strokeStyle = `rgba(0, 0, 0, ${a})`;
+      ctx.lineWidth = 4;
+      ctx.strokeText('— INFINITE ROTATION —', W / 2, H * 0.94);
+      ctx.fillText('— INFINITE ROTATION —', W / 2, H * 0.94);
+      ctx.restore();
+      ctx.textAlign = 'left';
+    }
+  }
+
   // Wonder of U ultimate cutscene
   if (wonderUltPhase === 1) {
     const t = 1 - wonderUltTimer / 60;
@@ -3135,12 +3275,15 @@ function drawUI() {
     }
   }
   if (active === 15) {
-    if (vortexUltCD > 0) {
+    if (vortexUltPhase > 0) {
+      ctx.fillStyle = '#fd6';
+      ctx.fillText(`✨ TUSK ACT 4`, 280, 33);
+    } else if (vortexUltCD > 0) {
       ctx.fillStyle = '#888';
-      ctx.fillText(`V Phi: ${(vortexUltCD / 60).toFixed(0)}s`, 280, 33);
+      ctx.fillText(`V Tusk Act 4: ${(vortexUltCD / 60).toFixed(0)}s`, 280, 33);
     } else {
       ctx.fillStyle = '#fd6';
-      ctx.fillText(`V Phi: LISTO`, 280, 33);
+      ctx.fillText(`V Tusk Act 4: LISTO`, 280, 33);
     }
   }
   if (active === 14) {
@@ -3370,7 +3513,8 @@ function restart() {
   webModeTimer = 0; webModeCD = 0;
   redModeTimer = 0; preKillCredits = 0;
   mirageCD = 0; decoys.length = 0;
-  vortexUltCD = 0; goldenRatioTimer = 0; whiteFlashTimer = 0;
+  vortexUltCD = 0; vortexUltPhase = 0; vortexUltTimer = 0;
+  goldenRatioTimer = 0; whiteFlashTimer = 0;
   bubbleBulletMode = false; bubbleUltCD = 0; bubbleUltPhase = 0; bubbleUltTimer = 0;
   bubbleUltClones = [];
   wonderCarsMode = false; wonderUltCD = 0; wonderUltPhase = 0; wonderUltTimer = 0;
