@@ -106,6 +106,9 @@
     <button id="sb-raid-brutal" style="background:#fd6;">🦁 Invocar Raid BRUTAL</button>
     <button id="sb-raid-nightmare" style="background:#f44;">💀 Invocar Raid PESADILLA</button>
   </div>
+  <div class="row" style="margin-top:4px;">
+    <button id="sb-darkness" style="background:#000; color:#fff; box-shadow:0 0 8px #fff;">🌑 OSCURIDAD ABSOLUTA</button>
+  </div>
   <label>Daño del jugador: <span class="val" id="sb-pdmg-v">1.0×</span></label>
   <input type="range" id="sb-pdmg" min="0.1" max="50" step="0.1" value="1">
   <label>Velocidad enemigos: <span class="val" id="sb-espd-v">1.0×</span></label>
@@ -269,7 +272,7 @@ const ABILITIES = [
   { id: 'rewind',      name: '18. Carmesí Inmortal (King Crimson)', cost: 1010,
     desc: 'Puños carmesí brutales que golpean en área. T: 10s inmortal + tiempo borrado, los enemigos del futuro aparecen en el centro (CD 90s).', color: '#d02' },
   { id: 'vortex',      name: '19. Tusk',                   cost: 3000,
-    desc: 'Stand evolutivo de Johnny Joestar. Act 1: uñas giratorias básicas. 500 kills → Act 2 (uñas más fuertes + Y: NAIL STORM). 1000 kills → Act 3 (uñas-wormhole que perforan dimensiones + Z: WORMHOLE PUNCH). 3000 kills → Act 4 (rayos dorados + V: GOLDEN RATIO). T: cicla entre Actos desbloqueados.', color: '#fd6' },
+    desc: 'Stand evolutivo de Johnny Joestar. Act 1: par de uñas en V que perforan 1 + U: TORNADO DE UÑAS (16 uñas en 360°). 500 kills → Act 2 (uñas más fuertes + Y: NAIL STORM). 1000 kills → Act 3 (uñas-wormhole que perforan dimensiones + Z: WORMHOLE PUNCH). 3000 kills → Act 4 (rayos dorados + V: GOLDEN RATIO). T: cicla entre Actos desbloqueados.', color: '#fd6' },
   { id: 'd4c',         name: '20. D4C',                    cost: 2200,
     desc: 'Lanza copias dimensionales en paralelo: 3 estrellas que atraviesan enemigos desde universos alternos. L: LOVE TRAIN — cutscene + 10s de barrera de rayos dorados que te cubre: refleja balas enemigas (×4 daño) y daña/empuja a todo enemigo que toca el halo (CD 90s).', color: '#f06' },
   { id: 'starplatinum', name: '21. Star Platinum',         cost: 1800,
@@ -304,12 +307,18 @@ let noCooldowns = false; // sandbox: ignora todos los cooldowns
 let bloodMoon = false;   // evento luna de sangre (oleadas nocturnas)
 let bloodMoonWave = -1;  // wave en la que se activó
 let coinRainTimer = 0;   // frames restantes de lluvia de monedas
+let darknessMode = false; // Oscuridad Absoluta (5% ola final de noche)
+let darknessWave = -1;
 let raidAnnounceTimer = 0;
 let raidAnnounceText = '';
 let raidAnnounceColor = '#fd6';
 // power-up activos del jugador
 let puDmgTimer = 0, puRateTimer = 0, puInvulnTimer = 0, puMagnetTimer = 0;
 const pibPuddles = []; // Paint It Black: charcos negros (de noche con contorno arcoíris)
+const pibGiants = [];  // clones gigantes arcoíris (ult de oscuridad)
+let pibForm = 0;       // 0 = balas, 1 = puños de pintura
+let pibGiantCD = 0;
+let pibGiantPhase = 0;
 let pibLetterCD = 0;
 let pibDayPhase = 0;   // 0 idle, 1 carga + bala gigante, 2 cutscene texto, 3 corazones X, 4 muerte
 let pibDayTimer = 0;
@@ -411,9 +420,12 @@ const TUSK_COLORS = ['', '#fea', '#fd9', '#fc7', '#fd6'];
 let tuskA1Kills = 0;
 let tuskA2Kills = 0;
 let tuskA3Kills = 0;
+let tuskA1Flash = 0;
 let tuskA2Flash = 0;
 let tuskA3Flash = 0;
 let tuskA4Flash = 0;
+let tuskA1UltCD = 0;
+let tuskA1UltTimer = 0;
 let tuskNailStormCD = 0;
 let tuskNailStormPhase = 0;
 let tuskNailStormTimer = 0;
@@ -514,6 +526,21 @@ function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 function distSq(a, b) { const dx = a.x - b.x, dy = a.y - b.y; return dx * dx + dy * dy; }
 function angleBetween(a, b) { return Math.atan2(b.y - a.y, b.x - a.x); }
 function aimAngle() { return Math.atan2(mouse.y - player.y, mouse.x - player.x); }
+// Devuelve color + alpha como #RGBA / #RRGGBBAA válido. alpha en [0,1].
+// Concatenar '#fd6' + 'aa' = '#fd6aa' (5 hex = inválido). Esto evita ese bug.
+function withAlpha(color, alpha) {
+  const a = Math.max(0, Math.min(15, Math.round(alpha * 15))).toString(16);
+  return color.length === 4 ? color + a : color + a + a; // #RGB → #RGBA, #RRGGBB → #RRGGBBAA
+}
+
+// Aplica daño al jugador respetando iframe, escudo y Love Train. Devuelve true si pegó.
+function tryDamagePlayer(amount, iframeDur, shakeAmount) {
+  if (player.iframe > 0 || shieldActive || ltActiveTimer > 0) return false;
+  player.hp -= amount;
+  player.iframe = iframeDur;
+  shake = Math.max(shake, shakeAmount);
+  return true;
+}
 
 // Day/Night cycle: cada 5 oleadas alterna. 1-5 día, 6-10 noche, 11-15 día, ...
 // En sandbox, sandboxNightOverride puede forzar 'day' o 'night'.
@@ -549,6 +576,7 @@ const ENEMY_TYPES = {
   pucci:      { hp: 130000, speed: 0.5, dmg: 60, r: 50, color: '#e8f', coins: 4500, ranged: true,  bossKind: 'pucci',      bossName: 'WHITESNAKE' },
   valentine:  { hp: 100000, speed: 0.7, dmg: 70, r: 45, color: '#f55', coins: 4000,                bossKind: 'valentine',  bossName: 'D4C' },
   wonderofu:  { hp: 150000, speed: 0.4, dmg: 80, r: 52, color: '#79d', coins: 5000,                bossKind: 'wonderofu',  bossName: 'WONDER OF U', armor: 0.4 },
+  darkboss:   { hp: 200000, speed: 0.45, dmg: 95, r: 58, color: '#111', coins: 7000, ranged: true,  bossKind: 'vampire',    bossName: 'DEVORADOR DE LUZ' },
   tuskslayer: { hp: 60000,  speed: 0.25, dmg: 65, r: 50, color: '#806', coins: 5500, ranged: true, bossKind: 'tuskslayer', bossName: 'CAZADOR DE TUSK', armor: 0, tuskOnly: true },
 };
 const BOSS_CYCLE = ['boss', 'chronos', 'vampire', 'summoner', 'mirror', 'juggernaut', 'warlord',
@@ -634,9 +662,7 @@ function applyPowerup(type) {
 
 function spawnRaidBoss(tier) {
   // tier: 'brutal' o 'nightmare'
-  const bossTypes = ['boss', 'chronos', 'vampire', 'summoner', 'mirror', 'juggernaut', 'warlord',
-                     'jdio', 'kira', 'diavolo', 'pucci', 'valentine', 'wonderofu'];
-  const type = bossTypes[Math.floor(Math.random() * bossTypes.length)];
+  const type = BOSS_CYCLE[Math.floor(Math.random() * BOSS_CYCLE.length)];
   spawnEnemy(type);
   const e = enemies[enemies.length - 1];
   if (!e) return;
@@ -693,10 +719,26 @@ function spawnCoinRain(amount) {
   shake = Math.max(shake, 14);
 }
 
+function triggerDarknessMode() {
+  darknessMode = true;
+  darknessWave = wave;
+  spawnZombieHorde(20);
+  spawnEnemy('darkboss');
+  raidAnnounceText = '🌑 OSCURIDAD ABSOLUTA 🌑';
+  raidAnnounceColor = '#fff';
+  raidAnnounceTimer = 260;
+  shake = Math.max(shake, 30);
+  effects.push({ type: 'flash', life: 40, max: 40, color: '#000' });
+  // Buff de PIB: +400 HP máx + full heal si tienes PIB
+  if (owned.has(27)) {
+    player.maxHp += 400;
+    player.hp = player.maxHp;
+    effects.push({ type: 'heal', life: 60, max: 60 });
+  }
+}
+
 function spawnBossRush() {
-  const allBosses = ['boss', 'chronos', 'vampire', 'summoner', 'mirror', 'juggernaut', 'warlord',
-                     'jdio', 'kira', 'diavolo', 'pucci', 'valentine', 'wonderofu'];
-  allBosses.forEach(b => spawnEnemy(b));
+  BOSS_CYCLE.forEach(b => spawnEnemy(b));
   raidAnnounceText = '⚔ BOSS RUSH ⚔';
   raidAnnounceColor = '#f48';
   raidAnnounceTimer = 180;
@@ -791,6 +833,12 @@ function startWave() {
   } else if (bloodMoonWave !== wave) {
     bloodMoon = false;
   }
+  // ===== Oscuridad Absoluta: 5% en la ola final de cada noche (wave % 10 === 0) =====
+  if (isNightWave(wave) && wave % 10 === 0 && darknessWave !== wave && Math.random() < 0.05) {
+    triggerDarknessMode();
+  } else if (darknessWave !== wave) {
+    darknessMode = false;
+  }
   // ===== Lluvia de monedas aleatoria: 4% por ola =====
   if (Math.random() < 0.04) {
     setTimeout(() => spawnCoinRain(8), 1000);
@@ -857,6 +905,7 @@ function updatePlayer() {
     if (player.slowed > 0) mult *= 0.35;
     if (active === 26 && standForm === 2) mult *= 2.2;   // Made in Heaven: pasivo súper veloz
     if (mihSpeedBoost > 0) mult *= 1.6;                   // tras la cutscene: ×3.5 total
+    if (active === 27 && darknessMode) mult *= 4.5;       // PIB en oscuridad: velocidad bestia
     const sp = player.speed * mult;
     player.x += (dx / m) * sp;
     player.y += (dy / m) * sp;
@@ -1107,6 +1156,27 @@ function updatePlayer() {
       effects.push({ type: 'flash', life: 14, max: 14, color: TUSK_COLORS[tuskAct] });
     }
   }
+  if (active === 18 && tuskAct === 1 && keyPressed['u'] && tuskA1UltCD <= 0) {
+    // Tusk Act 1 — TORNADO DE UÑAS: 16 uñas en 360° alrededor del jugador
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      const sp = 10 + Math.random() * 2;
+      projectiles.push({
+        x: player.x + Math.cos(a) * 18,
+        y: player.y + Math.sin(a) * 18,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        r: 8, dmg: 200, life: 80,
+        type: 'tusknail', color: '#fea',
+        pierce: 2, hits: new Set(), angle: a, trail: []
+      });
+    }
+    tuskA1UltCD = 60 * 12;
+    tuskA1UltTimer = 22;
+    tuskA1Flash = 22;
+    shake = 14;
+    effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 22, max: 22, r: 0, color: '#fea' });
+    effects.push({ type: 'flash', life: 12, max: 12, color: '#fea' });
+  }
   if (active === 18 && tuskAct === 2 && keyPressed['y'] && tuskNailStormCD <= 0) {
     // Tusk Act 2 — NAIL BARRAGE: ráfaga inmediata en cono hacia donde apuntas
     const baseAng = aimAngle();
@@ -1206,6 +1276,29 @@ function updatePlayer() {
     nkcCD = 60 * 18;
     shake = 12;
   }
+  if (active === 27 && keyPressed['l']) {
+    // Paint It Black — cambiar moveset (balas ↔ puños de pintura)
+    pibForm = pibForm === 0 ? 1 : 0;
+    effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 20, max: 20, r: 0, color: '#000' });
+    effects.push({ type: 'flash', life: 14, max: 14, color: pibForm === 1 ? '#fff' : '#000' });
+  }
+  if (active === 27 && darknessMode && keyPressed['n'] && pibGiantCD <= 0 && pibGiantPhase === 0) {
+    // PIB Oscuridad — CLON GIGANTE ARCOÍRIS: aparece 1/4 de mapa, rebota y mata todo
+    pibGiantCD = 60 * 60; // 60s
+    pibGiantPhase = 1;
+    const vMag = 11;
+    const ang = Math.random() * Math.PI * 2;
+    pibGiants.push({
+      x: W / 2, y: H / 2,
+      vx: Math.cos(ang) * vMag, vy: Math.sin(ang) * vMag,
+      r: 200,
+      life: 60 * 10, max: 60 * 10,
+      punchTimer: 0,
+    });
+    shake = Math.max(shake, 30);
+    effects.push({ type: 'flash', life: 32, max: 32, color: '#fff' });
+    effects.push({ type: 'shockwave', x: W / 2, y: H / 2, life: 28, max: 28, r: 0, color: '#fff' });
+  }
   if (active === 27 && keyPressed['p'] && pibLetterCD <= 0 && pibDayPhase === 0 && pibNightPhase === 0) {
     // Paint It Black — letter ability (B)
     if (isNightWave(wave)) {
@@ -1259,7 +1352,7 @@ function updatePlayer() {
     nkcCD = 0; ltCD = 0; apexCD = 0; smokeFogCD = 0; webModeCD = 0;
     mirageCD = 0; vortexUltCD = 0; pibLetterCD = 0;
     shieldCD = 0; shieldCharge = SHIELD_MAX;
-    tuskNailStormCD = 0; tuskWormholeCD = 0;
+    tuskA1UltCD = 0; tuskNailStormCD = 0; tuskWormholeCD = 0;
     wsUltCD = 0; cmUltCD = 0; mihUltCD = 0;
     bubbleUltCD = 0; wonderUltCD = 0; gerReturnCD = 0;
   }
@@ -1759,9 +1852,12 @@ function updatePlayer() {
     }
   }
 
-  // Tusk Act 2 / Act 3 cooldowns + cutscenes
+  // Tusk Act 1 / Act 2 / Act 3 cooldowns + cutscenes
+  if (tuskA1UltCD > 0) tuskA1UltCD--;
+  if (tuskA1UltTimer > 0) tuskA1UltTimer--;
   if (tuskNailStormCD > 0) tuskNailStormCD--;
   if (tuskWormholeCD > 0) tuskWormholeCD--;
+  if (tuskA1Flash > 0) tuskA1Flash--;
   if (tuskA2Flash > 0) tuskA2Flash--;
   if (tuskA3Flash > 0) tuskA3Flash--;
   if (tuskA4Flash > 0) tuskA4Flash--;
@@ -1825,7 +1921,7 @@ function updatePlayer() {
 
 function getAttackCD() {
   if (active === 26) return [280, 200, 90][standForm];
-  if (active === 18) return [0, 320, 280, 240, 250][tuskAct];
+  if (active === 18) return [0, 220, 280, 240, 250][tuskAct];
   if (active === 27) return isNightWave(wave) ? 180 : 320;
   return [340, 260, 500, 0, 280, 320, 600, 300, 200, 260, 280, 700, 280, 280, 360, 380, 520, 240, 250, 320, 520, 250, 380, 320, 110, 320][active];
 }
@@ -2395,11 +2491,58 @@ function updateFires() {
   }
 }
 
-// 28. Paint It Black — 5 balas negras que dejan charcos
+// 28. Paint It Black — forma 0: 5 balas negras; forma 1: puños que pintan
 function paintItBlackAttack(angle) {
   const night = isNightWave(wave);
-  const sp = night ? 14 : 10;
-  const dmg = night ? 220 : 130;
+  const darkMult = darknessMode ? 2.5 : 1;
+  if (pibForm === 1) {
+    // ---- Forma PUÑOS DE PINTURA: golpe en área amplia que mancha enemigos y pinta el suelo
+    const range = 52;
+    const hitR = night ? 72 : 56;
+    const dmg = (night ? 280 : 170) * darkMult;
+    const punchColor = night ? `hsl(${(frame * 12) % 360}, 100%, 60%)` : '#000';
+    const px = player.x + Math.cos(angle) * range;
+    const py = player.y + Math.sin(angle) * range;
+    // golpe (dañar + empujar)
+    for (let j = 0; j < enemies.length; j++) {
+      const e = enemies[j];
+      if (e.ally) continue;
+      const rr = hitR + e.r;
+      const dx = e.x - px, dy = e.y - py;
+      if (dx * dx + dy * dy < rr * rr) {
+        damageEnemy(e, dmg, punchColor);
+        e.vx += Math.cos(angle) * 6;
+        e.vy += Math.sin(angle) * 6;
+        // marca como tocado por el charco para que se generé el stain al salir
+        e.pibInPuddle = (e.pibInPuddle || 0) + 10;
+        e.pibLastTouch = frame;
+      }
+    }
+    effects.push({ type: 'punch', x: px, y: py, life: 12, max: 12, color: punchColor, r: hitR });
+    // pintar el piso: charco grande donde golpea
+    pibPuddles.push({
+      x: px, y: py,
+      r: hitR * 0.75,
+      life: night ? 360 : 280,
+      max: night ? 360 : 280,
+      neon: night,
+      phase: Math.random() * Math.PI * 2,
+    });
+    // gotas
+    for (let p = 0; p < 8; p++) {
+      particles.push({
+        x: px + rand(-hitR * 0.6, hitR * 0.6),
+        y: py + rand(-hitR * 0.6, hitR * 0.6),
+        vx: rand(-3, 3), vy: rand(-3, 1),
+        life: 22, max: 22,
+        color: night ? `hsl(${(frame * 10 + p * 45) % 360}, 100%, 60%)` : '#000', r: 3
+      });
+    }
+    return;
+  }
+  // ---- Forma BALAS (original)
+  const sp = darknessMode ? 18 : (night ? 14 : 10);
+  const dmg = (night ? 220 : 130) * darkMult;
   for (let i = -2; i <= 2; i++) {
     const a = angle + i * 0.10;
     projectiles.push({
@@ -2508,6 +2651,60 @@ function updatePibPuddles() {
       }
     }
   }
+}
+
+// 28. Paint It Black — clones gigantes arcoíris (ult de oscuridad N)
+function updatePibGiants() {
+  if (pibGiantCD > 0) pibGiantCD--;
+  for (let i = pibGiants.length - 1; i >= 0; i--) {
+    const g = pibGiants[i];
+    g.life--;
+    g.x += g.vx;
+    g.y += g.vy;
+    if (g.x < g.r) { g.x = g.r; g.vx = Math.abs(g.vx); }
+    if (g.x > W - g.r) { g.x = W - g.r; g.vx = -Math.abs(g.vx); }
+    if (g.y < g.r) { g.y = g.r; g.vy = Math.abs(g.vy); }
+    if (g.y > H - g.r) { g.y = H - g.r; g.vy = -Math.abs(g.vy); }
+    // ráfaga de puños tipo ORA con hitbox amplificada por el tamaño
+    g.punchTimer--;
+    if (g.punchTimer <= 0) {
+      g.punchTimer = 4;
+      const a = Math.random() * Math.PI * 2;
+      const off = g.r * (0.3 + Math.random() * 0.5);
+      const px = g.x + Math.cos(a) * off;
+      const py = g.y + Math.sin(a) * off;
+      const punchR = g.r * 0.7;
+      const punchColor = `hsl(${(frame * 14) % 360}, 100%, 60%)`;
+      for (let j = enemies.length - 1; j >= 0; j--) {
+        const e = enemies[j];
+        if (e.ally) continue;
+        const rr = punchR + e.r;
+        const dx = e.x - px, dy = e.y - py;
+        if (dx * dx + dy * dy < rr * rr) {
+          damageEnemy(e, 1500, punchColor);
+          // empuje
+          e.vx += Math.cos(a) * 4;
+          e.vy += Math.sin(a) * 4;
+        }
+      }
+      effects.push({ type: 'punch', x: px, y: py, life: 14, max: 14, color: punchColor, r: punchR });
+      if (Math.random() < 0.35) {
+        effects.push({ type: 'ora', x: px, y: py - 16, life: 22, max: 22, big: Math.random() < 0.3 });
+      }
+    }
+    // partículas de estela arcoíris
+    if (frame % 2 === 0) {
+      particles.push({
+        x: g.x + rand(-g.r * 0.8, g.r * 0.8),
+        y: g.y + rand(-g.r * 0.8, g.r * 0.8),
+        vx: rand(-1, 1), vy: rand(-1, 1),
+        life: 24, max: 24,
+        color: `hsl(${(frame * 10) % 360}, 100%, 60%)`, r: 3
+      });
+    }
+    if (g.life <= 0) pibGiants.splice(i, 1);
+  }
+  if (pibGiants.length === 0 && pibGiantPhase === 1) pibGiantPhase = 0;
 }
 
 // 28. Paint It Black — letter ability (B): día = bala gigante + cutscene; noche = dash hitbox total
@@ -3119,14 +3316,17 @@ function processOraBarrage() {
 // 6. Vórtice
 function vortexAttack(angle) {
   if (tuskAct === 1) {
-    // ACT 1: una sola uña giratoria, daño moderado, sin atravesar, alcance corto
-    projectiles.push({
-      x: player.x + Math.cos(angle) * 18, y: player.y + Math.sin(angle) * 18,
-      vx: Math.cos(angle) * 11, vy: Math.sin(angle) * 11,
-      r: 7, dmg: 110, life: 55,
-      type: 'tusknail', color: '#fea',
-      pierce: 0, angle, trail: []
-    });
+    // ACT 1: par de uñas en V, perforan 1, daño 150 c/u
+    for (let i = -1; i <= 1; i += 2) {
+      const a = angle + i * 0.07;
+      projectiles.push({
+        x: player.x + Math.cos(a) * 18, y: player.y + Math.sin(a) * 18,
+        vx: Math.cos(a) * 12.5, vy: Math.sin(a) * 12.5,
+        r: 7, dmg: 150, life: 65,
+        type: 'tusknail', color: '#fea',
+        pierce: 1, hits: new Set(), angle: a, trail: []
+      });
+    }
   } else if (tuskAct === 2) {
     // ACT 2: 2 uñas en V, atraviesan 2 enemigos, daño mayor
     for (let i = -1; i <= 1; i += 2) {
@@ -4978,11 +5178,7 @@ function updateBossHazards() {
         h.detonated = true;
         const dx = player.x - h.x, dy = player.y - h.y;
         const rr = h.r + player.r;
-        if (dx*dx + dy*dy < rr*rr && player.iframe <= 0 && !shieldActive && ltActiveTimer <= 0) {
-          player.hp -= h.dmg;
-          player.iframe = 50;
-          shake = Math.max(shake, 18);
-        }
+        if (dx*dx + dy*dy < rr*rr) tryDamagePlayer(h.dmg, 50, 18);
         effects.push({ type: 'shockwave', x: h.x, y: h.y, life: 32, max: 32, r: 0, color: h.color });
         effects.push({ type: 'shockwave', x: h.x, y: h.y, life: 22, max: 22, r: 0, color: '#fff' });
         for (let s = 0; s < 14; s++) {
@@ -5007,11 +5203,7 @@ function updateBossHazards() {
       const perp = Math.abs(-sa * dxp + ca * dyp);
       const active1 = h.life > 8;     // mientras está visible
       if (active1 && along > 0 && along < h.len && perp < player.r + h.r * 0.6) {
-        if (player.iframe <= 0 && !shieldActive && ltActiveTimer <= 0) {
-          player.hp -= h.dmg;
-          player.iframe = 40;
-          shake = Math.max(shake, 16);
-        }
+        tryDamagePlayer(h.dmg, 40, 16);
       }
       // Si un rayo rojo cruza un hoyo azul → mini explosión que se daña a ambos
       if (h.type === 'tslRedRay') {
@@ -5036,11 +5228,7 @@ function updateBossHazards() {
             // daño en área al jugador si está cerca
             const pdx = player.x - cx, pdy = player.y - cy;
             const rr = 90;
-            if (pdx * pdx + pdy * pdy < rr * rr && player.iframe <= 0 && !shieldActive && ltActiveTimer <= 0) {
-              player.hp -= h.dmg * 1.4;
-              player.iframe = 50;
-              shake = Math.max(shake, 22);
-            }
+            if (pdx * pdx + pdy * pdy < rr * rr) tryDamagePlayer(h.dmg * 1.4, 50, 22);
             // ambos se detonan
             h.life = 0;
             bh.life = 0;
@@ -5059,11 +5247,7 @@ function updateBossHazards() {
       }
       // núcleo daña al contacto
       const cr = player.r + h.coreR;
-      if (dSq < cr * cr && player.iframe <= 0 && !shieldActive && ltActiveTimer <= 0) {
-        player.hp -= h.dmg;
-        player.iframe = 36;
-        shake = Math.max(shake, 12);
-      }
+      if (dSq < cr * cr) tryDamagePlayer(h.dmg, 36, 12);
     }
 
     // Eliminación
@@ -5120,19 +5304,27 @@ function draw() {
 
   // background — alterna día/noche cada 5 oleadas
   const __night = isNightWave(wave);
-  ctx.fillStyle = __night ? '#02030a' : '#0c0c22';
+  const __darkness = darknessMode;
+  ctx.fillStyle = __darkness ? '#000' : (__night ? '#02030a' : '#0c0c22');
   ctx.fillRect(0, 0, W, H);
-  ctx.strokeStyle = __night ? '#0a0a1a' : '#161636';
-  ctx.lineWidth = 1;
-  for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-  for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
-  if (__night) {
-    // luna sutil en esquina superior derecha
-    const mx = W - 60, my = 60;
-    ctx.fillStyle = 'rgba(220, 220, 240, 0.18)';
-    ctx.beginPath(); ctx.arc(mx, my, 22, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(2, 3, 10, 0.9)';
-    ctx.beginPath(); ctx.arc(mx + 8, my - 4, 20, 0, Math.PI * 2); ctx.fill();
+  if (!__darkness) {
+    ctx.strokeStyle = __night ? '#0a0a1a' : '#161636';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    if (__night) {
+      // luna sutil en esquina superior derecha
+      const mx = W - 60, my = 60;
+      ctx.fillStyle = 'rgba(220, 220, 240, 0.18)';
+      ctx.beginPath(); ctx.arc(mx, my, 22, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(2, 3, 10, 0.9)';
+      ctx.beginPath(); ctx.arc(mx + 8, my - 4, 20, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  // Modo oscuridad: halo blanco global a todo lo dibujado a partir de aquí
+  if (__darkness) {
+    ctx.shadowColor = '#fff';
+    ctx.shadowBlur = 9;
   }
 
   // vortex fields
@@ -5207,8 +5399,8 @@ function draw() {
     const fade = Math.min(1, pu.life / 120);
     // halo
     const grd = ctx.createRadialGradient(pu.x, pu.y + bob, 0, pu.x, pu.y + bob, 28);
-    grd.addColorStop(0, info.color + 'cc');
-    grd.addColorStop(1, info.color + '00');
+    grd.addColorStop(0, withAlpha(info.color, 0.8));
+    grd.addColorStop(1, withAlpha(info.color, 0));
     ctx.fillStyle = grd;
     ctx.beginPath(); ctx.arc(pu.x, pu.y + bob, 28, 0, Math.PI * 2); ctx.fill();
     // caja
@@ -5229,8 +5421,10 @@ function draw() {
     ctx.textBaseline = 'alphabetic';
   });
 
-  // charcos de Paint It Black
+  // charcos de Paint It Black — opt-out del halo blanco si el charco es neón
   pibPuddles.forEach(pd => {
+    const _hasShadow = darknessMode && pd.neon;
+    if (_hasShadow) { ctx.save(); ctx.shadowBlur = 0; }
     const fade = Math.min(1, pd.life / 80);
     const pulse = Math.sin(pd.phase) * 2;
     const r = pd.r + pulse;
@@ -5262,6 +5456,7 @@ function draw() {
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(pd.x, pd.y, r, 0, Math.PI * 2); ctx.stroke();
     }
+    if (_hasShadow) ctx.restore();
   });
 
   // hogueras
@@ -6081,6 +6276,8 @@ function draw() {
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 0.6, 0, Math.PI * 2); ctx.fill();
     }
     if (p.type === 'pibbullet') {
+      const _pibShadow = darknessMode && p.neon;
+      if (_pibShadow) { ctx.save(); ctx.shadowBlur = 0; }
       // estela negra
       if (p.trail) {
         p.trail.forEach((t, i) => {
@@ -6107,8 +6304,11 @@ function draw() {
         ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.stroke();
       }
+      if (_pibShadow) ctx.restore();
     }
     if (p.type === 'pibgiant') {
+      const _pibGShadow = darknessMode && isNightWave(wave);
+      if (_pibGShadow) { ctx.save(); ctx.shadowBlur = 0; }
       // bala gigante de pintura — pulsa
       const pulse = Math.sin(frame * 0.35) * 4;
       const r = p.r + pulse;
@@ -6146,6 +6346,7 @@ function draw() {
           });
         }
       }
+      if (_pibGShadow) ctx.restore();
     }
     if (p.type === 'bomb') {
       // Touch Bomb rosado. Si está stuck, pulsa rápido (countdown)
@@ -6404,8 +6605,8 @@ function draw() {
       const pulse = 0.5 + 0.5 * Math.sin(frame * 0.18);
       const auraR = e.r + 16 + pulse * 6;
       const auraGrd = ctx.createRadialGradient(e.x, e.y, e.r, e.x, e.y, auraR);
-      auraGrd.addColorStop(0, e.raidGlow + 'aa');
-      auraGrd.addColorStop(1, e.raidGlow + '00');
+      auraGrd.addColorStop(0, withAlpha(e.raidGlow, 0.67));
+      auraGrd.addColorStop(1, withAlpha(e.raidGlow, 0));
       ctx.fillStyle = auraGrd;
       ctx.beginPath(); ctx.arc(e.x, e.y, auraR, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = e.raidGlow;
@@ -6424,6 +6625,7 @@ function draw() {
     // Manchado por Paint It Black: cubierta negra con goteo + contorno arcoíris si es de noche
     if (e.pibStainTimer && e.pibStainTimer > 0 && !e.ally) {
       ctx.save();
+      if (darknessMode && e.pibStainNeon) ctx.shadowBlur = 0;
       ctx.fillStyle = `rgba(0, 0, 0, 0.85)`;
       ctx.beginPath(); ctx.arc(e.x, e.y, e.r * 1.05, 0, Math.PI * 2); ctx.fill();
       if (e.pibStainNeon) {
@@ -9186,6 +9388,29 @@ function draw() {
     }
   }
 
+  // Clones gigantes arcoíris (ult de oscuridad)
+  pibGiants.forEach(g => {
+    ctx.save();
+    ctx.shadowBlur = 0;
+    const fade = Math.min(1, g.life / 60);
+    // cuerpo negro
+    ctx.fillStyle = `rgba(0, 0, 0, ${0.9 * fade})`;
+    ctx.beginPath(); ctx.arc(g.x, g.y, g.r, 0, Math.PI * 2); ctx.fill();
+    // anillos arcoíris
+    for (let s = 0; s < 7; s++) {
+      ctx.strokeStyle = `hsla(${(frame * 12 + s * 50) % 360}, 100%, 60%, ${0.85 * fade})`;
+      ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.arc(g.x, g.y, g.r + s * 7, 0, Math.PI * 2); ctx.stroke();
+    }
+    // halo exterior
+    const halo = ctx.createRadialGradient(g.x, g.y, g.r, g.x, g.y, g.r + 80);
+    halo.addColorStop(0, `hsla(${(frame * 10) % 360}, 100%, 60%, ${0.4 * fade})`);
+    halo.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath(); ctx.arc(g.x, g.y, g.r + 80, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  });
+
   // flash blanco del Phi
   if (whiteFlashTimer > 0) {
     const a = (whiteFlashTimer / 180) * 0.92;
@@ -9549,12 +9774,28 @@ function drawUI() {
       ctx.fillStyle = night ? `hsl(${(frame * 12) % 360}, 100%, 60%)` : '#fff';
       ctx.fillText(night ? `P Paint It Black: LISTO (NOCHE)` : `P Paint It Black: LISTO (DÍA)`, 280, 33);
     }
+    // Forma (balas / puños)
+    ctx.fillStyle = '#bbf';
+    ctx.fillText(`L → ${pibForm === 0 ? 'Puños' : 'Balas'} (ahora: ${pibForm === 0 ? 'Balas' : 'Puños'})`, 280, 50);
+    // Clon gigante (sólo en oscuridad)
+    if (darknessMode) {
+      if (pibGiantPhase > 0) {
+        ctx.fillStyle = `hsl(${(frame * 14) % 360}, 100%, 60%)`;
+        ctx.fillText(`🌈 CLON GIGANTE ACTIVO`, 480, 33);
+      } else if (pibGiantCD > 0) {
+        ctx.fillStyle = '#888';
+        ctx.fillText(`N Clon Gigante: ${(pibGiantCD / 60).toFixed(0)}s`, 480, 33);
+      } else {
+        ctx.fillStyle = `hsl(${(frame * 14) % 360}, 100%, 60%)`;
+        ctx.fillText(`N Clon Gigante: LISTO`, 480, 33);
+      }
+    }
   }
   if (active === 18) {
     // Estado por Acto: ult + kill counter
     if (tuskAct === 1) {
-      ctx.fillStyle = '#fea';
-      ctx.fillText(`Act 1: uñas básicas`, 280, 33);
+      if (tuskA1UltCD > 0) { ctx.fillStyle = '#888'; ctx.fillText(`U Tornado Uñas: ${(tuskA1UltCD / 60).toFixed(0)}s`, 280, 33); }
+      else { ctx.fillStyle = '#fea'; ctx.fillText(`U Tornado Uñas: LISTO`, 280, 33); }
       ctx.fillStyle = tuskA1Kills >= 500 ? '#fd9' : '#fff';
       ctx.fillText(`☠ Kills Act 1: ${Math.min(tuskA1Kills, 500)}/500`, 480, 33);
     } else if (tuskAct === 2) {
@@ -9934,10 +10175,13 @@ function restart() {
   vortexFields.length = 0;
   fires.length = 0;
   pibPuddles.length = 0;
+  pibGiants.length = 0;
+  pibForm = 0; pibGiantCD = 0; pibGiantPhase = 0;
   pibLetterCD = 0; pibDayPhase = 0; pibDayTimer = 0; pibDayTargets = [];
   pibNightPhase = 0; pibNightTimer = 0;
   powerups.length = 0;
   noCooldowns = false; bloodMoon = false; bloodMoonWave = -1;
+  darknessMode = false; darknessWave = -1;
   coinRainTimer = 0; raidAnnounceTimer = 0;
   puDmgTimer = 0; puRateTimer = 0; puInvulnTimer = 0; puMagnetTimer = 0;
   const nocdCheckbox = document.getElementById('sb-nocd');
@@ -9984,7 +10228,8 @@ function restart() {
   standForm = 0; standFormUnlocked.clear(); standFormUnlocked.add(0);
   tuskAct = 1; tuskUnlocked.clear(); tuskUnlocked.add(1);
   tuskA1Kills = 0; tuskA2Kills = 0; tuskA3Kills = 0;
-  tuskA2Flash = 0; tuskA3Flash = 0; tuskA4Flash = 0;
+  tuskA1Flash = 0; tuskA2Flash = 0; tuskA3Flash = 0; tuskA4Flash = 0;
+  tuskA1UltCD = 0; tuskA1UltTimer = 0;
   tuskNailStormCD = 0; tuskNailStormPhase = 0; tuskNailStormTimer = 0;
   tuskWormholeCD = 0; tuskWormholePhase = 0; tuskWormholeTimer = 0;
   tuskWormholeTargets = [];
@@ -10018,6 +10263,7 @@ function loop() {
     updatePowerups();
     updatePibPuddles();
     updatePibLetter();
+    updatePibGiants();
     updateSmokeClouds();
     updateMuda();
     processWebMode();
@@ -10133,6 +10379,11 @@ document.getElementById('sb-coin-rain').addEventListener('click', () => spawnCoi
 document.getElementById('sb-boss-rush').addEventListener('click', () => spawnBossRush());
 document.getElementById('sb-raid-brutal').addEventListener('click', () => spawnRaidBoss('brutal'));
 document.getElementById('sb-raid-nightmare').addEventListener('click', () => spawnRaidBoss('nightmare'));
+document.getElementById('sb-darkness').addEventListener('click', () => {
+  sandboxNightOverride = 'night';
+  document.getElementById('sb-cycle-v').textContent = 'NOCHE';
+  triggerDarknessMode();
+});
 
 loop();
 </script>
