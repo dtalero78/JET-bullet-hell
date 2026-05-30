@@ -90,6 +90,22 @@
     <button id="sb-unlock">Desbloquear todo</button>
     <button id="sb-heal">Curar (HP máx +100)</button>
   </div>
+  <div class="row" style="margin-top:6px;">
+    <label style="display:inline-flex; align-items:center; gap:4px; margin:0; color:#ff4;">
+      <input type="checkbox" id="sb-nocd"> Sin cooldowns
+    </label>
+    <label style="display:inline-flex; align-items:center; gap:4px; margin:0; color:#f88;">
+      <input type="checkbox" id="sb-bloodmoon"> 🌑 Luna Sangre forzada
+    </label>
+  </div>
+  <div class="row" style="margin-top:6px;">
+    <button id="sb-coin-rain" style="background:#fc4;">💰 Lluvia de monedas</button>
+    <button id="sb-boss-rush" style="background:#f48;">⚔ BOSS RUSH</button>
+  </div>
+  <div class="row" style="margin-top:4px;">
+    <button id="sb-raid-brutal" style="background:#fd6;">🦁 Invocar Raid BRUTAL</button>
+    <button id="sb-raid-nightmare" style="background:#f44;">💀 Invocar Raid PESADILLA</button>
+  </div>
   <label>Daño del jugador: <span class="val" id="sb-pdmg-v">1.0×</span></label>
   <input type="range" id="sb-pdmg" min="0.1" max="50" step="0.1" value="1">
   <label>Velocidad enemigos: <span class="val" id="sb-espd-v">1.0×</span></label>
@@ -131,6 +147,14 @@
     <input type="number" id="sb-spawn-count" min="1" max="500" value="5">
     <button id="sb-spawn-btn">Invocar</button>
     <button id="sb-kill-all">Matar todos</button>
+  </div>
+  <hr>
+  <label>Ciclo día/noche: <span class="val" id="sb-cycle-v">AUTO</span></label>
+  <div class="row">
+    <button id="sb-cycle-auto">Auto</button>
+    <button id="sb-cycle-day">☀ Día</button>
+    <button id="sb-cycle-night">☾ Noche</button>
+    <button id="sb-spawn-zombies">Invocar 10 zombis</button>
   </div>
   <div style="color:#776; margin-top:8px; font-size:11px;">M para abrir/cerrar este panel</div>
 </div>
@@ -240,28 +264,30 @@ const ABILITIES = [
     desc: 'Bola giratoria con espiral que rebota en bordes y curva su trayectoria. F: Lesson 3 — bola dorada que rebota entre enemigos con daño escalado (CD 8s).', color: '#cde' },
   { id: 'dash',        name: '16. Scary Monsters',         cost: 900,
     desc: 'Mordida-dash que infecta enemigos. Los infectados al morir se vuelven DINOSAURIOS aliados (más veloces, mordida en área). R: APEX PREDATOR — cutscene + rugido que aturde y daña a todos en pantalla, infecta supervivientes y recarga la vida de los dinos (CD 25s).', color: '#6b3' },
-  { id: 'mirage',      name: '17. Espejismo Dorado',       cost: 1000,
-    desc: 'Balas doradas. K: bala que atraviesa todo y convierte enemigos en señuelos que reflejan.', color: '#fd0' },
-  { id: 'vortex',      name: '18. Tusk',                   cost: 3000,
+  { id: 'mirage',      name: '17. Gold Experience', cost: 1000,
+    desc: 'Gold Experience: balas de vida dorada. K: MUDA MUDA MUDA — lluvia de puños de vida en área; los supervivientes quedan SOBRECARGADOS y reciben +80% de daño durante 5s (CD 7s). 4000 kills → Gold Experience Requiem: clics mejores + R: RETURN TO ZERO — 30s inmune; todo enemigo que te ataque cae en un bucle de muerte infinito que se contagia al contacto y, al acabar, todos mueren (los bosses reciben mucho daño).', color: '#fd0' },
+  { id: 'rewind',      name: '18. Carmesí Inmortal (King Crimson)', cost: 1010,
+    desc: 'Puños carmesí brutales que golpean en área. T: 10s inmortal + tiempo borrado, los enemigos del futuro aparecen en el centro (CD 90s).', color: '#d02' },
+  { id: 'vortex',      name: '19. Tusk',                   cost: 3000,
     desc: 'Stand evolutivo de Johnny Joestar. Act 1: uñas giratorias básicas. 500 kills → Act 2 (uñas más fuertes + Y: NAIL STORM). 1000 kills → Act 3 (uñas-wormhole que perforan dimensiones + Z: WORMHOLE PUNCH). 3000 kills → Act 4 (rayos dorados + V: GOLDEN RATIO). T: cicla entre Actos desbloqueados.', color: '#fd6' },
-  { id: 'd4c',         name: '19. D4C',                    cost: 2200,
+  { id: 'd4c',         name: '20. D4C',                    cost: 2200,
     desc: 'Lanza copias dimensionales en paralelo: 3 estrellas que atraviesan enemigos desde universos alternos. L: LOVE TRAIN — cutscene + 10s de barrera de rayos dorados que te cubre: refleja balas enemigas (×4 daño) y daña/empuja a todo enemigo que toca el halo (CD 90s).', color: '#f06' },
-  { id: 'starplatinum', name: '20. Star Platinum',         cost: 1800,
+  { id: 'starplatinum', name: '21. Star Platinum',         cost: 1800,
     desc: 'Ráfaga ORA ORA ORA — 8 puños ultra rápidos en línea con golpe final masivo. R: cutscene "THE WORLD" — paraliza el tiempo 12s (CD 25s).', color: '#93f' },
-  { id: 'theworld',    name: '21. The World (DIO)',        cost: 1800,
+  { id: 'theworld',    name: '22. The World (DIO)',        cost: 1800,
     desc: 'Lanza cuchillos voladores. Durante la parada de tiempo, los cuchillos se quedan flotando y al terminar salen disparados a toda velocidad. Z: cutscene "ZA WARUDO!" — paraliza el tiempo 12s (CD 25s).', color: '#fd2' },
-  { id: 'detonate',    name: '22. Killer Queen',           cost: 1200,
+  { id: 'detonate',    name: '23. Killer Queen',           cost: 1200,
     desc: 'Touch Bombs rosadas teledirigidas que se pegan al enemigo y detonan tras 1.5s (daño en área). G: Bites the Dust — cutscene + onda final que mata todo en pantalla, invulnerable durante el ritual + cura 30% HP (CD 2min).', color: '#f48' },
-  { id: 'smoke',       name: '23. Cortina de Humo',        cost: 2500,
+  { id: 'smoke',       name: '24. Cortina de Humo',        cost: 2500,
     desc: 'Bombas de humo que dañan. H: niebla total 5s — invulnerable, rápido, dañas a todos.', color: '#bbb' },
-  { id: 'rewind',      name: '24. Carmesí Inmortal',       cost: 2000,
-    desc: 'Balas rojas potentes. T: 30s inmortal + tiempo parado, enemigos futuros aparecen en centro.', color: '#d02' },
   { id: 'bubble',      name: '25. Burbujas Infinitas',     cost: 4500,
     desc: 'Puños fuertes. N: balas que paralizan/ciegan/resbalan. L: ejército de clones con burbujas mortales (CD 2min).', color: '#9ff' },
   { id: 'wonder',      name: '26. Wonder of U',            cost: 4500,
     desc: 'Rocas teledirigidas que se pegan (+daño con el tiempo). N: tira carros. X: calamidad mata todo (CD 2min).', color: '#c30' },
   { id: 'pucci',       name: '27. White Snake → C-Moon → Made in Heaven', cost: 5000,
     desc: 'Stand evolutivo del Padre Pucci. Empieza como White Snake (disco blanco DISC + K: 11 NIGHTS). 500 kills desbloquea C-Moon (discos lunares teledirigidos que aturden + M: GRAVITY INVERSION). 2000 kills más desbloquea Made in Heaven (velocidad sobrehumana + H: HEAVEN ASCENSION). L: cicla entre las stands desbloqueadas.', color: '#ddd' },
+  { id: 'paintblack',  name: '28. Paint It Black',         cost: 4800,
+    desc: 'Dispara 5 balas negras que dejan charcos: enemigo tocado muere, sobrevivientes quedan MANCHADOS (paralizados y dañados al salir según tiempo en charco). De noche: balas y charcos con contorno arcoíris neón, velocidad y daño aumentados. P: DÍA → bala gigante de pintura, cutscene "BLACK, EVERYTHING MUST BE BLACK" + X negra en el corazón = muerte instantánea por presión. NOCHE → dash de hitbox total mientras grita BLACK en ráfaga (CD 35s).', color: '#000' },
 ];
 
 const owned = new Set([0]); // start with whip
@@ -273,6 +299,23 @@ const particles = [];
 const effects = [];
 const vortexFields = [];
 const fires = [];
+const powerups = []; // power-ups que sueltan los enemigos
+let noCooldowns = false; // sandbox: ignora todos los cooldowns
+let bloodMoon = false;   // evento luna de sangre (oleadas nocturnas)
+let bloodMoonWave = -1;  // wave en la que se activó
+let coinRainTimer = 0;   // frames restantes de lluvia de monedas
+let raidAnnounceTimer = 0;
+let raidAnnounceText = '';
+let raidAnnounceColor = '#fd6';
+// power-up activos del jugador
+let puDmgTimer = 0, puRateTimer = 0, puInvulnTimer = 0, puMagnetTimer = 0;
+const pibPuddles = []; // Paint It Black: charcos negros (de noche con contorno arcoíris)
+let pibLetterCD = 0;
+let pibDayPhase = 0;   // 0 idle, 1 carga + bala gigante, 2 cutscene texto, 3 corazones X, 4 muerte
+let pibDayTimer = 0;
+let pibDayTargets = []; // enemigos que la bala gigante tocó
+let pibNightPhase = 0; // 0 idle, 1 carga, 2 dash con ráfaga, 3 fade
+let pibNightTimer = 0;
 const bossHazards = []; // relojes, charcos, portales, pisotones, meteoros
 
 let nextEnemyId = 1;
@@ -312,8 +355,16 @@ let webModeCD = 0;
 let redModeTimer = 0;
 let preKillCredits = 0;
 
-let mirageCD = 0;
-const decoys = [];
+let mirageCD = 0;           // CD del awakening de GE (MUDA MUDA MUDA)
+let mudaPhase = 0;          // 0 = idle, 1 = golpiza de vida activa
+let mudaTimer = 0;          // frames restantes de la ráfaga
+let mudaAngle = 0;          // ángulo visual de los puños
+// Gold Experience → Gold Experience Requiem (slot 16)
+let geForm = 0;              // 0 = Gold Experience, 1 = Gold Experience Requiem
+let gerUnlocked = false;
+let gerKills = 0;            // kills usando Gold Experience (slot 16)
+let gerReturnTimer = 0;      // Return to Zero activo (30s)
+let gerReturnCD = 0;
 
 let vortexUltCD = 0;
 let vortexUltPhase = 0;
@@ -464,6 +515,17 @@ function distSq(a, b) { const dx = a.x - b.x, dy = a.y - b.y; return dx * dx + d
 function angleBetween(a, b) { return Math.atan2(b.y - a.y, b.x - a.x); }
 function aimAngle() { return Math.atan2(mouse.y - player.y, mouse.x - player.x); }
 
+// Day/Night cycle: cada 5 oleadas alterna. 1-5 día, 6-10 noche, 11-15 día, ...
+// En sandbox, sandboxNightOverride puede forzar 'day' o 'night'.
+let sandboxNightOverride = null;
+function isNightWave(w) {
+  if (mode === 'sandbox' && sandboxNightOverride) return sandboxNightOverride === 'night';
+  if (!w || w < 1) return false;
+  return Math.floor((w - 1) / 5) % 2 === 1;
+}
+
+const ZOMBIE_ABILITIES = ['shoot', 'spit', 'slow', 'bomb', 'dash'];
+
 // ---------------- Enemies ----------------
 const ENEMY_TYPES = {
   grunt:   { hp: 25,  speed: 0.9, dmg: 12, r: 12, color: '#d44', coins: 2 },
@@ -471,6 +533,7 @@ const ENEMY_TYPES = {
   tank:    { hp: 110, speed: 0.5, dmg: 25, r: 24, color: '#844', coins: 12 },
   shooter: { hp: 38,  speed: 0.6, dmg: 8,  r: 14, color: '#a4d', coins: 8, ranged: true },
   brute:   { hp: 280, speed: 0.6, dmg: 32, r: 30, color: '#622', coins: 30 },
+  zombie:  { hp: 25,  speed: 0.55, dmg: 14, r: 13, color: '#3a5a3a', coins: 6 },
   // Bosses (each with unique ability)
   boss:       { hp: 7000,   speed: 0.4, dmg: 40, r: 44, color: '#f33', coins: 200,  ranged: true, bossKind: 'bulletmaster', bossName: 'TIRADOR' },
   chronos:    { hp: 11000,  speed: 0.5, dmg: 45, r: 50, color: '#48f', coins: 350,  ranged: true, bossKind: 'chronos',      bossName: 'CRONOS' },
@@ -491,6 +554,156 @@ const ENEMY_TYPES = {
 const BOSS_CYCLE = ['boss', 'chronos', 'vampire', 'summoner', 'mirror', 'juggernaut', 'warlord',
                     'jdio', 'kira', 'diavolo', 'pucci', 'valentine', 'wonderofu'];
 
+// ---------------- Raid bosses, Power-ups, Coin rain ----------------
+const POWERUP_TYPES = {
+  dmg:    { color: '#f48', icon: '⚔', name: 'DAÑO x2',       dur: 60 * 12 },
+  rate:   { color: '#fc4', icon: '⚡', name: 'CADENCIA x2',   dur: 60 * 12 },
+  invuln: { color: '#6cf', icon: '🛡', name: 'INVULNERABLE', dur: 60 * 8 },
+  magnet: { color: '#fe6', icon: '🧲', name: 'IMÁN MONEDAS', dur: 60 * 15 },
+  heal:   { color: '#4f8', icon: '❤', name: 'HEAL +40%',     dur: 0 },
+};
+const POWERUP_KEYS = Object.keys(POWERUP_TYPES);
+
+function spawnPowerup(x, y, forceType) {
+  const t = forceType || POWERUP_KEYS[Math.floor(Math.random() * POWERUP_KEYS.length)];
+  powerups.push({
+    x, y, vx: rand(-1.2, 1.2), vy: rand(-1.5, 0),
+    type: t, life: 60 * 15, max: 60 * 15,
+    bobPhase: Math.random() * Math.PI * 2,
+  });
+}
+
+function updatePowerups() {
+  const magnetRange = puMagnetTimer > 0 ? 220 : 50;
+  for (let i = powerups.length - 1; i >= 0; i--) {
+    const pu = powerups[i];
+    pu.life--;
+    pu.bobPhase += 0.08;
+    // gravedad ligera + drag
+    pu.vy += 0.06;
+    pu.vx *= 0.96; pu.vy *= 0.97;
+    // imán: atraído al jugador si está en rango
+    const dx = player.x - pu.x, dy = player.y - pu.y;
+    const d = Math.hypot(dx, dy);
+    if (d < magnetRange) {
+      const pull = puMagnetTimer > 0 ? 0.6 : 0.18;
+      pu.vx += (dx / Math.max(d, 1)) * pull;
+      pu.vy += (dy / Math.max(d, 1)) * pull;
+    }
+    pu.x += pu.vx; pu.y += pu.vy;
+    pu.x = Math.max(20, Math.min(W - 20, pu.x));
+    pu.y = Math.max(20, Math.min(H - 20, pu.y));
+    // colisión con jugador
+    if (d < player.r + 16) {
+      applyPowerup(pu.type);
+      effects.push({ type: 'shockwave', x: pu.x, y: pu.y, life: 18, max: 18, r: 0, color: POWERUP_TYPES[pu.type].color });
+      for (let p = 0; p < 8; p++) {
+        particles.push({
+          x: pu.x, y: pu.y, vx: rand(-3,3), vy: rand(-3,3),
+          life: 20, max: 20, color: POWERUP_TYPES[pu.type].color, r: 3
+        });
+      }
+      powerups.splice(i, 1);
+      continue;
+    }
+    if (pu.life <= 0) powerups.splice(i, 1);
+  }
+  if (puDmgTimer > 0) puDmgTimer--;
+  if (puRateTimer > 0) puRateTimer--;
+  if (puInvulnTimer > 0) { puInvulnTimer--; player.iframe = Math.max(player.iframe, 4); }
+  if (puMagnetTimer > 0) puMagnetTimer--;
+}
+
+function applyPowerup(type) {
+  const info = POWERUP_TYPES[type];
+  if (type === 'heal') {
+    player.hp = Math.min(player.maxHp, player.hp + Math.floor(player.maxHp * 0.4));
+  } else if (type === 'dmg') {
+    puDmgTimer = info.dur;
+  } else if (type === 'rate') {
+    puRateTimer = info.dur;
+  } else if (type === 'invuln') {
+    puInvulnTimer = info.dur;
+  } else if (type === 'magnet') {
+    puMagnetTimer = info.dur;
+  }
+  raidAnnounceText = `${info.icon} ${info.name}`;
+  raidAnnounceColor = info.color;
+  raidAnnounceTimer = 90;
+}
+
+function spawnRaidBoss(tier) {
+  // tier: 'brutal' o 'nightmare'
+  const bossTypes = ['boss', 'chronos', 'vampire', 'summoner', 'mirror', 'juggernaut', 'warlord',
+                     'jdio', 'kira', 'diavolo', 'pucci', 'valentine', 'wonderofu'];
+  const type = bossTypes[Math.floor(Math.random() * bossTypes.length)];
+  spawnEnemy(type);
+  const e = enemies[enemies.length - 1];
+  if (!e) return;
+  if (tier === 'nightmare') {
+    e.hp = Math.floor(e.hp * 10);
+    e.maxHp = e.hp;
+    e.dmg = Math.floor(e.dmg * 2);
+    e.coins = e.coins * 10;
+    e.r = Math.floor(e.r * 1.5);
+    e.speed = e.speed * 1.5;
+    e.raid = 'nightmare';
+    e.raidGlow = '#f22';
+    e.bossName = '☠ ' + (e.bossName || 'JEFE') + ' PESADILLA';
+    raidAnnounceText = '💀 RAID PESADILLA APARECIÓ 💀';
+    raidAnnounceColor = '#f22';
+  } else {
+    e.hp = Math.floor(e.hp * 5);
+    e.maxHp = e.hp;
+    e.dmg = Math.floor(e.dmg * 1.5);
+    e.coins = e.coins * 4;
+    e.r = Math.floor(e.r * 1.25);
+    e.speed = e.speed * 1.3;
+    e.raid = 'brutal';
+    e.raidGlow = '#fd6';
+    e.bossName = '🦁 ' + (e.bossName || 'JEFE') + ' BRUTAL';
+    raidAnnounceText = '🦁 RAID BRUTAL APARECIÓ 🦁';
+    raidAnnounceColor = '#fd6';
+  }
+  raidAnnounceTimer = 180;
+  shake = Math.max(shake, 24);
+  effects.push({ type: 'flash', life: 30, max: 30, color: e.raidGlow });
+  effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 36, max: 36, r: 0, color: e.raidGlow });
+}
+
+function spawnCoinRain(amount) {
+  coinRainTimer = Math.max(coinRainTimer, 180);
+  for (let i = 0; i < amount; i++) {
+    const ex = rand(40, W - 40), ey = rand(40, H - 40);
+    setTimeout(() => {
+      effects.push({ type: 'coin', x: ex, y: ey, value: 25, life: 60, max: 60 });
+      player.coins += 25;
+      for (let p = 0; p < 4; p++) {
+        particles.push({
+          x: ex, y: ey, vx: rand(-3, 3), vy: rand(-3, 3),
+          life: 24, max: 24, color: '#fc4', r: 3
+        });
+      }
+    }, i * 30);
+  }
+  // suelta también algunos power-ups
+  for (let i = 0; i < 5; i++) {
+    spawnPowerup(rand(80, W - 80), rand(80, H - 80));
+  }
+  shake = Math.max(shake, 14);
+}
+
+function spawnBossRush() {
+  const allBosses = ['boss', 'chronos', 'vampire', 'summoner', 'mirror', 'juggernaut', 'warlord',
+                     'jdio', 'kira', 'diavolo', 'pucci', 'valentine', 'wonderofu'];
+  allBosses.forEach(b => spawnEnemy(b));
+  raidAnnounceText = '⚔ BOSS RUSH ⚔';
+  raidAnnounceColor = '#f48';
+  raidAnnounceTimer = 180;
+  shake = Math.max(shake, 28);
+  effects.push({ type: 'flash', life: 36, max: 36, color: '#f48' });
+}
+
 function spawnEnemy(type) {
   const side = Math.floor(Math.random() * 4);
   let x, y;
@@ -500,12 +713,20 @@ function spawnEnemy(type) {
   else { x = -40; y = Math.random() * H; }
   const t = ENEMY_TYPES[type] || ENEMY_TYPES.grunt;
   const scale = 1 + (wave - 1) * 0.05; // small scaling per wave
-  const hp = Math.max(1, Math.floor(t.hp * scale * enemyHpMult));
+  let hp = Math.max(1, Math.floor(t.hp * scale * enemyHpMult));
+  let speed = t.speed;
+  let dmg = t.dmg;
+  // Luna de sangre: enemigos +30% velocidad, +30% daño, +20% HP
+  if (bloodMoon) {
+    speed *= 1.3;
+    dmg = Math.floor(dmg * 1.3);
+    hp = Math.floor(hp * 1.2);
+  }
   enemies.push({
     id: nextEnemyId++,
     x, y, r: t.r,
     hp, maxHp: hp,
-    speed: t.speed, dmg: t.dmg,
+    speed, dmg,
     color: t.color, coins: t.coins,
     type, ranged: !!t.ranged,
     vx: 0, vy: 0,
@@ -521,7 +742,17 @@ function spawnEnemy(type) {
     bossSplits: 0,
     isClone: false,
     entered: false,
+    bloodMoonBorn: bloodMoon,
   });
+}
+
+function spawnZombieHorde(n) {
+  for (let i = 0; i < n; i++) {
+    spawnEnemy('zombie');
+    const z = enemies[enemies.length - 1];
+    if (z) z.zombieAbility = ZOMBIE_ABILITIES[Math.floor(Math.random() * ZOMBIE_ABILITIES.length)];
+  }
+  effects.push({ type: 'flash', life: 28, max: 28, color: '#2a5' });
 }
 
 // ---------------- Wave system ----------------
@@ -535,10 +766,38 @@ function startWave() {
   const baseGap = Math.max(10, 38 - wave * 1.5);
   waveSpawnGap = Math.max(4, Math.floor(baseGap / (enemySpawnMult || 1)));
   waveTimer = 0;
-  // Spawn extra: Cazador de Tusk con 30% una vez desbloqueado Tusk Act 4
-  if (tuskUnlocked.has(4) && Math.random() < 0.30) {
+  // Spawn extra: Cazador de Tusk con 0.5% una vez desbloqueado Tusk Act 4
+  if (tuskUnlocked.has(4) && Math.random() < 0.005) {
     spawnEnemy('tuskslayer');
     effects.push({ type: 'flash', life: 26, max: 26, color: '#a08' });
+  }
+  // ===== Raid bosses: en olas de jefes, chance Brutal (~2%) o Pesadilla (~0.5%) =====
+  if (isBossWave && wave >= 5) {
+    const r = Math.random();
+    if (r < 0.005) spawnRaidBoss('nightmare');
+    else if (r < 0.025) spawnRaidBoss('brutal');
+  }
+  // ===== Blood Moon: 20% en olas nocturnas (no se acumula) =====
+  if (isNightWave(wave)) {
+    if (bloodMoonWave !== wave && Math.random() < 0.20) {
+      bloodMoon = true;
+      bloodMoonWave = wave;
+      raidAnnounceText = '🌑 LUNA DE SANGRE 🌑';
+      raidAnnounceColor = '#f44';
+      raidAnnounceTimer = 200;
+      shake = Math.max(shake, 18);
+      effects.push({ type: 'flash', life: 32, max: 32, color: '#f22' });
+    }
+  } else if (bloodMoonWave !== wave) {
+    bloodMoon = false;
+  }
+  // ===== Lluvia de monedas aleatoria: 4% por ola =====
+  if (Math.random() < 0.04) {
+    setTimeout(() => spawnCoinRain(8), 1000);
+  }
+  // Horda zombi nocturna: 50% por oleada cuando es de noche
+  if (isNightWave(wave) && Math.random() < 0.5) {
+    spawnZombieHorde(10);
   }
 }
 
@@ -729,7 +988,7 @@ function updatePlayer() {
   if (keyPressed['q']) cycleAbility(-1);
   if (keyPressed['e']) cycleAbility(1);
 
-  if (active === 19 && keyPressed['r'] && timeStopCD <= 0) {
+  if (active === 20 && keyPressed['r'] && timeStopCD <= 0) {
     // Star Platinum: THE WORLD — cutscene
     starPlatinumPhase = 1;
     starPlatinumTimer = 90;
@@ -743,18 +1002,18 @@ function updatePlayer() {
     apexCD = 60 * 25;
     shake = 16;
   }
-  if (active === 20 && keyPressed['z'] && timeStopCD <= 0) {
+  if (active === 21 && keyPressed['z'] && timeStopCD <= 0) {
     // The World (DIO): ZA WARUDO — cutscene
     dioPhase = 1;
     dioTimer = 90;
     timeStopCD = 60 * 25;
     shake = 14;
   }
-  if (active === 23 && keyPressed['t'] && rewindCD <= 0) {
+  if (active === 17 && keyPressed['t'] && rewindCD <= 0) {
     activateRedMode();
     rewindCD = 60 * 90;
   }
-  if (active === 22 && keyPressed['h'] && smokeFogCD <= 0) {
+  if (active === 23 && keyPressed['h'] && smokeFogCD <= 0) {
     smokeFogTimer = 60 * 5;
     smokeFogCD = 60 * 30;
     shake = 16;
@@ -815,7 +1074,7 @@ function updatePlayer() {
     mihUltCD = 60 * 90;
     shake = 22;
   }
-  if (active === 18 && keyPressed['l'] && ltCD <= 0) {
+  if (active === 19 && keyPressed['l'] && ltCD <= 0) {
     // D4C: LOVE TRAIN cutscene
     ltPhase = 1;
     ltTimer = 80;
@@ -838,7 +1097,7 @@ function updatePlayer() {
       });
     }
   }
-  if (active === 17 && keyPressed['t']) {
+  if (active === 18 && keyPressed['t']) {
     // Ciclar entre Tusk Acts desbloqueados
     const acts = [1, 2, 3, 4].filter(a => tuskUnlocked.has(a));
     if (acts.length > 1) {
@@ -848,7 +1107,7 @@ function updatePlayer() {
       effects.push({ type: 'flash', life: 14, max: 14, color: TUSK_COLORS[tuskAct] });
     }
   }
-  if (active === 17 && tuskAct === 2 && keyPressed['y'] && tuskNailStormCD <= 0) {
+  if (active === 18 && tuskAct === 2 && keyPressed['y'] && tuskNailStormCD <= 0) {
     // Tusk Act 2 — NAIL BARRAGE: ráfaga inmediata en cono hacia donde apuntas
     const baseAng = aimAngle();
     for (let i = 0; i < 22; i++) {
@@ -872,7 +1131,7 @@ function updatePlayer() {
     effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 18, max: 18, r: 0, color: '#fff' });
     effects.push({ type: 'flash', life: 14, max: 14, color: '#fd9' });
   }
-  if (active === 17 && tuskAct === 3 && keyPressed['z'] && tuskWormholeCD <= 0) {
+  if (active === 18 && tuskAct === 3 && keyPressed['z'] && tuskWormholeCD <= 0) {
     // Tusk Act 3 — WORMHOLE PUNCH
     tuskWormholePhase = 1;
     tuskWormholeTimer = 70;
@@ -881,25 +1140,30 @@ function updatePlayer() {
     tuskWormholeTargets = enemies.filter(e => !e.ally && e.hp > 0).map(e => ({ id: e.id, x: e.x, y: e.y }));
     shake = 16;
   }
-  if (active === 17 && tuskAct === 4 && keyPressed['v'] && vortexUltCD <= 0) {
+  if (active === 18 && tuskAct === 4 && keyPressed['v'] && vortexUltCD <= 0) {
     vortexUltCD = 60 * 90;
     vortexUltPhase = 1;
     vortexUltTimer = 60;
     shake = 22;
   }
-  if (active === 16 && keyPressed['k'] && mirageCD <= 0) {
-    const ang = aimAngle();
-    projectiles.push({
-      x: player.x + Math.cos(ang) * 20, y: player.y + Math.sin(ang) * 20,
-      vx: Math.cos(ang) * 18, vy: Math.sin(ang) * 18,
-      r: 14, dmg: 0, life: 110, type: 'transmute', color: '#fd0',
-      hits: new Set(), trail: []
-    });
-    mirageCD = 60 * 120;
-    shake = 14;
-    effects.push({ type: 'flash', life: 22, max: 22, color: '#fd0' });
+  if (active === 16 && keyPressed['k'] && mirageCD <= 0 && mudaPhase === 0) {
+    // Gold Experience — MUDA MUDA MUDA: golpiza de vida en área + sobrecarga
+    mudaPhase = 1;
+    mudaTimer = 55;
+    mudaAngle = aimAngle();
+    mirageCD = 60 * 7;
+    shake = 16;
+    effects.push({ type: 'flash', life: 20, max: 20, color: '#fd0' });
   }
-  if (active === 21 && keyPressed['g'] && detonateAllCD <= 0) {
+  if (active === 16 && geForm === 1 && keyPressed['r'] && gerReturnCD <= 0 && gerReturnTimer <= 0) {
+    // Gold Experience Requiem — RETURN TO ZERO: 30s inmune + bucle de muerte infinito
+    gerReturnTimer = 60 * 30;
+    gerReturnCD = 60 * 120;
+    shake = 26;
+    effects.push({ type: 'flash', life: 34, max: 34, color: '#fe6' });
+    effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 30, max: 30, r: 0, color: '#fe6' });
+  }
+  if (active === 22 && keyPressed['g'] && detonateAllCD <= 0) {
     // Bites the Dust — cutscene
     kqPhase = 1;
     kqTimer = 80;
@@ -942,6 +1206,20 @@ function updatePlayer() {
     nkcCD = 60 * 18;
     shake = 12;
   }
+  if (active === 27 && keyPressed['p'] && pibLetterCD <= 0 && pibDayPhase === 0 && pibNightPhase === 0) {
+    // Paint It Black — letter ability (B)
+    if (isNightWave(wave)) {
+      pibNightPhase = 1;
+      pibNightTimer = 60;
+    } else {
+      pibDayPhase = 1;
+      pibDayTimer = 50;
+      pibDayTargets = [];
+    }
+    pibLetterCD = 60 * 35;
+    shake = 18;
+    effects.push({ type: 'flash', life: 22, max: 22, color: '#000' });
+  }
   if (active === 14 && keyPressed['f'] && lesson3CD <= 0) {
     const ang = aimAngle();
     projectiles.push({
@@ -973,6 +1251,18 @@ function updatePlayer() {
   if (webModeCD > 0) webModeCD--;
   if (mirageCD > 0) mirageCD--;
   if (vortexUltCD > 0) vortexUltCD--;
+  if (pibLetterCD > 0) pibLetterCD--;
+  // Sandbox: sin cooldowns — zero todos los CD cada frame
+  if (noCooldowns) {
+    timeStopCD = 0; rewindCD = 0; shortRewindCD = 0; detonateAllCD = 0;
+    lesson3CD = 0; skCD = 0; rhcpCD = 0; sfCD = 0; nrCD = 0; mmCD = 0;
+    nkcCD = 0; ltCD = 0; apexCD = 0; smokeFogCD = 0; webModeCD = 0;
+    mirageCD = 0; vortexUltCD = 0; pibLetterCD = 0;
+    shieldCD = 0; shieldCharge = SHIELD_MAX;
+    tuskNailStormCD = 0; tuskWormholeCD = 0;
+    wsUltCD = 0; cmUltCD = 0; mihUltCD = 0;
+    bubbleUltCD = 0; wonderUltCD = 0; gerReturnCD = 0;
+  }
   // Star Platinum: THE WORLD cutscene
   if (starPlatinumPhase === 1) {
     // Fase 1: pose, carga de "ZA WARUDO"
@@ -1524,7 +1814,9 @@ function updatePlayer() {
   if (redModeTimer > 0) { redModeTimer--; player.iframe = 999; }
   if (timeStopTimer > 0) timeStopTimer--;
 
-  const cd = getAttackCD();
+  let cd = getAttackCD();
+  if (puRateTimer > 0) cd = cd / 2;
+  if (noCooldowns) cd = Math.min(cd, 60); // sandbox sin-CD: ataque mínimo 60ms
   if (mouse.down && Date.now() - player.lastAttack > cd) {
     doAttack();
     player.lastAttack = Date.now();
@@ -1533,8 +1825,9 @@ function updatePlayer() {
 
 function getAttackCD() {
   if (active === 26) return [280, 200, 90][standForm];
-  if (active === 17) return [0, 320, 280, 240, 250][tuskAct];
-  return [340, 260, 500, 0, 280, 320, 600, 300, 200, 260, 280, 700, 280, 280, 360, 380, 520, 250, 320, 520, 250, 380, 320, 240, 110, 320][active];
+  if (active === 18) return [0, 320, 280, 240, 250][tuskAct];
+  if (active === 27) return isNightWave(wave) ? 180 : 320;
+  return [340, 260, 500, 0, 280, 320, 600, 300, 200, 260, 280, 700, 280, 280, 360, 380, 520, 240, 250, 320, 520, 250, 380, 320, 110, 320][active];
 }
 
 function doAttack() {
@@ -1557,13 +1850,13 @@ function doAttack() {
     case 14: steelBallAttack(a); break;
     case 15: dashAttack(a); break;
     case 16: mirageAttack(a); break;
-    case 17: vortexAttack(a); break;
-    case 18: d4cAttack(a); break;
-    case 19: starPlatinumAttack(a); break;
-    case 20: theWorldAttack(a); break;
-    case 21: detonateAttack(a); break;
-    case 22: smokeAttack(a); break;
-    case 23: rewindFistsAttack(a); break;
+    case 17: rewindFistsAttack(a); break;
+    case 18: vortexAttack(a); break;
+    case 19: d4cAttack(a); break;
+    case 20: starPlatinumAttack(a); break;
+    case 21: theWorldAttack(a); break;
+    case 22: detonateAttack(a); break;
+    case 23: smokeAttack(a); break;
     case 24: bubbleAttack(a); break;
     case 25: wonderAttack(a); break;
     case 26:
@@ -1571,6 +1864,7 @@ function doAttack() {
       else if (standForm === 1) cmoonAttack(a);
       else if (standForm === 2) mihAttack(a);
       break;
+    case 27: paintItBlackAttack(a); break;
   }
 }
 
@@ -1623,6 +1917,8 @@ function damageEnemy(e, dmg, color) {
   }
   // damage infinite is preserved (bubbles)
   let finalDmg = dmg >= 999999 ? dmg : dmg * playerDmgMult;
+  if (puDmgTimer > 0) finalDmg *= 2; // power-up daño x2
+  if (e.geOvercharge > 0) finalDmg *= 1.8; // sobrecarga de vida de GE (MUDA)
   if (e.armor) finalDmg = finalDmg * (1 - e.armor);
   e.hp -= finalDmg;
   for (let p = 0; p < 3; p++) {
@@ -2099,34 +2395,369 @@ function updateFires() {
   }
 }
 
-// 15. Espejismo Dorado — balas doradas + bala de transmutación
+// 28. Paint It Black — 5 balas negras que dejan charcos
+function paintItBlackAttack(angle) {
+  const night = isNightWave(wave);
+  const sp = night ? 14 : 10;
+  const dmg = night ? 220 : 130;
+  for (let i = -2; i <= 2; i++) {
+    const a = angle + i * 0.10;
+    projectiles.push({
+      x: player.x + Math.cos(a) * 20,
+      y: player.y + Math.sin(a) * 20,
+      vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+      r: 8, dmg, life: night ? 70 : 90,
+      type: 'pibbullet', color: '#000', neon: night,
+      trail: []
+    });
+  }
+  // chispa de impulso
+  for (let p = 0; p < 4; p++) {
+    particles.push({
+      x: player.x + Math.cos(angle) * 22, y: player.y + Math.sin(angle) * 22,
+      vx: rand(-2, 2), vy: rand(-2, 2), life: 16, max: 16,
+      color: night ? `hsl(${(frame * 10 + p * 60) % 360}, 100%, 60%)` : '#222', r: 2
+    });
+  }
+}
+
+function createPibPuddle(x, y) {
+  const night = isNightWave(wave);
+  pibPuddles.push({
+    x, y,
+    r: 46 + Math.random() * 8,
+    life: night ? 540 : 420,
+    max: night ? 540 : 420,
+    neon: night,
+    phase: Math.random() * Math.PI * 2,
+  });
+  if (shake < 4) shake = 4;
+  for (let p = 0; p < 10; p++) {
+    particles.push({
+      x, y,
+      vx: rand(-3, 3), vy: rand(-3, 3),
+      life: 22, max: 22,
+      color: night ? `hsl(${(p * 60) % 360}, 100%, 55%)` : '#000', r: 3
+    });
+  }
+}
+
+function updatePibPuddles() {
+  const night = isNightWave(wave);
+  for (let i = pibPuddles.length - 1; i >= 0; i--) {
+    const pd = pibPuddles[i];
+    pd.life--;
+    pd.phase += 0.04;
+    // partículas burbujeando
+    if (frame % 4 === 0) {
+      const a = Math.random() * Math.PI * 2;
+      const rr = Math.random() * pd.r;
+      particles.push({
+        x: pd.x + Math.cos(a) * rr,
+        y: pd.y + Math.sin(a) * rr,
+        vx: rand(-0.4, 0.4), vy: -0.6 - Math.random() * 1.2,
+        life: 22, max: 22,
+        color: pd.neon ? `hsl(${(frame * 6) % 360}, 100%, 60%)` : '#111', r: 2
+      });
+    }
+    // colisión con enemigos
+    for (let j = 0; j < enemies.length; j++) {
+      const e = enemies[j];
+      if (e.ally) continue;
+      const rr = pd.r + e.r * 0.5;
+      if (distSq(e, pd) < rr * rr) {
+        // En el charco: acumula tiempo, daño ligero, ligera ralentización
+        e.pibInPuddle = (e.pibInPuddle || 0) + 1;
+        e.pibLastTouch = frame;
+        if (frame % 6 === 0) damageEnemy(e, pd.neon ? 6 : 3, '#000');
+        // ralentiza dentro del charco
+        e.vx *= 0.85; e.vy *= 0.85;
+      }
+    }
+    if (pd.life <= 0) pibPuddles.splice(i, 1);
+  }
+
+  // procesar manchado: cuando un enemigo sale del charco (no tocado este frame)
+  for (let j = 0; j < enemies.length; j++) {
+    const e = enemies[j];
+    if (e.ally) continue;
+    if (e.pibInPuddle && e.pibLastTouch !== frame) {
+      // salió del charco: convertir tiempo en charco en stain
+      const t = e.pibInPuddle;
+      // ratio canónico: 0.5s (30f) en charco → 10s (600f) de efecto, 5 dmg/sec
+      // tiempoEfectoFrames = t * 20
+      // dmgPorSegundo = 5 * (t / 30)
+      // Reducción para enemigos fuertes (basado en maxHp): tank/boss = menos
+      const toughness = Math.max(1, e.maxHp / 100);
+      const reduce = 1 / Math.sqrt(toughness);
+      e.pibStainTimer = Math.floor(t * 20 * reduce);
+      e.pibStainDmgPerTick = (5 * (t / 30) * reduce) / 60; // por frame (5/seg base = 5/60 por frame)
+      e.pibStainNeon = isNightWave(wave);
+      e.pibInPuddle = 0;
+    }
+    if (e.pibStainTimer && e.pibStainTimer > 0) {
+      e.pibStainTimer--;
+      e.frozen = Math.max(e.frozen || 0, 4); // paralizado constante mientras dura el stain
+      if (e.pibStainDmgPerTick) damageEnemy(e, e.pibStainDmgPerTick * (e.pibStainNeon ? 1.6 : 1), '#000');
+      if (frame % 8 === 0) {
+        particles.push({
+          x: e.x + rand(-e.r, e.r), y: e.y + rand(-e.r, e.r),
+          vx: rand(-0.3, 0.3), vy: rand(-0.6, 0.2), life: 24, max: 24,
+          color: e.pibStainNeon ? `hsl(${(frame * 8) % 360}, 100%, 55%)` : '#000', r: 2.5
+        });
+      }
+    }
+  }
+}
+
+// 28. Paint It Black — letter ability (B): día = bala gigante + cutscene; noche = dash hitbox total
+function updatePibLetter() {
+  // ---- DÍA ----
+  if (pibDayPhase === 1) {
+    // Fase 1: carga + lanza la bala gigante hacia el cursor
+    pibDayTimer--;
+    player.iframe = Math.max(player.iframe, 4);
+    if (pibDayTimer === 30) {
+      const ang = aimAngle();
+      projectiles.push({
+        x: player.x + Math.cos(ang) * 30,
+        y: player.y + Math.sin(ang) * 30,
+        vx: Math.cos(ang) * 7, vy: Math.sin(ang) * 7,
+        r: 60, dmg: 9999999, life: 200,
+        type: 'pibgiant', color: '#000', hits: new Set(), trail: []
+      });
+      shake = 22;
+    }
+    if (pibDayTimer <= 0) {
+      pibDayPhase = 2;
+      pibDayTimer = 110; // "BLACK, EVERYTHING MUST BE BLACK"
+    }
+  } else if (pibDayPhase === 2) {
+    pibDayTimer--;
+    player.iframe = Math.max(player.iframe, 4);
+    if (pibDayTimer <= 0) {
+      pibDayPhase = 3;
+      pibDayTimer = 60; // mostrar corazones con X
+    }
+  } else if (pibDayPhase === 3) {
+    pibDayTimer--;
+    player.iframe = Math.max(player.iframe, 4);
+    if (pibDayTimer <= 0) {
+      pibDayPhase = 0;
+      pibDayTargets = [];
+    }
+  }
+
+  // ---- NOCHE ----
+  if (pibNightPhase === 1) {
+    // carga corta (pose)
+    pibNightTimer--;
+    player.iframe = Math.max(player.iframe, 4);
+    if (pibNightTimer <= 0) {
+      pibNightPhase = 2;
+      pibNightTimer = 110; // ráfaga de "BLACK"
+    }
+  } else if (pibNightPhase === 2) {
+    pibNightTimer--;
+    player.iframe = 999; // invulnerable durante el dash
+    // dash mata todo lo que hay en pantalla (hitbox = mapa completo)
+    if (frame % 3 === 0) {
+      for (let j = enemies.length - 1; j >= 0; j--) {
+        const e = enemies[j];
+        if (e.ally) continue;
+        damageEnemy(e, 4000, '#fff');
+        // chispa arcoíris en cada víctima
+        for (let s = 0; s < 4; s++) {
+          particles.push({
+            x: e.x, y: e.y,
+            vx: rand(-5, 5), vy: rand(-5, 5),
+            life: 20, max: 20,
+            color: `hsl(${(frame * 18 + s * 60) % 360}, 100%, 60%)`, r: 3
+          });
+        }
+      }
+    }
+    // limpia balas enemigas
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+      if (projectiles[i].type === 'enemy') projectiles.splice(i, 1);
+    }
+    if (pibNightTimer <= 0) {
+      pibNightPhase = 3;
+      pibNightTimer = 30;
+    }
+  } else if (pibNightPhase === 3) {
+    pibNightTimer--;
+    player.iframe = Math.max(player.iframe, 4);
+    if (pibNightTimer <= 0) pibNightPhase = 0;
+  }
+}
+
+// 17. Gold Experience / Gold Experience Requiem — vida dorada + bala de transmutación
 function mirageAttack(angle) {
+  if (geForm === 1) {
+    // Gold Experience Requiem: ráfaga de 3 balas de vida dorada, mucho más fuertes
+    for (let i = -1; i <= 1; i++) {
+      const a = angle + i * 0.12;
+      projectiles.push({
+        x: player.x + Math.cos(a) * 18, y: player.y + Math.sin(a) * 18,
+        vx: Math.cos(a) * 15, vy: Math.sin(a) * 15,
+        r: 8, dmg: 360, life: 85, type: 'goldbullet', color: '#fe6', trail: []
+      });
+    }
+    // chispas verdes de "vida"
+    for (let p = 0; p < 5; p++) {
+      particles.push({
+        x: player.x + Math.cos(angle) * 22, y: player.y + Math.sin(angle) * 22,
+        vx: rand(-2, 2), vy: rand(-2, 2), life: 18, max: 18,
+        color: rand(0, 1) > 0.5 ? '#8e3' : '#fe6', r: 2
+      });
+    }
+    return;
+  }
+  // Gold Experience: bala de vida dorada con chispa verde
   projectiles.push({
     x: player.x + Math.cos(angle) * 18,
     y: player.y + Math.sin(angle) * 18,
-    vx: Math.cos(angle) * 11, vy: Math.sin(angle) * 11,
-    r: 6, dmg: 150, life: 80, type: 'goldbullet', color: '#fd0', trail: []
+    vx: Math.cos(angle) * 12, vy: Math.sin(angle) * 12,
+    r: 6, dmg: 180, life: 80, type: 'goldbullet', color: '#fd0', trail: []
   });
+  for (let p = 0; p < 3; p++) {
+    particles.push({
+      x: player.x + Math.cos(angle) * 20, y: player.y + Math.sin(angle) * 20,
+      vx: rand(-1.5, 1.5), vy: rand(-1.5, 1.5), life: 16, max: 16, color: '#8e3', r: 2
+    });
+  }
 }
 
-function spawnDecoy(x, y) {
-  decoys.push({ x, y, r: 11, life: 1800, maxLife: 1800 });
-}
-
-function updateDecoys() {
-  for (let i = decoys.length - 1; i >= 0; i--) {
-    const d = decoys[i];
-    d.life--;
-    if (d.life <= 0) {
-      for (let p = 0; p < 12; p++) {
-        particles.push({
-          x: d.x, y: d.y,
-          vx: rand(-4, 4), vy: rand(-4, 4),
-          life: 28, max: 28, color: '#fd0', r: 3
+// 17. Gold Experience — MUDA MUDA MUDA (golpiza de vida + sobrecarga)
+function updateMuda() {
+  if (mudaPhase === 0) return;
+  mudaTimer--;
+  const reach = 155;
+  // ráfaga de puños 👊 cada 2 frames (30 puños/seg)
+  if (frame % 2 === 0) {
+    mudaAngle += 1.1;
+    const hitDmg = geForm === 1 ? 200 : 115;
+    for (let i = 0; i < enemies.length; i++) {
+      const e = enemies[i];
+      if (e.ally) continue;
+      const rr = reach + e.r;
+      if (distSq(player, e) >= rr * rr) continue;
+      damageEnemy(e, hitDmg, '#fe6');
+      e.geOvercharge = 300;            // 5s de sobrecarga, renovada con cada golpe
+      e.frozen = Math.max(e.frozen || 0, 4);
+      // 2-3 puños volando hacia el enemigo desde direcciones aleatorias
+      const fists = 2 + (Math.random() < 0.5 ? 1 : 0);
+      for (let p = 0; p < fists; p++) {
+        const fa = Math.random() * Math.PI * 2;
+        const dist = 26 + Math.random() * 16;
+        effects.push({
+          type: 'mudafist',
+          x: e.x + Math.cos(fa) * dist, y: e.y + Math.sin(fa) * dist,
+          vx: -Math.cos(fa) * 5, vy: -Math.sin(fa) * 5,
+          rot: rand(-0.5, 0.5), life: 9, max: 9, size: 16 + Math.random() * 8
         });
       }
-      decoys.splice(i, 1);
+      for (let p = 0; p < 3; p++) {
+        particles.push({
+          x: e.x + rand(-e.r, e.r), y: e.y + rand(-e.r, e.r),
+          vx: rand(-3, 3), vy: rand(-3, 3), life: 14, max: 14,
+          color: rand(0, 1) > 0.5 ? '#fe6' : '#8e3', r: 2 + Math.random() * 2
+        });
+      }
+      if (Math.random() < 0.35) {
+        effects.push({ type: 'muda', x: e.x + rand(-18, 18), y: e.y - e.r - rand(0, 16), life: 22, max: 22 });
+      }
     }
+    // corona de puños 👊 girando alrededor del jugador
+    for (let p = 0; p < 6; p++) {
+      const a = mudaAngle + p * (Math.PI * 2 / 6);
+      const orb = reach * (0.5 + 0.35 * Math.abs(Math.sin(frame * 0.3 + p)));
+      effects.push({
+        type: 'mudafist',
+        x: player.x + Math.cos(a) * orb, y: player.y + Math.sin(a) * orb,
+        vx: Math.cos(a) * 6, vy: Math.sin(a) * 6,
+        rot: a, life: 8, max: 8, size: 18
+      });
+    }
+  }
+  if (mudaTimer <= 0) mudaPhase = 0;
+}
+
+// Gold Experience Requiem — RETURN TO ZERO
+function enterZeroLoop(e) {
+  if (e.ally || e.zeroLoop) return;
+  e.zeroLoop = true;
+  e.frozen = 6;
+  e.vx = 0; e.vy = 0;
+  e.paralyzed = 0; e.sliding = 0;
+  effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 16, max: 16, r: 0, color: '#fe6' });
+  for (let p = 0; p < 6; p++) {
+    particles.push({ x: e.x, y: e.y, vx: rand(-3, 3), vy: rand(-3, 3), life: 20, max: 20, color: '#fe6', r: 3 });
+  }
+}
+
+function resolveZeroLoop() {
+  shake = 24;
+  effects.push({ type: 'flash', life: 30, max: 30, color: '#fe6' });
+  for (let i = 0; i < enemies.length; i++) {
+    const e = enemies[i];
+    if (!e.zeroLoop) continue;
+    e.zeroLoop = false;
+    if (e.bossKind) {
+      // bosses: no mueren al instante, reciben mucho daño
+      e.hp -= Math.max(5000, e.maxHp * 0.6);
+      e.armor = 0;
+      effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 26, max: 26, r: 0, color: '#f44' });
+    } else {
+      // muere por la vía normal (otorga monedas, progresión, partículas)
+      e.hp = 0;
+    }
+  }
+}
+
+function updateGerReturn() {
+  if (gerReturnCD > 0) gerReturnCD--;
+  if (gerReturnTimer <= 0) return;
+  gerReturnTimer--;
+  player.iframe = 999; // inmune total durante Return to Zero
+
+  // 1) enemigos que te atacan (te tocan) caen en el bucle de muerte
+  for (let i = 0; i < enemies.length; i++) {
+    const e = enemies[i];
+    if (e.ally || e.zeroLoop) continue;
+    const rr = player.r + e.r + 6;
+    if (distSq(player, e) < rr * rr) enterZeroLoop(e);
+  }
+  // 2) contagio: cualquier enemigo que toque un cuerpo en bucle también cae
+  for (let i = 0; i < enemies.length; i++) {
+    const z = enemies[i];
+    if (!z.zeroLoop) continue;
+    for (let j = 0; j < enemies.length; j++) {
+      const e = enemies[j];
+      if (e === z || e.ally || e.zeroLoop) continue;
+      const rr = z.r + e.r + 4;
+      if (distSq(z, e) < rr * rr) enterZeroLoop(e);
+    }
+  }
+  // 3) mantener los cuerpos congelados, muriendo infinitamente
+  for (let i = 0; i < enemies.length; i++) {
+    const e = enemies[i];
+    if (!e.zeroLoop) continue;
+    e.frozen = 4;
+    e.vx = 0; e.vy = 0;
+    if (frame % 3 === 0) {
+      particles.push({
+        x: e.x + rand(-e.r, e.r), y: e.y + rand(-e.r, e.r),
+        vx: rand(-1.5, 1.5), vy: rand(-2, 0.5), life: 22, max: 22,
+        color: rand(0, 1) > 0.5 ? '#fe6' : '#8e3', r: 2
+      });
+    }
+  }
+  // 4) al terminar: todos los del bucle mueren (bosses reciben mucho daño)
+  if (gerReturnTimer === 0) {
+    resolveZeroLoop();
+    player.iframe = 60; // breve gracia al salir (evita invulnerabilidad residual larga)
   }
 }
 
@@ -2558,22 +3189,24 @@ function createVortex(x, y) {
   shake = 14;
 }
 
-// 7. Puños del Rebobinado
+// 18. Carmesí Inmortal (King Crimson) — puños carmesí brutales en área
 function rewindFistsAttack(angle) {
-  // 3 balas rojas carmesí muy fuertes
-  for (let i = -1; i <= 1; i++) {
-    const a = angle + i * 0.10;
-    projectiles.push({
-      x: player.x + Math.cos(a) * 16, y: player.y + Math.sin(a) * 16,
-      vx: Math.cos(a) * 10, vy: Math.sin(a) * 10,
-      r: 9, dmg: 800, life: 90, type: 'redbolt', color: '#d02', trail: []
+  punchAttack(angle, 50, 420, 18, '#d02', 56);
+  punchAttack(angle, 26, 420, 14, '#f44', 42);
+  const tx = player.x + Math.cos(angle) * 50;
+  const ty = player.y + Math.sin(angle) * 50;
+  for (let p = 0; p < 12; p++) {
+    particles.push({
+      x: tx + rand(-14, 14), y: ty + rand(-14, 14),
+      vx: rand(-3.5, 3.5), vy: rand(-3.5, 3.5),
+      life: 24, max: 24, color: rand(0, 1) > 0.5 ? '#d02' : '#f66', r: 3
     });
   }
 }
 
 function activateRedMode() {
-  redModeTimer = 60 * 30;
-  timeStopTimer = Math.max(timeStopTimer, 60 * 30);
+  redModeTimer = 60 * 10;
+  timeStopTimer = Math.max(timeStopTimer, 60 * 10);
   shake = 24;
   effects.push({ type: 'flash', life: 30, max: 30, color: '#d02' });
   // Spawn 40 preview enemies at center (frozen)
@@ -2699,6 +3332,7 @@ function updateEnemies() {
   }
   enemies.forEach(e => {
     if (timeStopTimer > 0) return;
+    if (e.geOvercharge > 0) e.geOvercharge--;
     if (e.frozen > 0) { e.frozen--; return; }
     // rocas pegadas: más tiempo = más daño
     if (e.rocks && e.rocks.length > 0) {
@@ -3257,21 +3891,58 @@ function updateEnemies() {
       }
     }
 
-    let tx = player.x, ty = player.y;
-    let targetDecoy = null;
-    if (decoys.length > 0) {
-      let nearest = decoys[0];
-      let bestSq = (nearest.x - e.x) * (nearest.x - e.x) + (nearest.y - e.y) * (nearest.y - e.y);
-      for (let di = 1; di < decoys.length; di++) {
-        const d = decoys[di];
-        const dx = d.x - e.x, dy = d.y - e.y;
-        const dSq = dx * dx + dy * dy;
-        if (dSq < bestSq) { bestSq = dSq; nearest = d; }
+    // ---- Zombie nocturno: habilidades de boss en versión débil ----
+    if (e.zombieAbility && !e.bossKind) {
+      e.zombieTimer = (e.zombieTimer || 0) + 1;
+      if (e.zombieAbility === 'shoot') {
+        // Tirador débil: un proyectil lento cada 2.5s
+        if (e.zombieTimer % 150 === 0 && distSq(player, e) < 360 * 360) {
+          const a = angleBetween(e, player);
+          projectiles.push({
+            x: e.x, y: e.y,
+            vx: Math.cos(a) * 3.2, vy: Math.sin(a) * 3.2,
+            r: 5, dmg: e.dmg * 0.5, life: 200, type: 'enemy', color: '#9c6'
+          });
+        }
+      } else if (e.zombieAbility === 'spit') {
+        // Vampiro débil: pequeño charco bajo sus pies cada 4s
+        if (e.zombieTimer % 240 === 0) {
+          bossHazards.push({
+            type: 'pool', x: e.x, y: e.y,
+            r: 18, hp: 30, life: 360, max: 360, color: '#5a2',
+            dmg: e.dmg * 0.3, source: e
+          });
+        }
+      } else if (e.zombieAbility === 'slow') {
+        // Cronos débil: un reloj pequeño cada 5s
+        if (e.zombieTimer % 300 === 0) {
+          bossHazards.push({
+            type: 'clock', x: e.x, y: e.y,
+            r: 16, hp: 40, life: 300, max: 300, color: '#7c4',
+            source: e
+          });
+        }
+      } else if (e.zombieAbility === 'bomb') {
+        // Kira débil: bomba pequeña en pies del jugador cada 5s
+        if (e.zombieTimer % 300 === 0 && distSq(player, e) < 320 * 320) {
+          bossHazards.push({
+            type: 'kqbomb', x: player.x, y: player.y,
+            r: 28, life: 110, max: 110, color: '#bca',
+            dmg: e.dmg * 0.6, source: e
+          });
+        }
+      } else if (e.zombieAbility === 'dash') {
+        // Vampiro/Warlord débil: embestida corta cada 3s
+        if (e.bossDashTimer === undefined) e.bossDashTimer = 0;
+        if (e.bossDashTimer > 0) {
+          e.bossDashTimer--;
+        } else if (e.zombieTimer % 180 === 0) {
+          e.bossDashTimer = 18;
+        }
       }
-      tx = nearest.x;
-      ty = nearest.y;
-      targetDecoy = nearest;
     }
+
+    let tx = player.x, ty = player.y;
     if (e.spinning > 0 && e.vortexTarget) {
       e.spinning--;
       e.spinAngle += 0.16;
@@ -3317,8 +3988,7 @@ function updateEnemies() {
       const period = e.type === 'boss' ? 50 : 110;
       if (e.shootTimer > period) {
         e.shootTimer = 0;
-        const aimAt = targetDecoy || player;
-        const a = Math.atan2(aimAt.y - e.y, aimAt.x - e.x);
+        const a = Math.atan2(player.y - e.y, player.x - e.x);
         const count = e.type === 'boss' ? 5 : 1;
         for (let i = 0; i < count; i++) {
           const off = (i - (count - 1) / 2) * 0.18;
@@ -3331,22 +4001,6 @@ function updateEnemies() {
       }
     }
 
-    // contacto con señuelo: refleja el daño que iba a recibir
-    for (let di = 0; di < decoys.length; di++) {
-      const d = decoys[di];
-      const dx = d.x - e.x, dy = d.y - e.y;
-      const rr = d.r + e.r;
-      if (dx * dx + dy * dy < rr * rr) {
-        damageEnemy(e, e.dmg * enemyDmgMult, '#fd0');
-        for (let p = 0; p < 3; p++) {
-          particles.push({
-            x: d.x, y: d.y,
-            vx: rand(-2,2), vy: rand(-2,2),
-            life: 16, max: 16, color: '#fd0', r: 2
-          });
-        }
-      }
-    }
     const playerHitR = player.r + e.r;
     if (distSq(player, e) < playerHitR * playerHitR && player.iframe <= 0 && !shieldActive) {
       const taken = e.dmg * enemyDmgMult;
@@ -3389,18 +4043,6 @@ function updateEnemies() {
       continue;
     }
     if (e.hp <= 0) {
-      if (e._converted) {
-        for (let p = 0; p < 8; p++) {
-          particles.push({
-            x: e.x, y: e.y,
-            vx: rand(-3,3), vy: rand(-3,3),
-            life: 22, max: 22, color: '#fd0', r: 3
-          });
-        }
-        e.dead = true;
-        enemies.splice(i, 1);
-        continue;
-      }
       if (e.infected > 0 && !e.miracle) {
         e.hp = 9999;
         convertToAlly(e, true);
@@ -3424,8 +4066,8 @@ function updateEnemies() {
       if (e.miracle) triggerMiracle(e);
       const bonus = e.markCoins || 0;
       player.coins += e.coins + bonus;
-      // Progresión Tusk Act 1 → 2 → 3 → 4 (slot 17)
-      if (active === 17 && owned.has(17)) {
+      // Progresión Tusk Act 1 → 2 → 3 → 4 (slot 18)
+      if (active === 18 && owned.has(18)) {
         if (tuskAct === 1) {
           tuskA1Kills++;
           if (tuskA1Kills >= 500 && !tuskUnlocked.has(2)) {
@@ -3447,6 +4089,16 @@ function updateEnemies() {
             tuskA4Flash = 300;
             effects.push({ type: 'flash', life: 40, max: 40, color: '#fd6' });
           }
+        }
+      }
+      // Progresión Gold Experience → Gold Experience Requiem (slot 16)
+      if (active === 16 && owned.has(16) && !gerUnlocked) {
+        gerKills++;
+        if (gerKills >= 4000) {
+          gerUnlocked = true;
+          geForm = 1;
+          effects.push({ type: 'flash', life: 44, max: 44, color: '#fe6' });
+          effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 34, max: 34, r: 0, color: '#fe6' });
         }
       }
       // Progresión White Snake → C-Moon → Made in Heaven (todo en slot 26)
@@ -3485,6 +4137,20 @@ function updateEnemies() {
           });
         }
       }
+      // Power-up drop: 3% normal, 15% en jefes, 60% en raid bosses; luna sangre = doble monedas
+      const isBoss = !!e.bossKind;
+      const isRaid = !!e.raid;
+      let dropChance = isRaid ? 1 : (isBoss ? 0.15 : 0.03);
+      if (Math.random() < dropChance) spawnPowerup(e.x, e.y);
+      // Raid bosses sueltan varias monedas extras + 1-3 power-ups
+      if (isRaid) {
+        const extraPU = e.raid === 'nightmare' ? 3 : 1;
+        for (let p = 0; p < extraPU; p++) spawnPowerup(e.x + rand(-30, 30), e.y + rand(-30, 30));
+        player.coins += e.coins; // double coins on top of normal
+        effects.push({ type: 'flash', life: 30, max: 30, color: e.raidGlow });
+      }
+      // Luna de sangre: monedas extra
+      if (bloodMoon) player.coins += Math.floor(e.coins);
       e.dead = true;
       enemies.splice(i, 1);
     }
@@ -3839,19 +4505,6 @@ function updateProjectiles() {
           p.hits.add(e.id);
         }
       }
-    } else if (p.type === 'transmute') {
-      for (let j = 0; j < enemies.length; j++) {
-        const e = enemies[j];
-        if (e.ally || e.preview) continue;
-        if (p.hits.has(e.id)) continue;
-        const rr = e.r + p.r;
-        if (distSq(e, p) < rr * rr) {
-          spawnDecoy(e.x, e.y);
-          e._converted = true;
-          e.hp = -1;
-          p.hits.add(e.id);
-        }
-      }
     } else if (p.type === 'smoke') {
       for (let j = 0; j < enemies.length; j++) {
         const e = enemies[j];
@@ -3874,6 +4527,41 @@ function updateProjectiles() {
           createFire(p.x, p.y);
           consumed = true;
           break;
+        }
+      }
+    } else if (p.type === 'pibbullet') {
+      for (let j = 0; j < enemies.length; j++) {
+        const e = enemies[j];
+        if (e.ally) continue;
+        const rr = e.r + p.r;
+        if (distSq(e, p) < rr * rr) {
+          // Si el daño no lo mata, el enemigo queda manchado contando 1 frame en charco
+          damageEnemy(e, p.dmg, p.neon ? '#fff' : '#000');
+          if (e.hp > 0) {
+            e.pibInPuddle = (e.pibInPuddle || 0) + 1;
+            e.pibLastTouch = frame;
+          }
+          createPibPuddle(p.x, p.y);
+          consumed = true;
+          break;
+        }
+      }
+    } else if (p.type === 'pibgiant') {
+      // Bala gigante de pintura: instakill por presión sobre todo lo que toca
+      if (!p.hits) p.hits = new Set();
+      for (let j = 0; j < enemies.length; j++) {
+        const e = enemies[j];
+        if (e.ally) continue;
+        if (p.hits.has(e.id)) continue;
+        const rr = e.r + p.r;
+        if (distSq(e, p) < rr * rr) {
+          p.hits.add(e.id);
+          // marca para X-corazón en la cutscene (no muere todavía si está en cutscene previa)
+          if (pibDayPhase >= 1) {
+            pibDayTargets.push({ id: e.id, x: e.x, y: e.y });
+          }
+          damageEnemy(e, 9999999, '#000');
+          createPibPuddle(e.x, e.y);
         }
       }
     } else if (p.type === 'bomb') {
@@ -4203,6 +4891,7 @@ function updateProjectiles() {
       if (p.type === 'vortex') createVortex(p.x, p.y);
       if (p.type === 'bomb' && p.life <= 0) explodeBomb(p.x, p.y);
       if (p.type === 'firebullet' && p.life <= 0) createFire(p.x, p.y);
+      if (p.type === 'pibbullet' && p.life <= 0) createPibPuddle(p.x, p.y);
       if (p.type === 'smoke' && p.life <= 0) createSmokeCloud(p.x, p.y);
       // burbujas grandes paren 5 burbujas hijas que también persiguen
       if (p.type === 'bubble' && p.split > 0 && p.life <= 0) {
@@ -4415,6 +5104,7 @@ function updateEffects() {
     f.life--;
     if (f.type === 'shockwave') f.r += 6;
     if (f.type === 'coin') f.y -= 1;
+    if (f.vx !== undefined) { f.x += f.vx; f.y += f.vy; }
     if (f.life <= 0) effects.splice(i, 1);
   }
 }
@@ -4428,13 +5118,22 @@ function draw() {
     if (shake < 0.4) shake = 0;
   }
 
-  // background
-  ctx.fillStyle = '#0c0c22';
+  // background — alterna día/noche cada 5 oleadas
+  const __night = isNightWave(wave);
+  ctx.fillStyle = __night ? '#02030a' : '#0c0c22';
   ctx.fillRect(0, 0, W, H);
-  ctx.strokeStyle = '#161636';
+  ctx.strokeStyle = __night ? '#0a0a1a' : '#161636';
   ctx.lineWidth = 1;
   for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
   for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  if (__night) {
+    // luna sutil en esquina superior derecha
+    const mx = W - 60, my = 60;
+    ctx.fillStyle = 'rgba(220, 220, 240, 0.18)';
+    ctx.beginPath(); ctx.arc(mx, my, 22, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(2, 3, 10, 0.9)';
+    ctx.beginPath(); ctx.arc(mx + 8, my - 4, 20, 0, Math.PI * 2); ctx.fill();
+  }
 
   // vortex fields
   vortexFields.forEach(v => {
@@ -4481,6 +5180,88 @@ function draw() {
     grd.addColorStop(1, 'rgba(120, 120, 120, 0)');
     ctx.fillStyle = grd;
     ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, Math.PI * 2); ctx.fill();
+  });
+
+  // ===== Luna de sangre overlay (background) =====
+  if (bloodMoon) {
+    const pulse = 0.05 + 0.04 * Math.sin(frame * 0.08);
+    ctx.fillStyle = `rgba(180, 20, 30, ${pulse})`;
+    ctx.fillRect(0, 0, W, H);
+    // luna roja en esquina superior derecha sobreescribiendo la luna normal
+    const mx = W - 60, my = 60;
+    ctx.fillStyle = `rgba(220, 30, 30, 0.7)`;
+    ctx.beginPath(); ctx.arc(mx, my, 28, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = `rgba(255, 80, 80, ${0.6 + 0.3 * Math.sin(frame * 0.2)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(mx, my, 30, 0, Math.PI * 2); ctx.stroke();
+    // bordes rojos pulsantes
+    ctx.strokeStyle = `rgba(220, 30, 30, ${0.6 + 0.3 * Math.sin(frame * 0.15)})`;
+    ctx.lineWidth = 6;
+    ctx.strokeRect(3, 3, W - 6, H - 6);
+  }
+
+  // ===== Power-ups en el suelo =====
+  powerups.forEach(pu => {
+    const info = POWERUP_TYPES[pu.type];
+    const bob = Math.sin(pu.bobPhase) * 3;
+    const fade = Math.min(1, pu.life / 120);
+    // halo
+    const grd = ctx.createRadialGradient(pu.x, pu.y + bob, 0, pu.x, pu.y + bob, 28);
+    grd.addColorStop(0, info.color + 'cc');
+    grd.addColorStop(1, info.color + '00');
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(pu.x, pu.y + bob, 28, 0, Math.PI * 2); ctx.fill();
+    // caja
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.arc(pu.x, pu.y + bob, 14, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = info.color;
+    ctx.lineWidth = 3;
+    ctx.globalAlpha = fade;
+    ctx.beginPath(); ctx.arc(pu.x, pu.y + bob, 14, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+    // icono
+    ctx.font = '16px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = info.color;
+    ctx.fillText(info.icon, pu.x, pu.y + bob);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+  });
+
+  // charcos de Paint It Black
+  pibPuddles.forEach(pd => {
+    const fade = Math.min(1, pd.life / 80);
+    const pulse = Math.sin(pd.phase) * 2;
+    const r = pd.r + pulse;
+    // base negra
+    const grd = ctx.createRadialGradient(pd.x, pd.y, 0, pd.x, pd.y, r);
+    grd.addColorStop(0, `rgba(0, 0, 0, ${0.95 * fade})`);
+    grd.addColorStop(0.7, `rgba(0, 0, 0, ${0.85 * fade})`);
+    grd.addColorStop(1, `rgba(0, 0, 0, 0)`);
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(pd.x, pd.y, r, 0, Math.PI * 2); ctx.fill();
+    // contorno arcoíris neón si es de noche
+    if (pd.neon) {
+      ctx.lineWidth = 3;
+      for (let s = 0; s < 6; s++) {
+        ctx.strokeStyle = `hsla(${(frame * 8 + s * 60) % 360}, 100%, 60%, ${0.7 * fade})`;
+        ctx.beginPath();
+        const off = s * 2.5;
+        ctx.arc(pd.x, pd.y, r + off, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      // glow exterior
+      const glow = ctx.createRadialGradient(pd.x, pd.y, r, pd.x, pd.y, r + 20);
+      glow.addColorStop(0, `hsla(${(frame * 8) % 360}, 100%, 60%, ${0.3 * fade})`);
+      glow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(pd.x, pd.y, r + 20, 0, Math.PI * 2); ctx.fill();
+    } else {
+      ctx.strokeStyle = `rgba(40, 40, 40, ${0.6 * fade})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(pd.x, pd.y, r, 0, Math.PI * 2); ctx.stroke();
+    }
   });
 
   // hogueras
@@ -5253,19 +6034,6 @@ function draw() {
       ctx.lineWidth = 1;
       ctx.stroke();
     }
-    if (p.type === 'transmute') {
-      const r = p.r + Math.sin(frame * 0.4) * 3;
-      const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 2);
-      grd.addColorStop(0, 'rgba(255, 240, 140, 0.85)');
-      grd.addColorStop(1, 'rgba(255, 200, 40, 0)');
-      ctx.fillStyle = grd;
-      ctx.beginPath(); ctx.arc(p.x, p.y, r * 2, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#fff8c0';
-      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
     if (p.type === 'redbolt') {
       const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 2.2);
       grd.addColorStop(0, 'rgba(255, 80, 120, 0.7)');
@@ -5311,6 +6079,73 @@ function draw() {
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#f73';
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 0.6, 0, Math.PI * 2); ctx.fill();
+    }
+    if (p.type === 'pibbullet') {
+      // estela negra
+      if (p.trail) {
+        p.trail.forEach((t, i) => {
+          const a = (i + 1) / p.trail.length;
+          ctx.fillStyle = p.neon
+            ? `hsla(${(frame * 12 + i * 30) % 360}, 100%, 55%, ${a * 0.5})`
+            : `rgba(0, 0, 0, ${a * 0.6})`;
+          ctx.beginPath(); ctx.arc(t.x, t.y, p.r * a * 0.85, 0, Math.PI * 2); ctx.fill();
+        });
+      }
+      // bala negra
+      ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+      if (p.neon) {
+        // contorno arcoíris
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = `hsl(${(frame * 14) % 360}, 100%, 60%)`;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 2, 0, Math.PI * 2); ctx.stroke();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = `hsl(${(frame * 14 + 120) % 360}, 100%, 60%)`;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 5, 0, Math.PI * 2); ctx.stroke();
+      } else {
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+    if (p.type === 'pibgiant') {
+      // bala gigante de pintura — pulsa
+      const pulse = Math.sin(frame * 0.35) * 4;
+      const r = p.r + pulse;
+      // glow oscuro
+      const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 1.6);
+      grd.addColorStop(0, 'rgba(0,0,0,0.9)');
+      grd.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r * 1.6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+      // contorno arcoíris neón si de noche, blanco brillante si de día
+      const night = isNightWave(wave);
+      if (night) {
+        for (let s = 0; s < 5; s++) {
+          ctx.strokeStyle = `hsl(${(frame * 10 + s * 72) % 360}, 100%, 60%)`;
+          ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.arc(p.x, p.y, r + s * 4, 0, Math.PI * 2); ctx.stroke();
+        }
+      } else {
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+        ctx.beginPath(); ctx.arc(p.x, p.y, r + 6, 0, Math.PI * 2); ctx.stroke();
+      }
+      // gotas de pintura cayendo
+      if (frame % 3 === 0) {
+        for (let s = 0; s < 3; s++) {
+          particles.push({
+            x: p.x + rand(-r * 0.7, r * 0.7),
+            y: p.y + rand(-r * 0.7, r * 0.7),
+            vx: rand(-1, 1), vy: rand(0.5, 2),
+            life: 22, max: 22, color: '#000', r: 3
+          });
+        }
+      }
     }
     if (p.type === 'bomb') {
       // Touch Bomb rosado. Si está stuck, pulsa rápido (countdown)
@@ -5540,6 +6375,9 @@ function draw() {
     if (e.ally) {
       ctx.fillStyle = e.dino ? '#6b3' : '#5cf';
       ctx.globalAlpha = 0.5 + 0.5 * Math.min(1, e.allyLife / 60);
+    } else if (e.zeroLoop) {
+      const pul = 0.5 + 0.5 * Math.sin(frame * 0.5 + e.id);
+      ctx.fillStyle = `rgb(${Math.floor(40 + 50 * pul)}, 8, 14)`;
     } else if (e.infected > 0) {
       ctx.fillStyle = '#5a3';
     } else if (e.frozen > 0 || timeStopTimer > 0) {
@@ -5561,6 +6399,59 @@ function draw() {
       ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
+    // Raid boss: aura pulsante alrededor + contorno grueso
+    if (e.raid && !e.ally) {
+      const pulse = 0.5 + 0.5 * Math.sin(frame * 0.18);
+      const auraR = e.r + 16 + pulse * 6;
+      const auraGrd = ctx.createRadialGradient(e.x, e.y, e.r, e.x, e.y, auraR);
+      auraGrd.addColorStop(0, e.raidGlow + 'aa');
+      auraGrd.addColorStop(1, e.raidGlow + '00');
+      ctx.fillStyle = auraGrd;
+      ctx.beginPath(); ctx.arc(e.x, e.y, auraR, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = e.raidGlow;
+      ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 4, 0, Math.PI * 2); ctx.stroke();
+      // chispas orbitales
+      for (let s = 0; s < 5; s++) {
+        const ang = frame * 0.06 + (s / 5) * Math.PI * 2;
+        const sr = e.r + 22 + Math.sin(frame * 0.1 + s) * 4;
+        ctx.fillStyle = e.raidGlow;
+        ctx.beginPath();
+        ctx.arc(e.x + Math.cos(ang) * sr, e.y + Math.sin(ang) * sr, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    // Manchado por Paint It Black: cubierta negra con goteo + contorno arcoíris si es de noche
+    if (e.pibStainTimer && e.pibStainTimer > 0 && !e.ally) {
+      ctx.save();
+      ctx.fillStyle = `rgba(0, 0, 0, 0.85)`;
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.r * 1.05, 0, Math.PI * 2); ctx.fill();
+      if (e.pibStainNeon) {
+        for (let s = 0; s < 4; s++) {
+          ctx.strokeStyle = `hsl(${(frame * 12 + s * 90) % 360}, 100%, 60%)`;
+          ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(e.x, e.y, e.r * 1.05 + s * 2, 0, Math.PI * 2); ctx.stroke();
+        }
+      }
+      // goteo de pintura
+      ctx.fillStyle = '#000';
+      const drip = (frame * 0.5) % (e.r * 1.4);
+      ctx.beginPath();
+      ctx.arc(e.x - e.r * 0.4, e.y + e.r * 0.6 + drip * 0.3, 3, 0, Math.PI * 2);
+      ctx.arc(e.x + e.r * 0.5, e.y + e.r * 0.7 + (drip * 0.4) % (e.r * 1.4), 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    // zombie nocturno: aura verde y ojos brillantes
+    if (e.type === 'zombie' && !e.ally) {
+      const pul = 0.5 + 0.5 * Math.sin(frame * 0.12 + e.id);
+      ctx.strokeStyle = `rgba(120, 220, 120, ${0.35 + 0.25 * pul})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 2, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#bf4';
+      ctx.beginPath(); ctx.arc(e.x - 4, e.y - 2, 1.8, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(e.x + 4, e.y - 2, 1.8, 0, Math.PI * 2); ctx.fill();
+    }
     // espinas de dinosaurio (aliado dino o infectado)
     if ((e.dino && e.ally) || (e.infected > 0 && !e.ally)) {
       ctx.fillStyle = e.dino ? '#cf6' : '#8e3';
@@ -5609,6 +6500,11 @@ function draw() {
       ctx.strokeStyle = `rgba(255, 80, 140, ${0.6 + 0.3 * Math.sin(frame * 0.2)})`;
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 5, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (e.zeroLoop) {
+      ctx.strokeStyle = `rgba(255, 230, 100, ${0.4 + 0.4 * Math.sin(frame * 0.4 + e.id)})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 4 + 2 * Math.sin(frame * 0.3), 0, Math.PI * 2); ctx.stroke();
     }
     if (e.rocks && e.rocks.length > 0) {
       e.rocks.forEach(r => {
@@ -5745,34 +6641,26 @@ function draw() {
       ctx.fillText(`🔥${Math.ceil(e.heat)}`, e.x, e.y - e.r - (e.bossName ? 32 : 18));
       ctx.textAlign = 'left';
     }
+    // Gold Experience — aura de sobrecarga (recibe daño aumentado)
+    if (e.geOvercharge > 0) {
+      const pulse = 0.5 + 0.5 * Math.sin(frame * 0.5);
+      const gr = e.r + 5 + pulse * 4;
+      ctx.strokeStyle = `rgba(255, 230, 100, ${0.5 + 0.4 * pulse})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(e.x, e.y, gr, 0, Math.PI * 2); ctx.stroke();
+      if (frame % 6 === 0) {
+        particles.push({
+          x: e.x + rand(-e.r, e.r), y: e.y + rand(-e.r, e.r),
+          vx: rand(-1, 1), vy: -0.5 - Math.random() * 1.5,
+          life: 16, max: 16, color: Math.random() > 0.5 ? '#fe6' : '#8e3', r: 2
+        });
+      }
+    }
   }
 
   // player
-  // señuelos (mini-yo)
-  decoys.forEach(d => {
-    const r = d.r + Math.sin(frame * 0.18) * 1.5;
-    // aura dorada
-    const grd = ctx.createRadialGradient(d.x, d.y, r, d.x, d.y, r + 12);
-    grd.addColorStop(0, 'rgba(255, 220, 80, 0.3)');
-    grd.addColorStop(1, 'rgba(255, 220, 80, 0)');
-    ctx.fillStyle = grd;
-    ctx.beginPath(); ctx.arc(d.x, d.y, r + 12, 0, Math.PI * 2); ctx.fill();
-    // cuerpo (mini player)
-    ctx.fillStyle = '#9cf';
-    ctx.beginPath(); ctx.arc(d.x, d.y, r, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#fd0';
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(d.x, d.y, r, 0, Math.PI * 2); ctx.stroke();
-    // timer bar
-    const w = r * 2;
-    ctx.fillStyle = '#420';
-    ctx.fillRect(d.x - w/2, d.y - r - 7, w, 3);
-    ctx.fillStyle = '#fd0';
-    ctx.fillRect(d.x - w/2, d.y - r - 7, w * (d.life / d.maxLife), 3);
-  });
-
   // aura rosa de Carmesí Inmortal
-  if (active === 23) {
+  if (active === 17) {
     const R = player.r + 18 + Math.sin(frame * 0.18) * 3;
     const grd = ctx.createRadialGradient(player.x, player.y, player.r + 2, player.x, player.y, R);
     grd.addColorStop(0, 'rgba(255, 120, 180, 0.35)');
@@ -5786,6 +6674,39 @@ function draw() {
     ctx.strokeStyle = `rgba(120, 180, 255, ${0.6 * pulse})`;
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(player.x, player.y, player.r + 8 + pulse * 4, 0, Math.PI * 2); ctx.stroke();
+  }
+  // Auras de power-up activos
+  if (puDmgTimer > 0) {
+    const pulse = 0.5 + 0.5 * Math.sin(frame * 0.3);
+    ctx.strokeStyle = `rgba(244, 80, 130, ${0.7 * pulse})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(player.x, player.y, player.r + 6, 0, Math.PI * 2); ctx.stroke();
+  }
+  if (puRateTimer > 0) {
+    const ang = frame * 0.4;
+    ctx.strokeStyle = '#fc4';
+    ctx.lineWidth = 2;
+    for (let s = 0; s < 3; s++) {
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, player.r + 10, ang + s * Math.PI * 2 / 3, ang + s * Math.PI * 2 / 3 + 0.8);
+      ctx.stroke();
+    }
+  }
+  if (puInvulnTimer > 0) {
+    const pulse = Math.sin(frame * 0.3) * 3;
+    const auraR = player.r + 14 + pulse;
+    const grd = ctx.createRadialGradient(player.x, player.y, player.r, player.x, player.y, auraR);
+    grd.addColorStop(0, 'rgba(100, 200, 255, 0.55)');
+    grd.addColorStop(1, 'rgba(100, 200, 255, 0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(player.x, player.y, auraR, 0, Math.PI * 2); ctx.fill();
+  }
+  if (puMagnetTimer > 0) {
+    ctx.strokeStyle = `rgba(255, 230, 100, ${0.4 + 0.2 * Math.sin(frame * 0.15)})`;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath(); ctx.arc(player.x, player.y, 220, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
   }
   const blink = player.iframe > 0 && player.iframe % 8 < 4;
   ctx.fillStyle = blink ? '#fff' : '#9cf';
@@ -5951,6 +6872,31 @@ function draw() {
       ctx.fillText(f.big ? 'ORAAA!!' : 'ORA', f.x, f.y + yOff);
       ctx.shadowBlur = 0;
       ctx.textAlign = 'left';
+      ctx.globalAlpha = 1;
+    } else if (f.type === 'muda') {
+      ctx.globalAlpha = f.life / f.max;
+      ctx.font = 'bold 20px monospace';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = '#fe6';
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = '#fd0';
+      const yOff = (1 - f.life / f.max) * -14;
+      ctx.fillText('MUDA', f.x, f.y + yOff);
+      ctx.shadowBlur = 0;
+      ctx.textAlign = 'left';
+      ctx.globalAlpha = 1;
+    } else if (f.type === 'mudafist') {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, f.life / f.max + 0.2);
+      ctx.translate(f.x, f.y);
+      ctx.rotate(f.rot || 0);
+      ctx.font = `${f.size || 18}px serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('👊', 0, 0);
+      ctx.restore();
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
       ctx.globalAlpha = 1;
     }
   });
@@ -7883,6 +8829,363 @@ function draw() {
     ctx.restore();
   }
 
+  // Paint It Black — DÍA cutscene: BLACK, EVERYTHING MUST BE BLACK
+  if (pibDayPhase > 0) {
+    // ===== Fase 1: pose + disparo de la bala gigante =====
+    if (pibDayPhase === 1) {
+      const t = 1 - pibDayTimer / 50;
+      // viñeta negra que cierra
+      const grd = ctx.createRadialGradient(W / 2, H / 2, 100, W / 2, H / 2, Math.max(W, H));
+      grd.addColorStop(0, `rgba(0, 0, 0, ${0.05 + 0.2 * t})`);
+      grd.addColorStop(1, `rgba(0, 0, 0, ${0.6 + 0.3 * t})`);
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, W, H);
+      // gotas de pintura escurriendo desde arriba
+      for (let s = 0; s < 14; s++) {
+        const sx = (s * 73 + frame * 4) % W;
+        const sy = -20 + ((frame * 6 + s * 53) % (H + 40));
+        ctx.fillStyle = `rgba(0, 0, 0, ${0.55 * t})`;
+        ctx.beginPath();
+        ctx.arc(sx, sy, 5 + (s % 3) * 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillRect(sx - 2, sy - 30, 4, 30);
+      }
+    }
+
+    // ===== Fase 2: BLACK, EVERYTHING MUST BE BLACK (cinemática manga) =====
+    if (pibDayPhase === 2) {
+      const t = 1 - pibDayTimer / 110;
+      // fondo negro con paneles diagonales tipo manga
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.92)';
+      ctx.fillRect(0, 0, W, H);
+      // panel diagonal blanco roto detrás del personaje
+      ctx.save();
+      ctx.translate(W * 0.32, H / 2);
+      ctx.rotate(-0.12);
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.06 + 0.1 * Math.min(1, t * 2)})`;
+      ctx.fillRect(-W, -160, W * 1.4, 320);
+      ctx.restore();
+      // líneas de velocidad/impacto radiales saliendo del centro
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.18 + 0.1 * Math.sin(frame * 0.3)})`;
+      ctx.lineWidth = 2;
+      const cx0 = W * 0.32, cy0 = H * 0.5;
+      for (let s = 0; s < 40; s++) {
+        const ang = (s / 40) * Math.PI * 2 + frame * 0.01;
+        ctx.beginPath();
+        ctx.moveTo(cx0 + Math.cos(ang) * 180, cy0 + Math.sin(ang) * 180);
+        ctx.lineTo(cx0 + Math.cos(ang) * 800, cy0 + Math.sin(ang) * 800);
+        ctx.stroke();
+      }
+      // gotas de pintura goteando
+      for (let s = 0; s < 24; s++) {
+        const sx = (s * 91 + frame * 2) % W;
+        const sy = (s * 131 + frame * 3) % H;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+        ctx.beginPath(); ctx.arc(sx, sy, 4 + (s % 3) * 3, 0, Math.PI * 2); ctx.fill();
+      }
+      // ===== retrato gigante del personaje (estilo manga) =====
+      ctx.save();
+      const portraitX = W * 0.30, portraitY = H * 0.58;
+      const scale = 2.6 + Math.min(1, t * 2) * 0.3;
+      ctx.translate(portraitX, portraitY);
+      ctx.scale(scale, scale);
+      // cabeza
+      ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.arc(0, -34, 30, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.arc(0, -34, 30, 0, Math.PI * 2); ctx.stroke();
+      // ojos (sombra dramática, solo brillos)
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(-14, -42, 8, 3);
+      ctx.fillRect(6, -42, 8, 3);
+      // boca abierta gritando
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.ellipse(0, -22, 8, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.arc(0, -18, 4, 0, Math.PI * 2); ctx.fill();
+      // cuello + torso
+      ctx.fillStyle = '#000';
+      ctx.fillRect(-26, -8, 52, 50);
+      ctx.strokeStyle = '#fff';
+      ctx.strokeRect(-26, -8, 52, 50);
+      // brazo apuntando una pistola hacia adelante (a la derecha)
+      ctx.fillStyle = '#000';
+      ctx.fillRect(20, -4, 60, 12);
+      ctx.strokeStyle = '#fff';
+      ctx.strokeRect(20, -4, 60, 12);
+      // pistola
+      ctx.fillStyle = '#111';
+      ctx.fillRect(78, -8, 28, 20);
+      ctx.strokeStyle = '#fff';
+      ctx.strokeRect(78, -8, 28, 20);
+      ctx.fillRect(82, 12, 8, 14);
+      // chispazo del cañón
+      if ((frame >> 2) % 2 === 0) {
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.moveTo(108, 2);
+        ctx.lineTo(124, -6);
+        ctx.lineTo(122, 4);
+        ctx.lineTo(140, 2);
+        ctx.lineTo(122, 8);
+        ctx.lineTo(126, 16);
+        ctx.lineTo(108, 6);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // ===== texto en cascada: "BLACK." → "EVERYTHING MUST BE BLACK." =====
+      ctx.save();
+      ctx.textAlign = 'left';
+      // BLACK.
+      const t1 = Math.max(0, Math.min(1, (t - 0.05) * 3));
+      const sizeBig = 70 + t1 * 30;
+      ctx.font = `900 ${sizeBig}px monospace`;
+      ctx.shadowColor = '#fff';
+      ctx.shadowBlur = 22;
+      ctx.fillStyle = `rgba(255, 255, 255, ${t1})`;
+      ctx.fillText('BLACK,', W * 0.50, H * 0.32);
+      // EVERYTHING MUST
+      const t2 = Math.max(0, Math.min(1, (t - 0.35) * 3));
+      ctx.font = `bold ${36 + t2 * 14}px monospace`;
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = `rgba(255, 255, 255, ${t2})`;
+      ctx.fillText('EVERYTHING MUST', W * 0.50, H * 0.52);
+      // BE BLACK.
+      const t3 = Math.max(0, Math.min(1, (t - 0.6) * 4));
+      ctx.font = `900 ${56 + t3 * 30}px monospace`;
+      ctx.shadowBlur = 26;
+      ctx.fillStyle = `rgba(255, 255, 255, ${t3})`;
+      ctx.fillText('BE BLACK.', W * 0.50, H * 0.72);
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+
+    // ===== Fase 3: corazones X + presión (manga panel sobre cada víctima) =====
+    if (pibDayPhase === 3) {
+      // overlay rojo-negro pulsante
+      ctx.fillStyle = `rgba(40, 0, 0, ${0.55 * Math.min(1, pibDayTimer / 50)})`;
+      ctx.fillRect(0, 0, W, H);
+      const t = 1 - pibDayTimer / 60;
+      pibDayTargets.forEach((tg, idx) => {
+        ctx.save();
+        ctx.translate(tg.x, tg.y);
+        const beat = 1 - t * 0.7; // el corazón se aplasta
+        ctx.scale(1.6 * beat, 1.6 * beat);
+        // halo blanco detrás
+        const halo = ctx.createRadialGradient(0, 0, 6, 0, 0, 40);
+        halo.addColorStop(0, 'rgba(255,255,255,0.6)');
+        halo.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = halo;
+        ctx.beginPath(); ctx.arc(0, 0, 40, 0, Math.PI * 2); ctx.fill();
+        // corazón blanco
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.moveTo(0, 14);
+        ctx.bezierCurveTo(-22, -4, -22, -28, 0, -14);
+        ctx.bezierCurveTo(22, -28, 22, -4, 0, 14);
+        ctx.closePath(); ctx.fill();
+        // fisuras (presión)
+        ctx.strokeStyle = '#a22';
+        ctx.lineWidth = 1.2;
+        for (let f = 0; f < 4; f++) {
+          ctx.beginPath();
+          ctx.moveTo(rand(-8, 8), rand(-8, 8));
+          ctx.lineTo(rand(-12, 12), rand(-12, 12));
+          ctx.stroke();
+        }
+        // X negra de pintura goteando
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-12, -12); ctx.lineTo(12, 10);
+        ctx.moveTo(12, -12); ctx.lineTo(-12, 10);
+        ctx.stroke();
+        // gotas negras goteando
+        ctx.fillStyle = '#000';
+        ctx.beginPath(); ctx.arc(-8, 14 + t * 8, 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(10, 12 + t * 10, 2, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        // texto "CRACK!" emergente
+        if (idx % 3 === 0) {
+          ctx.save();
+          ctx.translate(tg.x + rand(-10, 10), tg.y - 30 - t * 16);
+          ctx.font = 'bold 18px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = `rgba(255, 80, 80, ${1 - t})`;
+          ctx.shadowColor = '#000';
+          ctx.shadowBlur = 6;
+          ctx.fillText('CRACK!', 0, 0);
+          ctx.shadowBlur = 0;
+          ctx.restore();
+        }
+      });
+      // título central
+      ctx.save();
+      ctx.textAlign = 'center';
+      const titleSize = 40 + (1 - pibDayTimer / 60) * 32;
+      ctx.font = `900 ${titleSize}px monospace`;
+      ctx.shadowColor = '#f44';
+      ctx.shadowBlur = 22;
+      ctx.fillStyle = `rgba(255, 230, 230, ${Math.min(1, (1 - pibDayTimer / 60) * 2)})`;
+      ctx.fillText('— PRESIÓN —', W / 2, 80);
+      ctx.shadowBlur = 0;
+      ctx.restore();
+      ctx.textAlign = 'left';
+    }
+  }
+
+  // Paint It Black — NOCHE cutscene: dash con hitbox total + ráfaga de golpes
+  if (pibNightPhase > 0) {
+    // ===== Fase 1: pose de carga + texto "PAINT IT BLACK" =====
+    if (pibNightPhase === 1) {
+      const t = 1 - pibNightTimer / 60;
+      ctx.fillStyle = `rgba(0,0,0,${0.55 + 0.3 * t})`;
+      ctx.fillRect(0, 0, W, H);
+      // anillos arcoíris expandiéndose desde el jugador
+      for (let s = 0; s < 4; s++) {
+        const r = 40 + (frame * 4 + s * 30) % 220;
+        ctx.strokeStyle = `hsla(${(frame * 18 + s * 90) % 360}, 100%, 60%, ${0.7 * (1 - r / 220)})`;
+        ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(player.x, player.y, r, 0, Math.PI * 2); ctx.stroke();
+      }
+      // texto PAINT IT BLACK con outline arcoíris
+      ctx.textAlign = 'center';
+      ctx.font = `900 ${72 + t * 36}px monospace`;
+      ctx.shadowColor = `hsl(${(frame * 18) % 360}, 100%, 60%)`;
+      ctx.shadowBlur = 30;
+      ctx.fillStyle = '#000';
+      ctx.strokeStyle = `hsl(${(frame * 18) % 360}, 100%, 60%)`;
+      ctx.lineWidth = 5;
+      ctx.strokeText('PAINT IT BLACK', W / 2, H / 2);
+      ctx.fillText('PAINT IT BLACK', W / 2, H / 2);
+      ctx.shadowBlur = 0;
+      ctx.textAlign = 'left';
+    }
+
+    // ===== Fase 2: DASH gigante con hitbox total + ráfaga de golpes BLACK =====
+    if (pibNightPhase === 2) {
+      const phaseT = 1 - pibNightTimer / 110;
+      // fondo negro de fondo
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+      ctx.fillRect(0, 0, W, H);
+      // bandas arcoíris horizontales como fondo
+      for (let s = 0; s < 8; s++) {
+        ctx.fillStyle = `hsla(${(frame * 18 + s * 45) % 360}, 100%, 50%, 0.10)`;
+        ctx.fillRect(0, (H / 8) * s, W, H / 8);
+      }
+      // líneas de velocidad diagonales (dash)
+      ctx.lineWidth = 3;
+      for (let s = 0; s < 60; s++) {
+        const hue = (frame * 22 + s * 17) % 360;
+        ctx.strokeStyle = `hsla(${hue}, 100%, 60%, 0.55)`;
+        const offset = (frame * 28 + s * 41) % (W + H);
+        ctx.beginPath();
+        ctx.moveTo(-100 + offset, -100);
+        ctx.lineTo(-100 + offset - 200, H + 100);
+        ctx.stroke();
+      }
+      // afterimages del jugador a lo largo del mapa (efecto dash que cubre todo)
+      const afterCount = 14;
+      for (let s = 0; s < afterCount; s++) {
+        const at = (frame * 0.4 + s) % afterCount / afterCount;
+        const ax = W * at + Math.sin(frame * 0.1 + s) * 30;
+        const ay = H / 2 + Math.cos(frame * 0.15 + s * 0.8) * (H * 0.35);
+        const hue = (frame * 22 + s * 30) % 360;
+        // silueta
+        ctx.fillStyle = `hsla(${hue}, 100%, 60%, 0.6)`;
+        ctx.beginPath(); ctx.arc(ax, ay, player.r + 2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.beginPath(); ctx.arc(ax, ay, player.r, 0, Math.PI * 2); ctx.fill();
+      }
+      // spawn de puños volando hacia enemigos (cada 2 frames)
+      if (frame % 2 === 0) {
+        for (let j = 0; j < enemies.length; j++) {
+          const e = enemies[j];
+          if (e.ally) continue;
+          const fa = Math.random() * Math.PI * 2;
+          const d = 30 + Math.random() * 20;
+          effects.push({
+            type: 'mudafist',
+            x: e.x + Math.cos(fa) * d, y: e.y + Math.sin(fa) * d,
+            vx: -Math.cos(fa) * 6, vy: -Math.sin(fa) * 6,
+            rot: rand(-0.6, 0.6), life: 10, max: 10, size: 22 + Math.random() * 10
+          });
+          // chispa arcoíris en el impacto
+          for (let p = 0; p < 2; p++) {
+            particles.push({
+              x: e.x, y: e.y,
+              vx: rand(-5, 5), vy: rand(-5, 5),
+              life: 18, max: 18,
+              color: `hsl(${(frame * 24 + p * 60) % 360}, 100%, 60%)`, r: 3
+            });
+          }
+        }
+        // puños extra rodeando al jugador
+        for (let s = 0; s < 4; s++) {
+          const a = Math.random() * Math.PI * 2;
+          const r = 50 + Math.random() * 80;
+          effects.push({
+            type: 'mudafist',
+            x: player.x + Math.cos(a) * r, y: player.y + Math.sin(a) * r,
+            vx: Math.cos(a + Math.PI) * 6, vy: Math.sin(a + Math.PI) * 6,
+            rot: a, life: 10, max: 10, size: 24 + Math.random() * 8
+          });
+        }
+      }
+      // texto "BLACK" repetido y caótico por toda la pantalla
+      ctx.save();
+      ctx.textAlign = 'center';
+      const count = 22;
+      for (let s = 0; s < count; s++) {
+        const x = ((s * 113 + frame * 9) % (W + 200)) - 100;
+        const y = ((s * 191 + frame * 14) % (H + 200)) - 100;
+        const hue = (frame * 20 + s * 35) % 360;
+        const size = 28 + (s % 4) * 18;
+        ctx.font = `900 ${size}px monospace`;
+        ctx.shadowColor = `hsl(${hue}, 100%, 60%)`;
+        ctx.shadowBlur = 18;
+        ctx.fillStyle = '#000';
+        ctx.strokeStyle = `hsl(${hue}, 100%, 65%)`;
+        ctx.lineWidth = 3;
+        ctx.strokeText('BLACK', x, y);
+        ctx.fillText('BLACK', x, y);
+      }
+      // título central palpitante
+      ctx.font = `900 ${88 + Math.sin(frame * 0.4) * 12}px monospace`;
+      ctx.shadowColor = `hsl(${(frame * 28) % 360}, 100%, 65%)`;
+      ctx.shadowBlur = 32;
+      ctx.fillStyle = '#000';
+      ctx.strokeStyle = `hsl(${(frame * 28) % 360}, 100%, 65%)`;
+      ctx.lineWidth = 6;
+      const titleY = H / 2 + Math.sin(frame * 0.5) * 6;
+      ctx.strokeText('BLACK!!', W / 2, titleY);
+      ctx.fillText('BLACK!!', W / 2, titleY);
+      ctx.shadowBlur = 0;
+      ctx.restore();
+      ctx.textAlign = 'left';
+    }
+
+    // ===== Fase 3: fade =====
+    if (pibNightPhase === 3) {
+      ctx.fillStyle = `rgba(0,0,0,${pibNightTimer / 30 * 0.5})`;
+      ctx.fillRect(0, 0, W, H);
+      // residuos arcoíris
+      for (let s = 0; s < 6; s++) {
+        const hue = (frame * 14 + s * 60) % 360;
+        ctx.strokeStyle = `hsla(${hue}, 100%, 60%, ${pibNightTimer / 30})`;
+        ctx.lineWidth = 2;
+        const y = (s * 60 + frame * 6) % H;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y - 18); ctx.stroke();
+      }
+    }
+  }
+
   // flash blanco del Phi
   if (whiteFlashTimer > 0) {
     const a = (whiteFlashTimer / 180) * 0.92;
@@ -7901,6 +9204,27 @@ function draw() {
     ctx.font = 'bold 16px monospace';
     ctx.textAlign = 'center';
     ctx.fillText(`CARMESÍ INMORTAL — ${(redModeTimer / 60).toFixed(1)}s`, W / 2, 30);
+    ctx.textAlign = 'left';
+  }
+
+  // ===== Anuncio (raid boss / blood moon / etc) =====
+  if (raidAnnounceTimer > 0) {
+    raidAnnounceTimer--;
+    const t = Math.min(1, raidAnnounceTimer / 60);
+    const fadeIn = Math.min(1, (200 - raidAnnounceTimer) / 30);
+    const a = Math.min(t * 1.4, fadeIn);
+    ctx.save();
+    ctx.textAlign = 'center';
+    const pulse = 1 + Math.sin(frame * 0.4) * 0.04;
+    const size = 56 * pulse;
+    ctx.font = `900 ${size}px monospace`;
+    ctx.shadowColor = raidAnnounceColor;
+    ctx.shadowBlur = 30;
+    ctx.fillStyle = raidAnnounceColor;
+    ctx.fillText(raidAnnounceText, W / 2, 160);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+    ctx.restore();
     ctx.textAlign = 'left';
   }
 
@@ -7941,13 +9265,42 @@ function drawUI() {
   ctx.fillStyle = mode === 'sandbox' ? '#ff4' : (mode === 'easy' ? '#4f8' : (mode === 'hard' ? '#f44' : '#88f'));
   ctx.font = '11px monospace';
   ctx.fillText(`[${mode.toUpperCase()}]`, 130, 78);
+  // Indicador día/noche (con Luna de Sangre)
+  const __isNight = isNightWave(wave);
+  if (bloodMoon) {
+    ctx.fillStyle = `rgba(255, 60, 60, ${0.7 + 0.3 * Math.sin(frame * 0.2)})`;
+    ctx.font = 'bold 11px monospace';
+    ctx.fillText('🌑 LUNA SANGRE', 175, 78);
+  } else {
+    ctx.fillStyle = __isNight ? '#8af' : '#fd6';
+    ctx.font = 'bold 11px monospace';
+    ctx.fillText(__isNight ? 'NOCHE' : 'DIA', 175, 78);
+  }
+  // Power-ups activos (HUD compacto a la derecha)
+  let puY = 50;
+  const puList = [
+    { active: puDmgTimer > 0, t: puDmgTimer, info: POWERUP_TYPES.dmg, key: 'dmg' },
+    { active: puRateTimer > 0, t: puRateTimer, info: POWERUP_TYPES.rate, key: 'rate' },
+    { active: puInvulnTimer > 0, t: puInvulnTimer, info: POWERUP_TYPES.invuln, key: 'invuln' },
+    { active: puMagnetTimer > 0, t: puMagnetTimer, info: POWERUP_TYPES.magnet, key: 'magnet' },
+  ];
+  puList.forEach(p => {
+    if (!p.active) return;
+    ctx.fillStyle = p.info.color;
+    ctx.font = 'bold 13px monospace';
+    ctx.fillText(`${p.info.icon} ${p.info.name} ${(p.t / 60).toFixed(1)}s`, W - 260, puY);
+    puY += 18;
+  });
   ctx.font = '14px monospace';
   if (active === 26) {
     ctx.fillStyle = STAND_COLORS[standForm];
     ctx.fillText(`27. ${STAND_LABELS[standForm]}`, 20, 98);
-  } else if (active === 17) {
+  } else if (active === 18) {
     ctx.fillStyle = TUSK_COLORS[tuskAct];
-    ctx.fillText(`18. ${TUSK_LABELS[tuskAct]}`, 20, 98);
+    ctx.fillText(`19. ${TUSK_LABELS[tuskAct]}`, 20, 98);
+  } else if (active === 16 && geForm === 1) {
+    ctx.fillStyle = '#fe6';
+    ctx.fillText(`17. Gold Experience Requiem`, 20, 98);
   } else {
     ctx.fillStyle = ABILITIES[active].color;
     ctx.fillText(`${ABILITIES[active].name}`, 20, 98);
@@ -8089,7 +9442,7 @@ function drawUI() {
       ctx.fillText(`🦖${dinos} · 🦠${infected}`, 480, 33);
     }
   }
-  if (active === 18) {
+  if (active === 19) {
     if (ltActiveTimer > 0) {
       ctx.fillStyle = '#fd0';
       ctx.fillText(`✨ LOVE TRAIN ${(ltActiveTimer / 60).toFixed(1)}s`, 280, 33);
@@ -8104,7 +9457,7 @@ function drawUI() {
       ctx.fillText(`L Love Train: LISTO`, 280, 33);
     }
   }
-  if (active === 19) {
+  if (active === 20) {
     if (starPlatinumPhase > 0) {
       ctx.fillStyle = '#ff0';
       ctx.fillText(`⏱ ZA WARUDO`, 280, 33);
@@ -8119,7 +9472,7 @@ function drawUI() {
       ctx.fillText(`R The World: LISTO`, 280, 33);
     }
   }
-  if (active === 20) {
+  if (active === 21) {
     if (dioPhase > 0) {
       ctx.fillStyle = '#fd2';
       ctx.fillText(`⏱ ZA WARUDO!`, 280, 33);
@@ -8134,7 +9487,7 @@ function drawUI() {
       ctx.fillText(`Z The World: LISTO`, 280, 33);
     }
   }
-  if (active === 21) {
+  if (active === 22) {
     if (kqPhase > 0) {
       ctx.fillStyle = '#f48';
       ctx.fillText(`💖 BITES THE DUST`, 280, 33);
@@ -8146,7 +9499,7 @@ function drawUI() {
       ctx.fillText(`G Bites the Dust: LISTO`, 280, 33);
     }
   }
-  if (active === 23) {
+  if (active === 17) {
     if (redModeTimer > 0) {
       ctx.fillStyle = '#f48';
       ctx.fillText(`❤ CARMESÍ ${(redModeTimer / 60).toFixed(1)}s`, 280, 33);
@@ -8184,7 +9537,20 @@ function drawUI() {
       ctx.fillText(`X Calamidad: LISTO`, 440, 33);
     }
   }
-  if (active === 17) {
+  if (active === 27) {
+    const night = isNightWave(wave);
+    if (pibDayPhase > 0 || pibNightPhase > 0) {
+      ctx.fillStyle = night ? `hsl(${(frame * 12) % 360}, 100%, 60%)` : '#fff';
+      ctx.fillText(night ? `🌈 BLACK!` : `🖤 BLACK!`, 280, 33);
+    } else if (pibLetterCD > 0) {
+      ctx.fillStyle = '#888';
+      ctx.fillText(`P Paint It Black: ${(pibLetterCD / 60).toFixed(0)}s`, 280, 33);
+    } else {
+      ctx.fillStyle = night ? `hsl(${(frame * 12) % 360}, 100%, 60%)` : '#fff';
+      ctx.fillText(night ? `P Paint It Black: LISTO (NOCHE)` : `P Paint It Black: LISTO (DÍA)`, 280, 33);
+    }
+  }
+  if (active === 18) {
     // Estado por Acto: ult + kill counter
     if (tuskAct === 1) {
       ctx.fillStyle = '#fea';
@@ -8218,19 +9584,33 @@ function drawUI() {
     }
   }
   if (active === 16) {
-    if (mirageCD > 0) {
+    if (mudaPhase > 0) {
+      ctx.fillStyle = '#fd0';
+      ctx.fillText(`👊 MUDA MUDA MUDA!`, 280, 33);
+    } else if (mirageCD > 0) {
       ctx.fillStyle = '#888';
-      ctx.fillText(`K Espejismo: ${(mirageCD / 60).toFixed(0)}s`, 280, 33);
+      ctx.fillText(`K Muda Muda: ${(mirageCD / 60).toFixed(0)}s`, 280, 33);
     } else {
       ctx.fillStyle = '#fd0';
-      ctx.fillText(`K Espejismo: LISTO`, 280, 33);
+      ctx.fillText(`K Muda Muda: LISTO`, 280, 33);
     }
-    if (decoys.length > 0) {
-      ctx.fillStyle = '#fd0';
-      ctx.fillText(`Señuelos: ${decoys.length}`, 440, 33);
+    if (geForm === 1) {
+      if (gerReturnTimer > 0) {
+        ctx.fillStyle = '#fe6';
+        ctx.fillText(`☯ RETURN TO ZERO ${(gerReturnTimer / 60).toFixed(1)}s`, 480, 33);
+      } else if (gerReturnCD > 0) {
+        ctx.fillStyle = '#888';
+        ctx.fillText(`R Return to Zero: ${(gerReturnCD / 60).toFixed(0)}s`, 480, 33);
+      } else {
+        ctx.fillStyle = '#fe6';
+        ctx.fillText(`R Return to Zero: LISTO`, 480, 33);
+      }
+    } else if (!gerUnlocked) {
+      ctx.fillStyle = gerKills >= 4000 ? '#fe6' : '#fff';
+      ctx.fillText(`☠ Kills GER: ${Math.min(gerKills, 4000)}/4000`, 480, 33);
     }
   }
-  if (active === 22) {
+  if (active === 23) {
     if (smokeFogTimer > 0) {
       ctx.fillStyle = '#fff';
       ctx.fillText(`🌫 NIEBLA ${(smokeFogTimer / 60).toFixed(1)}s`, 280, 33);
@@ -8553,6 +9933,17 @@ function restart() {
   effects.length = 0;
   vortexFields.length = 0;
   fires.length = 0;
+  pibPuddles.length = 0;
+  pibLetterCD = 0; pibDayPhase = 0; pibDayTimer = 0; pibDayTargets = [];
+  pibNightPhase = 0; pibNightTimer = 0;
+  powerups.length = 0;
+  noCooldowns = false; bloodMoon = false; bloodMoonWave = -1;
+  coinRainTimer = 0; raidAnnounceTimer = 0;
+  puDmgTimer = 0; puRateTimer = 0; puInvulnTimer = 0; puMagnetTimer = 0;
+  const nocdCheckbox = document.getElementById('sb-nocd');
+  const bmCheckbox = document.getElementById('sb-bloodmoon');
+  if (nocdCheckbox) nocdCheckbox.checked = false;
+  if (bmCheckbox) bmCheckbox.checked = false;
   bossHazards.length = 0;
   rewindBuffer.length = 0;
   owned.clear(); owned.add(0);
@@ -8582,7 +9973,9 @@ function restart() {
   smokeFogTimer = 0; smokeFogCD = 0; smokeClouds.length = 0;
   webModeTimer = 0; webModeCD = 0;
   redModeTimer = 0; preKillCredits = 0;
-  mirageCD = 0; decoys.length = 0;
+  mirageCD = 0; mudaPhase = 0; mudaTimer = 0;
+  geForm = 0; gerUnlocked = false; gerKills = 0;
+  gerReturnTimer = 0; gerReturnCD = 0;
   vortexUltCD = 0; vortexUltPhase = 0; vortexUltTimer = 0;
   goldenRatioTimer = 0; whiteFlashTimer = 0;
   bubbleBulletMode = false; bubbleUltCD = 0; bubbleUltPhase = 0; bubbleUltTimer = 0;
@@ -8613,6 +10006,7 @@ function loop() {
 
   if (gameStarted && !shopOpen && !paused && !gameOver) {
     updatePlayer();
+    updateGerReturn();
     updateRain();
     if (timeStopTimer === 0) {
       updateEnemies();
@@ -8621,8 +10015,11 @@ function loop() {
     updateVortexFields();
     updateBossHazards();
     updateFires();
+    updatePowerups();
+    updatePibPuddles();
+    updatePibLetter();
     updateSmokeClouds();
-    updateDecoys();
+    updateMuda();
     processWebMode();
     updateParticles();
     updateEffects();
@@ -8657,6 +10054,9 @@ document.querySelectorAll('#modes button').forEach(btn => {
       standFormUnlocked.add(2);
       // y todos los Tusk Acts desbloqueados
       tuskUnlocked.add(2); tuskUnlocked.add(3); tuskUnlocked.add(4);
+      // Gold Experience empieza en su forma base; GER se gana con 4000 kills
+      // (o con el botón "Desbloquear todo" del panel sandbox)
+      gerUnlocked = false; geForm = 0; gerKills = 0;
       player.coins = 99999;
       sandboxOpen = true;
       sandboxPanel.style.display = 'block';
@@ -8673,6 +10073,7 @@ document.getElementById('sb-unlock').addEventListener('click', () => {
   standFormUnlocked.add(1);
   standFormUnlocked.add(2);
   tuskUnlocked.add(2); tuskUnlocked.add(3); tuskUnlocked.add(4);
+  gerUnlocked = true; geForm = 1;
 });
 document.getElementById('sb-heal').addEventListener('click', () => {
   player.maxHp += 100;
@@ -8701,6 +10102,37 @@ document.getElementById('sb-kill-all').addEventListener('click', () => {
     if (!enemies[i].ally) { enemies[i].dead = true; enemies.splice(i, 1); }
   }
 });
+
+function setSandboxCycle(v) {
+  sandboxNightOverride = v;
+  const lbl = v === 'day' ? 'DÍA' : (v === 'night' ? 'NOCHE' : 'AUTO');
+  document.getElementById('sb-cycle-v').textContent = lbl;
+}
+document.getElementById('sb-cycle-auto').addEventListener('click', () => setSandboxCycle(null));
+document.getElementById('sb-cycle-day').addEventListener('click', () => setSandboxCycle('day'));
+document.getElementById('sb-cycle-night').addEventListener('click', () => setSandboxCycle('night'));
+document.getElementById('sb-spawn-zombies').addEventListener('click', () => spawnZombieHorde(10));
+
+// ===== Nuevos botones sandbox =====
+document.getElementById('sb-nocd').addEventListener('change', e => {
+  noCooldowns = e.target.checked;
+});
+document.getElementById('sb-bloodmoon').addEventListener('change', e => {
+  if (e.target.checked) {
+    bloodMoon = true;
+    bloodMoonWave = wave;
+    raidAnnounceText = '🌑 LUNA DE SANGRE 🌑';
+    raidAnnounceColor = '#f44';
+    raidAnnounceTimer = 200;
+  } else {
+    bloodMoon = false;
+    bloodMoonWave = -1;
+  }
+});
+document.getElementById('sb-coin-rain').addEventListener('click', () => spawnCoinRain(20));
+document.getElementById('sb-boss-rush').addEventListener('click', () => spawnBossRush());
+document.getElementById('sb-raid-brutal').addEventListener('click', () => spawnRaidBoss('brutal'));
+document.getElementById('sb-raid-nightmare').addEventListener('click', () => spawnRaidBoss('nightmare'));
 
 loop();
 </script>
