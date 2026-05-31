@@ -74,6 +74,7 @@
     <button class="normal" data-mode="normal">NORMAL</button>
     <button class="hard" data-mode="hard">DIFÍCIL</button>
     <button class="sandbox" data-mode="sandbox">SANDBOX</button>
+    <button class="race" data-mode="race" style="background:#c83; color:#fff;">🐎 STEEL BALL RUN</button>
   </div>
   <p style="margin-top:30px; color:#556; font-size: 12px;">WASD mover · Click atacar · 1-9, 0, -, =, ], [ cambiar · B tienda · R/T/G poderes · M panel sandbox</p>
 </div>
@@ -136,13 +137,13 @@
       <option value="juggernaut">COLOSO</option>
       <option value="warlord">SEÑOR DE LA GUERRA</option>
     </optgroup>
-    <optgroup label="Stands (villanos JoJo)">
-      <option value="jdio">THE WORLD (DIO)</option>
-      <option value="kira">KILLER QUEEN (Kira)</option>
-      <option value="diavolo">KING CRIMSON (Diavolo)</option>
-      <option value="pucci">WHITESNAKE → C-MOON → MADE IN HEAVEN (Pucci)</option>
-      <option value="valentine">D4C (Valentine)</option>
-      <option value="wonderofu">WONDER OF U (Tooru)</option>
+    <optgroup label="Poderes (Jefes)">
+      <option value="jdio">MUNDO DETENIDO</option>
+      <option value="kira">REINA EXPLOSIVA</option>
+      <option value="diavolo">CARMESÍ ETERNO</option>
+      <option value="pucci">DISCO DEL ALMA → GRAVEDAD LUNAR → CIELO ACELERADO</option>
+      <option value="valentine">COPIAS DIMENSIONALES</option>
+      <option value="wonderofu">CALAMIDAD</option>
     </optgroup>
   </select>
   <div class="row" style="margin-top:6px;">
@@ -189,7 +190,7 @@ function getMousePos(evt) {
   };
 }
 canvas.addEventListener('mousemove', e => { const p = getMousePos(e); mouse.x = p.x; mouse.y = p.y; });
-canvas.addEventListener('mousedown', e => { mouse.down = true; });
+canvas.addEventListener('mousedown', e => { mouse.down = true; mouse.clicked = true; });
 canvas.addEventListener('mouseup',   e => { mouse.down = false; });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 
@@ -237,11 +238,11 @@ const player = {
 const ABILITIES = [
   { id: 'whip',     name: '1. Látigo Eléctrico Morado', cost: 0,
     desc: 'Arco eléctrico que encadena daño entre enemigos.', color: '#c4f' },
-  { id: 'threads',  name: '2. Stone Free',              cost: 25,
-    desc: 'Puños teal + 3 hilos en abanico que se desentrañan al volar. Y: STAND OUT — cutscene + descarga de 16 hilos en 360° que paralizan a los enemigos 1.5s (CD 15s).', color: '#2cb' },
+  { id: 'threads',  name: '2. Hilo Liberado',              cost: 25,
+    desc: 'Puños teal + 3 hilos en abanico que se desentrañan al volar. Y: RUPTURA DE HILOS — cutscene + descarga de 16 hilos en 360° que paralizan a los enemigos 1.5s (CD 15s).', color: '#2cb' },
   { id: 'breaker',  name: '3. Puños Rompedores',        cost: 120,
     desc: 'Ráfaga de 4 puños rosados rápidos en línea.', color: '#f8c' },
-  { id: 'rain',     name: '4. November Rain',           cost: 250,
+  { id: 'rain',     name: '4. Tormenta Torrencial',           cost: 250,
     desc: 'Nube tormenta sobre el cursor con relámpagos y lluvia teardrop. Mantén click para apuntar. O: TORMENTA FINAL — cutscene + nube gigante cubre la pantalla 5s con lluvia caótica y daño global (CD 30s).', color: '#69c' },
   { id: 'arrow',    name: '5. Flechas Perforantes',     cost: 300,
     desc: 'Flechas que atraviesan y empujan a los enemigos en su dirección.', color: '#cf8' },
@@ -253,43 +254,43 @@ const ABILITIES = [
     desc: 'Bala que crea una hoguera donde cae. El fuego dura 10s y daña a quien lo pise.', color: '#f73' },
   { id: 'emerald',     name: '9. Esmeraldas',              cost: 460,
     desc: 'Rayos verdes. J: telarañas 8s — enemigos atrapados disparan esmeraldas (CD 2min).', color: '#4f8' },
-  { id: 'nutking',     name: '10. Nut King Call',          cost: 180,
+  { id: 'nutking',     name: '10. Pernos Letales',          cost: 180,
     desc: '3 pernos por click; cada hit clava un NUT al enemigo (hasta 5 stacks). C: DISASSEMBLE — cutscene + desensambla a todos los marcados (250 × nuts de daño + paralizados 1s) (CD 18s).', color: '#c97' },
-  { id: 'spirit',      name: '11. Red Hot Chili Pepper',   cost: 470,
+  { id: 'spirit',      name: '11. Furia Eléctrica',   cost: 470,
     desc: 'Rayo encadenado rojo-amarillo que salta entre enemigos, paraliza 0.5s y acumula CARGA ELÉCTRICA (hasta 10). P: Electric Scream — cutscene + descarga TODAS las cargas en una tormenta que pega a todos los enemigos, daño escalado por cargas (CD 15s).', color: '#f63' },
-  { id: 'bounty',      name: '12. Miracle Man',            cost: 750,
+  { id: 'bounty',      name: '12. Don del Milagro',            cost: 750,
     desc: 'Marca 10 enemigos con un milagro aleatorio (💰 monedas, ❤ cura, ⚡ cadena, 🛑 stun) + 30% HP de daño. El milagro se dispara al morir. I: DIVINE INTERVENTION — cutscene + detona todos los milagros, +200 monedas, cura 40% HP (CD 30s).', color: '#fc4' },
   { id: 'shortrewind', name: '13. Eco Temporal',           cost: 500,
     desc: 'Puños ágiles + T: rebobina enemigos 6s cada 8s. Limpia balas enemigas.', color: '#b9f' },
-  { id: 'speedking',   name: '14. Speed King',             cost: 580,
+  { id: 'speedking',   name: '14. Calor Cinético',             cost: 580,
     desc: 'Puños ardientes que marcan al enemigo con CALOR (hasta 5 stacks). Mientras el enemigo se mueve, el calor lo quema según su velocidad. U: Heat Detonation — cutscene + todos los marcados explotan según calor acumulado (CD 12s).', color: '#f73' },
   { id: 'steelball',   name: '15. Pelota de Acero',        cost: 550,
     desc: 'Bola giratoria con espiral que rebota en bordes y curva su trayectoria. F: Lesson 3 — bola dorada que rebota entre enemigos con daño escalado (CD 8s).', color: '#cde' },
-  { id: 'dash',        name: '16. Scary Monsters',         cost: 900,
+  { id: 'dash',        name: '16. Plaga Primigenia',         cost: 900,
     desc: 'Mordida-dash que infecta enemigos. Los infectados al morir se vuelven DINOSAURIOS aliados (más veloces, mordida en área). R: APEX PREDATOR — cutscene + rugido que aturde y daña a todos en pantalla, infecta supervivientes y recarga la vida de los dinos (CD 25s).', color: '#6b3' },
-  { id: 'mirage',      name: '17. Gold Experience', cost: 1000,
-    desc: 'Gold Experience: balas de vida dorada. K: MUDA MUDA MUDA — lluvia de puños de vida en área; los supervivientes quedan SOBRECARGADOS y reciben +80% de daño durante 5s (CD 7s). 4000 kills → Gold Experience Requiem: clics mejores + R: RETURN TO ZERO — 30s inmune; todo enemigo que te ataque cae en un bucle de muerte infinito que se contagia al contacto y, al acabar, todos mueren (los bosses reciben mucho daño).', color: '#fd0' },
-  { id: 'rewind',      name: '18. Carmesí Inmortal (King Crimson)', cost: 1010,
+  { id: 'mirage',      name: '17. Vida Dorada', cost: 1000,
+    desc: 'Vida Dorada: balas de vida dorada. K: INÚTIL INÚTIL INÚTIL — lluvia de puños de vida en área; los supervivientes quedan SOBRECARGADOS y reciben +80% de daño durante 5s (CD 7s). 4000 kills → Réquiem Dorado: clics mejores + R: RETURN TO ZERO — 30s inmune; todo enemigo que te ataque cae en un bucle de muerte infinito que se contagia al contacto y, al acabar, todos mueren (los bosses reciben mucho daño).', color: '#fd0' },
+  { id: 'rewind',      name: '18. Carmesí Inmortal', cost: 1010,
     desc: 'Puños carmesí brutales que golpean en área. T: 10s inmortal + tiempo borrado, los enemigos del futuro aparecen en el centro (CD 90s).', color: '#d02' },
-  { id: 'vortex',      name: '19. Tusk',                   cost: 3000,
-    desc: 'Stand evolutivo de Johnny Joestar. Act 1: par de uñas en V que perforan 1 + U: TORNADO DE UÑAS (16 uñas en 360°). 500 kills → Act 2 (uñas más fuertes + Y: NAIL STORM). 1000 kills → Act 3 (uñas-wormhole que perforan dimensiones + Z: WORMHOLE PUNCH). 3000 kills → Act 4 (rayos dorados + V: GOLDEN RATIO). T: cicla entre Actos desbloqueados.', color: '#fd6' },
-  { id: 'd4c',         name: '20. D4C',                    cost: 2200,
-    desc: 'Lanza copias dimensionales en paralelo: 3 estrellas que atraviesan enemigos desde universos alternos. L: LOVE TRAIN — cutscene + 10s de barrera de rayos dorados que te cubre: refleja balas enemigas (×4 daño) y daña/empuja a todo enemigo que toca el halo (CD 90s).', color: '#f06' },
-  { id: 'starplatinum', name: '21. Star Platinum',         cost: 1800,
-    desc: 'Ráfaga ORA ORA ORA — 8 puños ultra rápidos en línea con golpe final masivo. R: cutscene "THE WORLD" — paraliza el tiempo 12s (CD 25s).', color: '#93f' },
-  { id: 'theworld',    name: '22. The World (DIO)',        cost: 1800,
-    desc: 'Lanza cuchillos voladores. Durante la parada de tiempo, los cuchillos se quedan flotando y al terminar salen disparados a toda velocidad. Z: cutscene "ZA WARUDO!" — paraliza el tiempo 12s (CD 25s).', color: '#fd2' },
-  { id: 'detonate',    name: '23. Killer Queen',           cost: 1200,
-    desc: 'Touch Bombs rosadas teledirigidas que se pegan al enemigo y detonan tras 1.5s (daño en área). G: Bites the Dust — cutscene + onda final que mata todo en pantalla, invulnerable durante el ritual + cura 30% HP (CD 2min).', color: '#f48' },
+  { id: 'vortex',      name: '19. Uña Espiral',                   cost: 3000,
+    desc: 'Poder evolutivo de el Jinete. Act 1: par de uñas en V que perforan 1 + U: TORNADO DE UÑAS (16 uñas en 360°). 500 kills → Act 2 (uñas más fuertes + Y: NAIL STORM). 1000 kills → Act 3 (uñas-wormhole que perforan dimensiones + Z: WORMHOLE PUNCH). 3000 kills → Act 4 (rayos dorados + V: GOLDEN RATIO). T: cicla entre Actos desbloqueados.', color: '#fd6' },
+  { id: 'd4c',         name: '20. Copias Dimensionales',                    cost: 2200,
+    desc: 'Lanza copias dimensionales en paralelo: 3 estrellas que atraviesan enemigos desde universos alternos. L: BARRERA DORADA — cutscene + 10s de barrera de rayos dorados que te cubre: refleja balas enemigas (×4 daño) y daña/empuja a todo enemigo que toca el halo (CD 90s).', color: '#f06' },
+  { id: 'starplatinum', name: '21. Puño Estelar',         cost: 1800,
+    desc: 'Ráfaga GOLPE GOLPE GOLPE — 8 puños ultra rápidos en línea con golpe final masivo. R: cutscene "MUNDO DETENIDO" — paraliza el tiempo 12s (CD 25s).', color: '#93f' },
+  { id: 'theworld',    name: '22. Mundo Detenido',        cost: 1800,
+    desc: 'Lanza cuchillos voladores. Durante la parada de tiempo, los cuchillos se quedan flotando y al terminar salen disparados a toda velocidad. Z: cutscene "ALTO TEMPORAL!" — paraliza el tiempo 12s (CD 25s).', color: '#fd2' },
+  { id: 'detonate',    name: '23. Reina Explosiva',           cost: 1200,
+    desc: 'Touch Bombs rosadas teledirigidas que se pegan al enemigo y detonan tras 1.5s (daño en área). G: Vuelta Mortal — cutscene + onda final que mata todo en pantalla, invulnerable durante el ritual + cura 30% HP (CD 2min).', color: '#f48' },
   { id: 'smoke',       name: '24. Cortina de Humo',        cost: 2500,
     desc: 'Bombas de humo que dañan. H: niebla total 5s — invulnerable, rápido, dañas a todos.', color: '#bbb' },
   { id: 'bubble',      name: '25. Burbujas Infinitas',     cost: 4500,
     desc: 'Puños fuertes. N: balas que paralizan/ciegan/resbalan. L: ejército de clones con burbujas mortales (CD 2min).', color: '#9ff' },
-  { id: 'wonder',      name: '26. Wonder of U',            cost: 4500,
+  { id: 'wonder',      name: '26. Calamidad',            cost: 4500,
     desc: 'Rocas teledirigidas que se pegan (+daño con el tiempo). N: tira carros. X: calamidad mata todo (CD 2min).', color: '#c30' },
-  { id: 'pucci',       name: '27. White Snake → C-Moon → Made in Heaven', cost: 5000,
-    desc: 'Stand evolutivo del Padre Pucci. Empieza como White Snake (disco blanco DISC + K: 11 NIGHTS). 500 kills desbloquea C-Moon (discos lunares teledirigidos que aturden + M: GRAVITY INVERSION). 2000 kills más desbloquea Made in Heaven (velocidad sobrehumana + H: HEAVEN ASCENSION). L: cicla entre las stands desbloqueadas.', color: '#ddd' },
-  { id: 'paintblack',  name: '28. Paint It Black',         cost: 4800,
+  { id: 'pucci',       name: '27. Disco del Alma → Gravedad Lunar → Cielo Acelerado', cost: 5000,
+    desc: 'Poder evolutivo del el Sacerdote. Empieza como Disco del Alma (disco blanco DISC + K: ONCE DISCOS). 500 kills desbloquea Gravedad Lunar (discos lunares teledirigidos que aturden + M: GRAVITY INVERSION). 2000 kills más desbloquea Cielo Acelerado (velocidad sobrehumana + H: HEAVEN ASCENSION). L: cicla entre las poderes desbloqueados.', color: '#ddd' },
+  { id: 'paintblack',  name: '28. Mancha Negra',         cost: 4800,
     desc: 'Dispara 5 balas negras que dejan charcos: enemigo tocado muere, sobrevivientes quedan MANCHADOS (paralizados y dañados al salir según tiempo en charco). De noche: balas y charcos con contorno arcoíris neón, velocidad y daño aumentados. P: DÍA → bala gigante de pintura, cutscene "BLACK, EVERYTHING MUST BE BLACK" + X negra en el corazón = muerte instantánea por presión. NOCHE → dash de hitbox total mientras grita BLACK en ráfaga (CD 35s).', color: '#000' },
 ];
 
@@ -314,7 +315,7 @@ let raidAnnounceText = '';
 let raidAnnounceColor = '#fd6';
 // power-up activos del jugador
 let puDmgTimer = 0, puRateTimer = 0, puInvulnTimer = 0, puMagnetTimer = 0;
-const pibPuddles = []; // Paint It Black: charcos negros (de noche con contorno arcoíris)
+const pibPuddles = []; // Mancha Negra: charcos negros (de noche con contorno arcoíris)
 const pibGiants = [];  // clones gigantes arcoíris (ult de oscuridad)
 let pibForm = 0;       // 0 = balas, 1 = puños de pintura
 let pibGiantCD = 0;
@@ -364,14 +365,14 @@ let webModeCD = 0;
 let redModeTimer = 0;
 let preKillCredits = 0;
 
-let mirageCD = 0;           // CD del awakening de GE (MUDA MUDA MUDA)
+let mirageCD = 0;           // CD del awakening de GE (INÚTIL INÚTIL INÚTIL)
 let mudaPhase = 0;          // 0 = idle, 1 = golpiza de vida activa
 let mudaTimer = 0;          // frames restantes de la ráfaga
 let mudaAngle = 0;          // ángulo visual de los puños
-// Gold Experience → Gold Experience Requiem (slot 16)
-let geForm = 0;              // 0 = Gold Experience, 1 = Gold Experience Requiem
+// Vida Dorada → Réquiem Dorado (slot 16)
+let geForm = 0;              // 0 = Vida Dorada, 1 = Réquiem Dorado
 let gerUnlocked = false;
-let gerKills = 0;            // kills usando Gold Experience (slot 16)
+let gerKills = 0;            // kills usando Vida Dorada (slot 16)
 let gerReturnTimer = 0;      // Return to Zero activo (30s)
 let gerReturnCD = 0;
 
@@ -392,14 +393,14 @@ let wonderUltCD = 0;
 let wonderUltPhase = 0;
 let wonderUltTimer = 0;
 
-// White Snake → C-Moon → Made in Heaven progression (slot 26, una sola hotbar)
+// Disco del Alma → Gravedad Lunar → Cielo Acelerado progression (slot 26, una sola hotbar)
 let standForm = 0;                          // 0=WS, 1=CM, 2=MIH
 const standFormUnlocked = new Set([0]);     // empieza solo WS; CM y MIH se desbloquean por kills
-const STAND_LABELS = ['White Snake', 'C-Moon', 'Made in Heaven'];
+const STAND_LABELS = ['Disco del Alma', 'Gravedad Lunar', 'Cielo Acelerado'];
 const STAND_COLORS = ['#ddd', '#48f', '#fc6'];
 let wsKills = 0;
 let cmKills = 0;
-let wsUnlockFlash = 0;   // visual flash when C-Moon unlocks
+let wsUnlockFlash = 0;   // visual flash when Gravedad Lunar unlocks
 let cmUnlockFlash = 0;   // visual flash when MIH unlocks
 let wsUltCD = 0;
 let wsUltPhase = 0;
@@ -412,11 +413,11 @@ let mihUltPhase = 0;
 let mihUltTimer = 0;
 let mihSpeedBoost = 0;   // frames remaining of x3 speed buff from H ult
 
-// Tusk Act 1 → 2 → 3 → 4 progression (slot 17)
+// Espiral Acto 1 → 2 → 3 → 4 progression (slot 17)
 let tuskAct = 1;                              // 1, 2, 3 o 4
 const tuskUnlocked = new Set([1]);            // arranca solo Act 1
-const TUSK_LABELS = ['', 'Tusk Act 1', 'Tusk Act 2', 'Tusk Act 3', 'Tusk Act 4'];
-const TUSK_COLORS = ['', '#fea', '#fd9', '#fc7', '#fd6'];
+const ESPIRAL_LABELS = ['', 'Espiral Acto 1', 'Espiral Acto 2', 'Espiral Acto 3', 'Espiral Acto 4'];
+const ESPIRAL_COLORS = ['', '#fea', '#fd9', '#fc7', '#fd6'];
 let tuskA1Kills = 0;
 let tuskA2Kills = 0;
 let tuskA3Kills = 0;
@@ -436,7 +437,7 @@ let tuskWormholeTargets = [];
 
 let lesson3CD = 0;
 
-let starPlatinumPhase = 0; // 0 idle, 1 ZA WARUDO charge, 2 THE WORLD flash, 3 time stopped
+let starPlatinumPhase = 0; // 0 idle, 1 ALTO TEMPORAL charge, 2 MUNDO DETENIDO flash, 3 time stopped
 let starPlatinumTimer = 0;
 let oraQueue = 0;
 let oraTimer = 0;
@@ -533,7 +534,7 @@ function withAlpha(color, alpha) {
   return color.length === 4 ? color + a : color + a + a; // #RGB → #RGBA, #RRGGBB → #RRGGBBAA
 }
 
-// Aplica daño al jugador respetando iframe, escudo y Love Train. Devuelve true si pegó.
+// Aplica daño al jugador respetando iframe, escudo y Barrera Dorada. Devuelve true si pegó.
 function tryDamagePlayer(amount, iframeDur, shakeAmount) {
   if (player.iframe > 0 || shieldActive || ltActiveTimer > 0) return false;
   player.hp -= amount;
@@ -569,15 +570,15 @@ const ENEMY_TYPES = {
   mirror:     { hp: 22000,  speed: 0.7, dmg: 50, r: 46, color: '#f8a', coins: 900,                bossKind: 'mirror',      bossName: 'ESPEJO' },
   juggernaut: { hp: 50000,  speed: 0.3, dmg: 70, r: 60, color: '#777', coins: 1500,               bossKind: 'juggernaut',  bossName: 'COLOSO', armor: 0.5 },
   warlord:    { hp: 70000,  speed: 0.5, dmg: 60, r: 50, color: '#f4f', coins: 2500, ranged: true, bossKind: 'warlord',     bossName: 'SEÑOR DE LA GUERRA' },
-  // JoJo villains (nombre = Stand)
-  jdio:       { hp: 90000,  speed: 0.6, dmg: 70, r: 50, color: '#fd2', coins: 3000,                bossKind: 'jdio',       bossName: 'THE WORLD' },
-  kira:       { hp: 80000,  speed: 0.5, dmg: 60, r: 46, color: '#f9c', coins: 2800,                bossKind: 'kira',       bossName: 'KILLER QUEEN' },
-  diavolo:    { hp: 110000, speed: 0.7, dmg: 75, r: 48, color: '#f06', coins: 3500,                bossKind: 'diavolo',    bossName: 'KING CRIMSON' },
-  pucci:      { hp: 130000, speed: 0.5, dmg: 60, r: 50, color: '#e8f', coins: 4500, ranged: true,  bossKind: 'pucci',      bossName: 'WHITESNAKE' },
-  valentine:  { hp: 100000, speed: 0.7, dmg: 70, r: 45, color: '#f55', coins: 4000,                bossKind: 'valentine',  bossName: 'D4C' },
-  wonderofu:  { hp: 150000, speed: 0.4, dmg: 80, r: 52, color: '#79d', coins: 5000,                bossKind: 'wonderofu',  bossName: 'WONDER OF U', armor: 0.4 },
+  // Jefes (nombre = Poder)
+  jdio:       { hp: 90000,  speed: 0.6, dmg: 70, r: 50, color: '#fd2', coins: 3000,                bossKind: 'jdio',       bossName: 'MUNDO DETENIDO' },
+  kira:       { hp: 80000,  speed: 0.5, dmg: 60, r: 46, color: '#f9c', coins: 2800,                bossKind: 'kira',       bossName: 'REINA EXPLOSIVA' },
+  diavolo:    { hp: 110000, speed: 0.7, dmg: 75, r: 48, color: '#f06', coins: 3500,                bossKind: 'diavolo',    bossName: 'CARMESÍ ETERNO' },
+  pucci:      { hp: 130000, speed: 0.5, dmg: 60, r: 50, color: '#e8f', coins: 4500, ranged: true,  bossKind: 'pucci',      bossName: 'DISCO DEL ALMA' },
+  valentine:  { hp: 100000, speed: 0.7, dmg: 70, r: 45, color: '#f55', coins: 4000,                bossKind: 'valentine',  bossName: 'COPIAS DIMENSIONALES' },
+  wonderofu:  { hp: 150000, speed: 0.4, dmg: 80, r: 52, color: '#79d', coins: 5000,                bossKind: 'wonderofu',  bossName: 'CALAMIDAD', armor: 0.4 },
   darkboss:   { hp: 200000, speed: 0.45, dmg: 95, r: 58, color: '#111', coins: 7000, ranged: true,  bossKind: 'vampire',    bossName: 'DEVORADOR DE LUZ' },
-  tuskslayer: { hp: 60000,  speed: 0.25, dmg: 65, r: 50, color: '#806', coins: 5500, ranged: true, bossKind: 'tuskslayer', bossName: 'CAZADOR DE TUSK', armor: 0, tuskOnly: true },
+  tuskslayer: { hp: 60000,  speed: 0.25, dmg: 65, r: 50, color: '#806', coins: 5500, ranged: true, bossKind: 'tuskslayer', bossName: 'CAZADOR DE ESPIRAL', armor: 0, tuskOnly: true },
 };
 const BOSS_CYCLE = ['boss', 'chronos', 'vampire', 'summoner', 'mirror', 'juggernaut', 'warlord',
                     'jdio', 'kira', 'diavolo', 'pucci', 'valentine', 'wonderofu'];
@@ -808,7 +809,7 @@ function startWave() {
   const baseGap = Math.max(10, 38 - wave * 1.5);
   waveSpawnGap = Math.max(4, Math.floor(baseGap / (enemySpawnMult || 1)));
   waveTimer = 0;
-  // Spawn extra: Cazador de Tusk con 0.5% una vez desbloqueado Tusk Act 4
+  // Spawn extra: Cazador de Uña Espiral con 0.5% una vez desbloqueado Espiral Acto 4
   if (tuskUnlocked.has(4) && Math.random() < 0.005) {
     spawnEnemy('tuskslayer');
     effects.push({ type: 'flash', life: 26, max: 26, color: '#a08' });
@@ -903,7 +904,7 @@ function updatePlayer() {
     if (active === 6) mult *= 1.6;
     if (smokeFogTimer > 0) mult *= 2.6;
     if (player.slowed > 0) mult *= 0.35;
-    if (active === 26 && standForm === 2) mult *= 2.2;   // Made in Heaven: pasivo súper veloz
+    if (active === 26 && standForm === 2) mult *= 2.2;   // Cielo Acelerado: pasivo súper veloz
     if (mihSpeedBoost > 0) mult *= 1.6;                   // tras la cutscene: ×3.5 total
     if (active === 27 && darknessMode) mult *= 4.5;       // PIB en oscuridad: velocidad bestia
     const sp = player.speed * mult;
@@ -985,7 +986,7 @@ function updatePlayer() {
 
   player.x = Math.max(player.r, Math.min(W - player.r, player.x));
   player.y = Math.max(player.r, Math.min(H - player.r, player.y));
-  // Escudo invisible del Cazador de Tusk: si no usas Tusk+, no puedes acercarte
+  // Escudo invisible del Cazador de Uña Espiral: si no usas Uña Espiral+, no puedes acercarte
   if (active < 17) {
     for (let j = 0; j < enemies.length; j++) {
       const e = enemies[j];
@@ -1038,21 +1039,21 @@ function updatePlayer() {
   if (keyPressed['e']) cycleAbility(1);
 
   if (active === 20 && keyPressed['r'] && timeStopCD <= 0) {
-    // Star Platinum: THE WORLD — cutscene
+    // Puño Estelar: MUNDO DETENIDO — cutscene
     starPlatinumPhase = 1;
     starPlatinumTimer = 90;
     timeStopCD = 60 * 25;
     shake = 14;
   }
   if (active === 15 && keyPressed['r'] && apexCD <= 0) {
-    // Scary Monsters: APEX PREDATOR — cutscene
+    // Plaga Primigenia: APEX PREDATOR — cutscene
     apexPhase = 1;
     apexTimer = 70;
     apexCD = 60 * 25;
     shake = 16;
   }
   if (active === 21 && keyPressed['z'] && timeStopCD <= 0) {
-    // The World (DIO): ZA WARUDO — cutscene
+    // Mundo Detenido: ALTO TEMPORAL — cutscene
     dioPhase = 1;
     dioTimer = 90;
     timeStopCD = 60 * 25;
@@ -1093,7 +1094,7 @@ function updatePlayer() {
     shake = 24;
   }
   if (active === 26 && keyPressed['l']) {
-    // Ciclar entre stands desbloqueadas
+    // Ciclar entre poderes desbloqueados
     const forms = [0, 1, 2].filter(f => standFormUnlocked.has(f));
     if (forms.length > 1) {
       const idx = forms.indexOf(standForm);
@@ -1103,28 +1104,28 @@ function updatePlayer() {
     }
   }
   if (active === 26 && standForm === 0 && keyPressed['k'] && wsUltCD <= 0) {
-    // White Snake: 11 NIGHTS
+    // Disco del Alma: ONCE DISCOS
     wsUltPhase = 1;
     wsUltTimer = 60;
     wsUltCD = 60 * 25;
     shake = 14;
   }
   if (active === 26 && standForm === 1 && keyPressed['m'] && cmUltCD <= 0) {
-    // C-Moon: GRAVITY INVERSION
+    // Gravedad Lunar: GRAVITY INVERSION
     cmUltPhase = 1;
     cmUltTimer = 70;
     cmUltCD = 60 * 30;
     shake = 18;
   }
   if (active === 26 && standForm === 2 && keyPressed['h'] && mihUltCD <= 0) {
-    // Made in Heaven: HEAVEN ASCENSION
+    // Cielo Acelerado: HEAVEN ASCENSION
     mihUltPhase = 1;
     mihUltTimer = 80;
     mihUltCD = 60 * 90;
     shake = 22;
   }
   if (active === 19 && keyPressed['l'] && ltCD <= 0) {
-    // D4C: LOVE TRAIN cutscene
+    // Copias Dimensionales: BARRERA DORADA cutscene
     ltPhase = 1;
     ltTimer = 80;
     ltCD = 60 * 90;
@@ -1147,17 +1148,17 @@ function updatePlayer() {
     }
   }
   if (active === 18 && keyPressed['t']) {
-    // Ciclar entre Tusk Acts desbloqueados
+    // Ciclar entre Espiral Actos desbloqueados
     const acts = [1, 2, 3, 4].filter(a => tuskUnlocked.has(a));
     if (acts.length > 1) {
       const idx = acts.indexOf(tuskAct);
       tuskAct = acts[(idx + 1) % acts.length];
-      effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 18, max: 18, r: 0, color: TUSK_COLORS[tuskAct] });
-      effects.push({ type: 'flash', life: 14, max: 14, color: TUSK_COLORS[tuskAct] });
+      effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 18, max: 18, r: 0, color: ESPIRAL_COLORS[tuskAct] });
+      effects.push({ type: 'flash', life: 14, max: 14, color: ESPIRAL_COLORS[tuskAct] });
     }
   }
   if (active === 18 && tuskAct === 1 && keyPressed['u'] && tuskA1UltCD <= 0) {
-    // Tusk Act 1 — TORNADO DE UÑAS: 16 uñas en 360° alrededor del jugador
+    // Espiral Acto 1 — TORNADO DE UÑAS: 16 uñas en 360° alrededor del jugador
     for (let i = 0; i < 16; i++) {
       const a = (i / 16) * Math.PI * 2;
       const sp = 10 + Math.random() * 2;
@@ -1178,7 +1179,7 @@ function updatePlayer() {
     effects.push({ type: 'flash', life: 12, max: 12, color: '#fea' });
   }
   if (active === 18 && tuskAct === 2 && keyPressed['y'] && tuskNailStormCD <= 0) {
-    // Tusk Act 2 — NAIL BARRAGE: ráfaga inmediata en cono hacia donde apuntas
+    // Espiral Acto 2 — NAIL BARRAGE: ráfaga inmediata en cono hacia donde apuntas
     const baseAng = aimAngle();
     for (let i = 0; i < 22; i++) {
       const spread = (Math.random() - 0.5) * 1.3;     // cono amplio ~75°
@@ -1202,7 +1203,7 @@ function updatePlayer() {
     effects.push({ type: 'flash', life: 14, max: 14, color: '#fd9' });
   }
   if (active === 18 && tuskAct === 3 && keyPressed['z'] && tuskWormholeCD <= 0) {
-    // Tusk Act 3 — WORMHOLE PUNCH
+    // Espiral Acto 3 — WORMHOLE PUNCH
     tuskWormholePhase = 1;
     tuskWormholeTimer = 70;
     tuskWormholeCD = 60 * 25;
@@ -1217,7 +1218,7 @@ function updatePlayer() {
     shake = 22;
   }
   if (active === 16 && keyPressed['k'] && mirageCD <= 0 && mudaPhase === 0) {
-    // Gold Experience — MUDA MUDA MUDA: golpiza de vida en área + sobrecarga
+    // Vida Dorada — INÚTIL INÚTIL INÚTIL: golpiza de vida en área + sobrecarga
     mudaPhase = 1;
     mudaTimer = 55;
     mudaAngle = aimAngle();
@@ -1226,7 +1227,7 @@ function updatePlayer() {
     effects.push({ type: 'flash', life: 20, max: 20, color: '#fd0' });
   }
   if (active === 16 && geForm === 1 && keyPressed['r'] && gerReturnCD <= 0 && gerReturnTimer <= 0) {
-    // Gold Experience Requiem — RETURN TO ZERO: 30s inmune + bucle de muerte infinito
+    // Réquiem Dorado — RETURN TO ZERO: 30s inmune + bucle de muerte infinito
     gerReturnTimer = 60 * 30;
     gerReturnCD = 60 * 120;
     shake = 26;
@@ -1234,7 +1235,7 @@ function updatePlayer() {
     effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 30, max: 30, r: 0, color: '#fe6' });
   }
   if (active === 22 && keyPressed['g'] && detonateAllCD <= 0) {
-    // Bites the Dust — cutscene
+    // Vuelta Mortal — cutscene
     kqPhase = 1;
     kqTimer = 80;
     detonateAllCD = 60 * 120;
@@ -1277,7 +1278,7 @@ function updatePlayer() {
     shake = 12;
   }
   if (active === 27 && keyPressed['l']) {
-    // Paint It Black — cambiar moveset (balas ↔ puños de pintura)
+    // Mancha Negra — cambiar moveset (balas ↔ puños de pintura)
     pibForm = pibForm === 0 ? 1 : 0;
     effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 20, max: 20, r: 0, color: '#000' });
     effects.push({ type: 'flash', life: 14, max: 14, color: pibForm === 1 ? '#fff' : '#000' });
@@ -1300,7 +1301,7 @@ function updatePlayer() {
     effects.push({ type: 'shockwave', x: W / 2, y: H / 2, life: 28, max: 28, r: 0, color: '#fff' });
   }
   if (active === 27 && keyPressed['p'] && pibLetterCD <= 0 && pibDayPhase === 0 && pibNightPhase === 0) {
-    // Paint It Black — letter ability (B)
+    // Mancha Negra — letter ability (B)
     if (isNightWave(wave)) {
       pibNightPhase = 1;
       pibNightTimer = 60;
@@ -1356,9 +1357,9 @@ function updatePlayer() {
     wsUltCD = 0; cmUltCD = 0; mihUltCD = 0;
     bubbleUltCD = 0; wonderUltCD = 0; gerReturnCD = 0;
   }
-  // Star Platinum: THE WORLD cutscene
+  // Puño Estelar: MUNDO DETENIDO cutscene
   if (starPlatinumPhase === 1) {
-    // Fase 1: pose, carga de "ZA WARUDO"
+    // Fase 1: pose, carga de "ALTO TEMPORAL"
     starPlatinumTimer--;
     player.iframe = Math.max(player.iframe, 4);
     if (starPlatinumTimer <= 0) {
@@ -1367,7 +1368,7 @@ function updatePlayer() {
       shake = 28;
     }
   } else if (starPlatinumPhase === 2) {
-    // Fase 2: "THE WORLD" flash + timestop comienza
+    // Fase 2: "MUNDO DETENIDO" flash + timestop comienza
     starPlatinumTimer--;
     player.iframe = Math.max(player.iframe, 4);
     if (starPlatinumTimer === 50) {
@@ -1382,7 +1383,7 @@ function updatePlayer() {
       starPlatinumPhase = 0;
     }
   }
-  // D4C: LOVE TRAIN cutscene
+  // Copias Dimensionales: BARRERA DORADA cutscene
   if (ltPhase === 1) {
     ltTimer--;
     player.iframe = Math.max(player.iframe, 8);
@@ -1448,7 +1449,7 @@ function updatePlayer() {
     }
   }
 
-  // Scary Monsters: APEX PREDATOR cutscene (rugido)
+  // Plaga Primigenia: APEX PREDATOR cutscene (rugido)
   if (apexPhase === 1) {
     apexTimer--;
     player.iframe = Math.max(player.iframe, 8);
@@ -1501,7 +1502,7 @@ function updatePlayer() {
       apexPhase = 0;
     }
   }
-  // Nut King Call: DISASSEMBLE cutscene
+  // Pernos Letales: DISASSEMBLE cutscene
   if (nkcPhase === 1) {
     nkcTimer--;
     player.iframe = Math.max(player.iframe, 4);
@@ -1518,7 +1519,7 @@ function updatePlayer() {
       nkcPhase = 0;
     }
   }
-  // Miracle Man: DIVINE INTERVENTION cutscene
+  // Don del Milagro: DIVINE INTERVENTION cutscene
   if (mmPhase === 1) {
     mmTimer--;
     player.iframe = Math.max(player.iframe, 4);
@@ -1549,7 +1550,7 @@ function updatePlayer() {
       shake = 26;
     }
   }
-  // November Rain: TORMENTA FINAL cutscene
+  // Tormenta Torrencial: TORMENTA FINAL cutscene
   if (nrPhase === 1) {
     nrTimer--;
     player.iframe = Math.max(player.iframe, 4);
@@ -1567,7 +1568,7 @@ function updatePlayer() {
       effects.push({ type: 'flash', life: 18, max: 18, color: '#69c' });
     }
   }
-  // Stone Free: STAND OUT cutscene
+  // Hilo Liberado: RUPTURA DE HILOS cutscene
   if (sfPhase === 1) {
     sfTimer--;
     player.iframe = Math.max(player.iframe, 4);
@@ -1584,7 +1585,7 @@ function updatePlayer() {
       sfPhase = 0;
     }
   }
-  // Red Hot Chili Pepper: ELECTRIC SCREAM cutscene
+  // Furia Eléctrica: ELECTRIC SCREAM cutscene
   if (rhcpPhase === 1) {
     rhcpTimer--;
     player.iframe = Math.max(player.iframe, 4);
@@ -1601,7 +1602,7 @@ function updatePlayer() {
       rhcpPhase = 0;
     }
   }
-  // Speed King: HEAT DETONATION cutscene
+  // Calor Cinético: HEAT DETONATION cutscene
   if (skPhase === 1) {
     skTimer--;
     player.iframe = Math.max(player.iframe, 4);
@@ -1618,7 +1619,7 @@ function updatePlayer() {
       skPhase = 0;
     }
   }
-  // Killer Queen: Bites the Dust cutscene
+  // Reina Explosiva: Vuelta Mortal cutscene
   if (kqPhase === 1) {
     // Fase 1: ojos aparecen y crecen, reflejo del jugador adentro
     kqTimer--;
@@ -1629,7 +1630,7 @@ function updatePlayer() {
       shake = 20;
     }
   } else if (kqPhase === 2) {
-    // Fase 2: ojos contraen pupilas + texto BITES THE DUST, BANG al final
+    // Fase 2: ojos contraen pupilas + texto VUELTA MORTAL, BANG al final
     kqTimer--;
     player.iframe = Math.max(player.iframe, 4);
     if (kqTimer <= 0) {
@@ -1637,7 +1638,7 @@ function updatePlayer() {
       kqPhase = 0;
     }
   }
-  // DIO: THE WORLD cutscene
+  // DIO: MUNDO DETENIDO cutscene
   if (dioPhase === 1) {
     dioTimer--;
     player.iframe = Math.max(player.iframe, 4);
@@ -1747,7 +1748,7 @@ function updatePlayer() {
       shake = 24;
     }
   }
-  // White Snake / C-Moon / Made in Heaven cooldowns + cutscenes
+  // Disco del Alma / Gravedad Lunar / Cielo Acelerado cooldowns + cutscenes
   if (wsUltCD > 0) wsUltCD--;
   if (cmUltCD > 0) cmUltCD--;
   if (mihUltCD > 0) mihUltCD--;
@@ -1755,7 +1756,7 @@ function updatePlayer() {
   if (cmUnlockFlash > 0) cmUnlockFlash--;
   if (mihSpeedBoost > 0) mihSpeedBoost--;
 
-  // White Snake — 11 NIGHTS
+  // Disco del Alma — ONCE DISCOS
   if (wsUltPhase === 1) {
     wsUltTimer--;
     player.iframe = Math.max(player.iframe, 4);
@@ -1786,7 +1787,7 @@ function updatePlayer() {
     }
   }
 
-  // C-Moon — GRAVITY INVERSION
+  // Gravedad Lunar — GRAVITY INVERSION
   if (cmUltPhase === 1) {
     cmUltTimer--;
     player.iframe = Math.max(player.iframe, 4);
@@ -1816,7 +1817,7 @@ function updatePlayer() {
     }
   }
 
-  // Made in Heaven — HEAVEN ASCENSION
+  // Cielo Acelerado — HEAVEN ASCENSION
   if (mihUltPhase === 1) {
     mihUltTimer--;
     player.iframe = Math.max(player.iframe, 4);
@@ -1852,7 +1853,7 @@ function updatePlayer() {
     }
   }
 
-  // Tusk Act 1 / Act 2 / Act 3 cooldowns + cutscenes
+  // Espiral Acto 1 / Act 2 / Act 3 cooldowns + cutscenes
   if (tuskA1UltCD > 0) tuskA1UltCD--;
   if (tuskA1UltTimer > 0) tuskA1UltTimer--;
   if (tuskNailStormCD > 0) tuskNailStormCD--;
@@ -1862,13 +1863,13 @@ function updatePlayer() {
   if (tuskA3Flash > 0) tuskA3Flash--;
   if (tuskA4Flash > 0) tuskA4Flash--;
 
-  // Tusk Act 2 — NAIL BARRAGE: sólo decae el flash visual (el daño ya se disparó al pulsar Y)
+  // Espiral Acto 2 — NAIL BARRAGE: sólo decae el flash visual (el daño ya se disparó al pulsar Y)
   if (tuskNailStormPhase === 1) {
     tuskNailStormTimer--;
     if (tuskNailStormTimer <= 0) tuskNailStormPhase = 0;
   }
 
-  // Tusk Act 3 — WORMHOLE PUNCH
+  // Espiral Acto 3 — WORMHOLE PUNCH
   if (tuskWormholePhase === 1) {
     tuskWormholeTimer--;
     player.iframe = Math.max(player.iframe, 4);
@@ -2003,7 +2004,7 @@ function mihAttack(angle) {
 // ---------------- Abilities ----------------
 function damageEnemy(e, dmg, color) {
   if (e.ally) return; // aliados son inmunes
-  // Cazador de Tusk: sólo daño con personajes Tusk+ (slot 17 en adelante)
+  // Cazador de Uña Espiral: sólo daño con personajes Uña Espiral+ (slot 17 en adelante)
   if (e.tuskOnly && active < 17) {
     // pequeña chispa visual para indicar inmunidad
     if (frame % 4 === 0) {
@@ -2085,7 +2086,7 @@ function punchAttack(angle, range, dmg, knock, color, hitR) {
   effects.push({ type: 'punch', x: px, y: py, life: 10, max: 10, color: color || '#fc8', r });
 }
 
-// 2. Stone Free — puños teal + 3 hilos que se desentrañan
+// 2. Hilo Liberado — puños teal + 3 hilos que se desentrañan
 function threadsAttack(angle) {
   punchAttack(angle, 36, 80, 7, '#2cb');
   for (let i = -1; i <= 1; i++) {
@@ -2145,7 +2146,7 @@ function processBreakerCombo() {
   }
 }
 
-// 4. November Rain (continua mientras click + tormenta global con O)
+// 4. Tormenta Torrencial (continua mientras click + tormenta global con O)
 let rainCounter = 0;
 function updateRain() {
   // Lluvia normal sobre el cursor
@@ -2216,7 +2217,7 @@ function updateRain() {
   }
 }
 
-// 19. D4C — 3 copias dimensionales en paralelo (atraviesan enemigos)
+// 19. Copias Dimensionales — 3 copias dimensionales en paralelo (atraviesan enemigos)
 function d4cAttack(angle) {
   const perpA = angle + Math.PI / 2;
   for (let k = -1; k <= 1; k++) {
@@ -2234,7 +2235,7 @@ function d4cAttack(angle) {
   }
 }
 
-// 16. Embestida Fulgurante (Scary Monsters) — bite dash, infecta, convierte en dinosaurio
+// 16. Embestida Fulgurante — bite dash, infecta, convierte en dinosaurio
 function dashAttack(angle) {
   if (dashTimer > 0) return;
   dashTimer = 20;
@@ -2295,7 +2296,7 @@ function processFlurry() {
   }
 }
 
-// 11. Miracle Man — marca 10 enemigos con milagro aleatorio + 30% HP de daño
+// 11. Don del Milagro — marca 10 enemigos con milagro aleatorio + 30% HP de daño
 const MIRACLE_TYPES = ['coin', 'heal', 'chain', 'stun'];
 const MIRACLE_ICONS = { coin: '💰', heal: '❤', chain: '⚡', stun: '🛑' };
 const MIRACLE_COLORS = { coin: '#fc4', heal: '#f8a', chain: '#8ef', stun: '#a8f' };
@@ -2375,7 +2376,7 @@ function triggerMiracle(e) {
   e.miracle = null;
 }
 
-// 10. Red Hot Chili Pepper — rayo rojo-amarillo encadenado + cargas eléctricas
+// 10. Furia Eléctrica — rayo rojo-amarillo encadenado + cargas eléctricas
 function spiritAttack(angle) {
   // primer objetivo: enemigo más cercano dentro de 420
   let first = null, bestSq = 420 * 420;
@@ -2491,7 +2492,7 @@ function updateFires() {
   }
 }
 
-// 28. Paint It Black — forma 0: 5 balas negras; forma 1: puños que pintan
+// 28. Mancha Negra — forma 0: 5 balas negras; forma 1: puños que pintan
 function paintItBlackAttack(angle) {
   const night = isNightWave(wave);
   const darkMult = darknessMode ? 2.5 : 1;
@@ -2653,7 +2654,7 @@ function updatePibPuddles() {
   }
 }
 
-// 28. Paint It Black — clones gigantes arcoíris (ult de oscuridad N)
+// 28. Mancha Negra — clones gigantes arcoíris (ult de oscuridad N)
 function updatePibGiants() {
   if (pibGiantCD > 0) pibGiantCD--;
   for (let i = pibGiants.length - 1; i >= 0; i--) {
@@ -2707,7 +2708,7 @@ function updatePibGiants() {
   if (pibGiants.length === 0 && pibGiantPhase === 1) pibGiantPhase = 0;
 }
 
-// 28. Paint It Black — letter ability (B): día = bala gigante + cutscene; noche = dash hitbox total
+// 28. Mancha Negra — letter ability (B): día = bala gigante + cutscene; noche = dash hitbox total
 function updatePibLetter() {
   // ---- DÍA ----
   if (pibDayPhase === 1) {
@@ -2789,10 +2790,10 @@ function updatePibLetter() {
   }
 }
 
-// 17. Gold Experience / Gold Experience Requiem — vida dorada + bala de transmutación
+// 17. Vida Dorada / Réquiem Dorado — vida dorada + bala de transmutación
 function mirageAttack(angle) {
   if (geForm === 1) {
-    // Gold Experience Requiem: ráfaga de 3 balas de vida dorada, mucho más fuertes
+    // Réquiem Dorado: ráfaga de 3 balas de vida dorada, mucho más fuertes
     for (let i = -1; i <= 1; i++) {
       const a = angle + i * 0.12;
       projectiles.push({
@@ -2811,7 +2812,7 @@ function mirageAttack(angle) {
     }
     return;
   }
-  // Gold Experience: bala de vida dorada con chispa verde
+  // Vida Dorada: bala de vida dorada con chispa verde
   projectiles.push({
     x: player.x + Math.cos(angle) * 18,
     y: player.y + Math.sin(angle) * 18,
@@ -2826,7 +2827,7 @@ function mirageAttack(angle) {
   }
 }
 
-// 17. Gold Experience — MUDA MUDA MUDA (golpiza de vida + sobrecarga)
+// 17. Vida Dorada — INÚTIL INÚTIL INÚTIL (golpiza de vida + sobrecarga)
 function updateMuda() {
   if (mudaPhase === 0) return;
   mudaTimer--;
@@ -2881,7 +2882,7 @@ function updateMuda() {
   if (mudaTimer <= 0) mudaPhase = 0;
 }
 
-// Gold Experience Requiem — RETURN TO ZERO
+// Réquiem Dorado — RETURN TO ZERO
 function enterZeroLoop(e) {
   if (e.ally || e.zeroLoop) return;
   e.zeroLoop = true;
@@ -3032,7 +3033,7 @@ function updateSmokeClouds() {
   }
 }
 
-// 19. Killer Queen — Touch Bombs que se pegan + Bites the Dust
+// 19. Reina Explosiva — Touch Bombs que se pegan + Vuelta Mortal
 function detonateAttack(angle) {
   // 3 bombas rosadas que persiguen enemigos
   for (let i = -1; i <= 1; i++) {
@@ -3078,7 +3079,7 @@ function explodeBomb(x, y) {
 }
 
 function detonateAllEnemies() {
-  // Bites the Dust — onda final + explota a cada enemigo en pantalla
+  // Vuelta Mortal — onda final + explota a cada enemigo en pantalla
   effects.push({ type: 'flash', life: 25, max: 25, color: '#f48' });
   shake = 40;
   for (let j = 0; j < enemies.length; j++) {
@@ -3100,7 +3101,7 @@ function detonateAllEnemies() {
   effects.push({ type: 'heal', life: 40, max: 40 });
 }
 
-// 25. Nut King Call — pernos que se clavan en enemigos
+// 25. Pernos Letales — pernos que se clavan en enemigos
 function nutKingAttack(angle) {
   for (let i = -1; i <= 1; i++) {
     const a = angle + i * 0.08;
@@ -3139,7 +3140,7 @@ function disassembleAll() {
   if (any) shake = Math.max(shake, 18);
 }
 
-// 13. Speed King (Joshu) — puños ardientes que aplican CALOR
+// 13. Calor Cinético (Joshu) — puños ardientes que aplican CALOR
 function speedKingAttack(angle) {
   // Tres puños rápidos en abanico que marcan con heat
   for (let i = -1; i <= 1; i++) {
@@ -3191,7 +3192,7 @@ function heatDetonateAll() {
   if (any) shake = Math.max(shake, 18);
 }
 
-// 14. Pelota de Acero (Gyro) — bola giratoria con espiral + Lesson 3 (F)
+// 14. Pelota de Acero — bola giratoria con espiral + Lesson 3 (F)
 function steelBallAttack(angle) {
   const spin = Math.random() > 0.5 ? 1 : -1;
   projectiles.push({
@@ -3254,7 +3255,7 @@ function bastionAttack(angle) {
   });
 }
 
-// 18. The World (DIO) — lanza cuchillos que se congelan durante timestop
+// 18. Mundo Detenido — lanza cuchillos que se congelan durante timestop
 function theWorldAttack(angle) {
   const ca = Math.cos(angle), sa = Math.sin(angle);
   projectiles.push({
@@ -3266,7 +3267,7 @@ function theWorldAttack(angle) {
   });
 }
 
-// 17. Star Platinum — ORA ORA barrage (8 puños rápidos en línea + golpe final)
+// 17. Puño Estelar — GOLPE GOLPE barrage (8 puños rápidos en línea + golpe final)
 function starPlatinumAttack(angle) {
   if (oraQueue > 0) return;
   oraQueue = 8;
@@ -3389,7 +3390,7 @@ function createVortex(x, y) {
   shake = 14;
 }
 
-// 18. Carmesí Inmortal (King Crimson) — puños carmesí brutales en área
+// 18. Carmesí Inmortal — puños carmesí brutales en área
 function rewindFistsAttack(angle) {
   punchAttack(angle, 50, 420, 18, '#d02', 56);
   punchAttack(angle, 26, 420, 14, '#f44', 42);
@@ -3480,7 +3481,7 @@ function updateRewindBuffer() {
   }
 }
 
-// 21. Wonder of U — rocas teledirigidas / carros + ultimate calamidad
+// 21. Calamidad — rocas teledirigidas / carros + ultimate calamidad
 function wonderAttack(angle) {
   if (wonderCarsMode) {
     projectiles.push({
@@ -3523,7 +3524,7 @@ function bubbleAttack(angle) {
 
 // ---------------- Updates ----------------
 function updateEnemies() {
-  // Made in Heaven: el tiempo de los enemigos se ralentiza.
+  // Cielo Acelerado: el tiempo de los enemigos se ralentiza.
   // Pasivo: 1 de cada 2 frames; durante el boost de la ult: 1 de cada 4.
   const mihSlowActive = active === 26 && standForm === 2;
   if (mihSlowActive) {
@@ -3542,7 +3543,7 @@ function updateEnemies() {
         return r.ticks < 600;
       });
     }
-    // Speed King — calor: daño proporcional a velocidad
+    // Calor Cinético — calor: daño proporcional a velocidad
     if (e.heat && e.heat > 0) {
       const speedSq = e.vx * e.vx + e.vy * e.vy;
       // sólo daña si se está moviendo
@@ -3839,7 +3840,7 @@ function updateEnemies() {
         }
       }
 
-      // DIO — ZA WARUDO mini: paraliza al jugador, teleport detrás y ráfaga de cuchillos
+      // DIO — ALTO TEMPORAL mini: paraliza al jugador, teleport detrás y ráfaga de cuchillos
       if (e.bossKind === 'jdio') {
         if (e.jdioCD === undefined) e.jdioCD = 360;
         e.jdioCD--;
@@ -3936,13 +3937,13 @@ function updateEnemies() {
         }
       }
 
-      // PUCCI — 3 fases por HP: Whitesnake → C-Moon → Made in Heaven
+      // PUCCI — 3 fases por HP: Whitesnake → Gravedad Lunar → Cielo Acelerado
       if (e.bossKind === 'pucci') {
         const pct = e.hp / e.maxHp;
         const newPhase = pct > 0.66 ? 0 : (pct > 0.33 ? 1 : 2);
         if (e.phase !== newPhase) {
           e.phase = newPhase;
-          e.bossName = newPhase === 0 ? 'WHITESNAKE' : (newPhase === 1 ? 'C-MOON' : 'MADE IN HEAVEN');
+          e.bossName = newPhase === 0 ? 'DISCO DEL ALMA' : (newPhase === 1 ? 'GRAVEDAD LUNAR' : 'CIELO ACELERADO');
           e.color = newPhase === 0 ? '#e8f' : (newPhase === 1 ? '#c6f' : '#fce');
           effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 28, max: 28, r: 0, color: e.color });
           effects.push({ type: 'flash', life: 18, max: 18, color: e.color });
@@ -3959,7 +3960,7 @@ function updateEnemies() {
             });
           }
         } else if (e.phase === 1) {
-          // C-Moon: pozos de gravedad
+          // Gravedad Lunar: pozos de gravedad
           if (e.bossTimer % 200 === 0) {
             bossHazards.push({
               type: 'gravity', x: rand(120, W - 120), y: rand(120, H - 120),
@@ -3968,7 +3969,7 @@ function updateEnemies() {
             });
           }
         } else if (e.phase === 2) {
-          // Made in Heaven: balas rápidas constantes
+          // Cielo Acelerado: balas rápidas constantes
           if (e.bossTimer % 22 === 0) {
             const a = angleBetween(e, player) + rand(-0.2, 0.2);
             projectiles.push({
@@ -3980,7 +3981,7 @@ function updateEnemies() {
         }
       }
 
-      // VALENTINE — D4C: a 70% HP genera 2 clones dimensionales que comparten daño
+      // VALENTINE — Copias Dimensionales: a 70% HP genera 2 clones dimensionales que comparten daño
       if (e.bossKind === 'valentine' && !e.isClone) {
         if (e.valSplit === undefined) e.valSplit = 0;
         if (e.valSplit === 0 && e.hp / e.maxHp < 0.7) {
@@ -4024,8 +4025,8 @@ function updateEnemies() {
         }
       }
 
-      // WONDER OF U — al recibir daño, genera calamidades cerca del jugador
-      // CAZADOR DE TUSK — sólo dañable con slot >= 17; rayos rojo/morado + hoyo azul
+      // CALAMIDAD — al recibir daño, genera calamidades cerca del jugador
+      // CAZADOR DE ESPIRAL — sólo dañable con slot >= 17; rayos rojo/morado + hoyo azul
       if (e.bossKind === 'tuskslayer') {
         // Rayo rojo cada 240 frames
         if (e.bossTimer % 240 === 60) {
@@ -4262,11 +4263,11 @@ function updateEnemies() {
         enemies.splice(i, 1);
         continue;
       }
-      // Dispara milagro de Miracle Man al morir
+      // Dispara milagro de Don del Milagro al morir
       if (e.miracle) triggerMiracle(e);
       const bonus = e.markCoins || 0;
       player.coins += e.coins + bonus;
-      // Progresión Tusk Act 1 → 2 → 3 → 4 (slot 18)
+      // Progresión Espiral Acto 1 → 2 → 3 → 4 (slot 18)
       if (active === 18 && owned.has(18)) {
         if (tuskAct === 1) {
           tuskA1Kills++;
@@ -4291,7 +4292,7 @@ function updateEnemies() {
           }
         }
       }
-      // Progresión Gold Experience → Gold Experience Requiem (slot 16)
+      // Progresión Vida Dorada → Réquiem Dorado (slot 16)
       if (active === 16 && owned.has(16) && !gerUnlocked) {
         gerKills++;
         if (gerKills >= 4000) {
@@ -4301,7 +4302,7 @@ function updateEnemies() {
           effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 34, max: 34, r: 0, color: '#fe6' });
         }
       }
-      // Progresión White Snake → C-Moon → Made in Heaven (todo en slot 26)
+      // Progresión Disco del Alma → Gravedad Lunar → Cielo Acelerado (todo en slot 26)
       if (active === 26 && owned.has(26)) {
         if (standForm === 0) {
           wsKills++;
@@ -4592,7 +4593,7 @@ function updateProjectiles() {
         }
       }
     } else if (p.type === 'wsdisc') {
-      // White Snake: disco que atraviesa y a veces paraliza
+      // Disco del Alma: disco que atraviesa y a veces paraliza
       for (let j = 0; j < enemies.length; j++) {
         const e = enemies[j];
         if (e.ally) continue;
@@ -4608,7 +4609,7 @@ function updateProjectiles() {
         }
       }
     } else if (p.type === 'cmoondisc') {
-      // C-Moon: teledirigido; al impactar se queda orbitando y atando
+      // Gravedad Lunar: teledirigido; al impactar se queda orbitando y atando
       if (p.attached) {
         const e = p.attached;
         if (!e || e.dead || e.hp <= 0) { p.life = 0; }
@@ -4887,7 +4888,7 @@ function updateProjectiles() {
         }
       }
     } else if (p.type === 'standOutThread') {
-      // hilo de Stone Free — atraviesa enemigos y los paraliza
+      // hilo de Hilo Liberado — atraviesa enemigos y los paraliza
       for (let j = 0; j < enemies.length; j++) {
         const e = enemies[j];
         if (e.ally) continue;
@@ -5186,7 +5187,7 @@ function updateBossHazards() {
         }
       }
     } else if (h.type === 'gravity') {
-      // Pozo de gravedad de C-Moon: tira al jugador
+      // Pozo de gravedad de Gravedad Lunar: tira al jugador
       const dx = player.x - h.x, dy = player.y - h.y;
       const dSq = dx * dx + dy * dy;
       if (dSq < h.r * h.r && dSq > 1) {
@@ -5421,7 +5422,7 @@ function draw() {
     ctx.textBaseline = 'alphabetic';
   });
 
-  // charcos de Paint It Black — opt-out del halo blanco si el charco es neón
+  // charcos de Mancha Negra — opt-out del halo blanco si el charco es neón
   pibPuddles.forEach(pd => {
     const _hasShadow = darknessMode && pd.neon;
     if (_hasShadow) { ctx.save(); ctx.shadowBlur = 0; }
@@ -5548,7 +5549,7 @@ function draw() {
       ctx.moveTo(h.x, h.y - 10); ctx.lineTo(h.x, h.y + 10);
       ctx.stroke();
     } else if (h.type === 'kqbomb') {
-      // bomba de Killer Queen: corazón rosa pulsante
+      // bomba de Reina Explosiva: corazón rosa pulsante
       const frac = 1 - h.life / h.max;
       const pulse = 0.6 + 0.4 * Math.sin(frame * 0.4);
       ctx.fillStyle = `rgba(255, 153, 204, ${0.2 + 0.3 * frac * pulse})`;
@@ -5565,7 +5566,7 @@ function draw() {
       ctx.bezierCurveTo(h.x + hs * 0.6, h.y - hs, h.x + hs * 1.4, h.y - hs * 0.4, h.x, h.y + hs * 0.6);
       ctx.closePath(); ctx.fill();
     } else if (h.type === 'calamity') {
-      // Calamidad de Wonder of U: roca cayendo del cielo (telegrafía abajo)
+      // Calamidad de Calamidad: roca cayendo del cielo (telegrafía abajo)
       const frac = 1 - h.life / h.max;
       ctx.fillStyle = `rgba(80, 130, 200, ${0.18 + 0.3 * frac})`;
       ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, Math.PI * 2); ctx.fill();
@@ -5659,7 +5660,7 @@ function draw() {
       ctx.fillStyle = 'rgba(120, 180, 255, 0.55)';
       ctx.beginPath(); ctx.arc(h.x - h.coreR * 0.3, h.y - h.coreR * 0.3, h.coreR * 0.25, 0, Math.PI * 2); ctx.fill();
     } else if (h.type === 'gravity') {
-      // pozo de gravedad de C-Moon: vórtice morado
+      // pozo de gravedad de Gravedad Lunar: vórtice morado
       const pulse = 0.5 + 0.5 * Math.sin(frame * 0.2);
       const grd = ctx.createRadialGradient(h.x, h.y, 0, h.x, h.y, h.r);
       grd.addColorStop(0, `rgba(180, 120, 240, ${0.45 * pulse})`);
@@ -5680,7 +5681,7 @@ function draw() {
     }
   }
 
-  // November Rain — nube tormenta sobre el cursor
+  // Tormenta Torrencial — nube tormenta sobre el cursor
   if (active === 3) {
     const cx = mouse.x, cy = mouse.y - 220;
     // zona de impacto en el suelo
@@ -5906,7 +5907,7 @@ function draw() {
       ctx.restore();
     }
     if (p.type === 'thread' || p.type === 'standOutThread') {
-      // Hilo de Stone Free — múltiples cuerdas paralelas oscilando
+      // Hilo de Hilo Liberado — múltiples cuerdas paralelas oscilando
       const baseColor = p.type === 'standOutThread' ? '#5fe' : '#2cb';
       const lightColor = p.type === 'standOutThread' ? '#fff' : '#cef';
       if (p.trail && p.trail.length > 1) {
@@ -6366,7 +6367,7 @@ function draw() {
       ctx.strokeStyle = '#fcd';
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
-      // corazón de Killer Queen
+      // corazón de Reina Explosiva
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.scale(r * 0.045, r * 0.045);
@@ -6622,7 +6623,7 @@ function draw() {
         ctx.fill();
       }
     }
-    // Manchado por Paint It Black: cubierta negra con goteo + contorno arcoíris si es de noche
+    // Manchado por Mancha Negra: cubierta negra con goteo + contorno arcoíris si es de noche
     if (e.pibStainTimer && e.pibStainTimer > 0 && !e.ally) {
       ctx.save();
       if (darknessMode && e.pibStainNeon) ctx.shadowBlur = 0;
@@ -6758,7 +6759,7 @@ function draw() {
       ctx.fillText(e.bossName, e.x, e.y - e.r - 16);
       ctx.textAlign = 'left';
     }
-    // Escudo invisible del Cazador de Tusk: visible sólo si NO usas Tusk+
+    // Escudo invisible del Cazador de Uña Espiral: visible sólo si NO usas Uña Espiral+
     if (e.tuskOnly && !e.ally && active < 17) {
       const shieldR = e.r + 150;
       const pulse = 0.55 + 0.25 * Math.sin(frame * 0.18);
@@ -6772,7 +6773,7 @@ function draw() {
       ctx.fillStyle = `rgba(220, 180, 255, ${pulse})`;
       ctx.font = 'bold 11px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('SOLO TUSK+', e.x, e.y - shieldR - 6);
+      ctx.fillText('SOLO ESPIRAL+', e.x, e.y - shieldR - 6);
       ctx.textAlign = 'left';
       ctx.restore();
     }
@@ -6781,7 +6782,7 @@ function draw() {
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 6, 0, Math.PI * 2); ctx.stroke();
     }
-    // Nut King Call — pernos rotando alrededor del enemigo
+    // Pernos Letales — pernos rotando alrededor del enemigo
     if (e.nuts && e.nuts > 0) {
       for (let n = 0; n < e.nuts; n++) {
         const ang = (n / e.nuts) * Math.PI * 2 + frame * 0.05;
@@ -6817,7 +6818,7 @@ function draw() {
       ctx.fillText(`🔩${e.nuts}`, e.x, e.y - e.r - (e.bossName ? 32 : 18));
       ctx.textAlign = 'left';
     }
-    // Speed King — aura de calor (más intensa con más stacks)
+    // Calor Cinético — aura de calor (más intensa con más stacks)
     if (e.heat && e.heat > 0) {
       const pulse = 0.5 + 0.5 * Math.sin(frame * 0.5);
       const intensity = e.heat / 5;
@@ -6843,7 +6844,7 @@ function draw() {
       ctx.fillText(`🔥${Math.ceil(e.heat)}`, e.x, e.y - e.r - (e.bossName ? 32 : 18));
       ctx.textAlign = 'left';
     }
-    // Gold Experience — aura de sobrecarga (recibe daño aumentado)
+    // Vida Dorada — aura de sobrecarga (recibe daño aumentado)
     if (e.geOvercharge > 0) {
       const pulse = 0.5 + 0.5 * Math.sin(frame * 0.5);
       const gr = e.r + 5 + pulse * 4;
@@ -7117,14 +7118,14 @@ function draw() {
     ctx.textAlign = 'left';
   }
 
-  // Star Platinum: THE WORLD cutscene
+  // Puño Estelar: MUNDO DETENIDO cutscene
   if (starPlatinumPhase === 1) {
-    // Fase 1 (90 frames): silueta gigante de Star Platinum detrás del jugador + ZA WARUDO
+    // Fase 1 (90 frames): silueta gigante de Puño Estelar detrás del jugador + ALTO TEMPORAL
     const t = 1 - starPlatinumTimer / 90;
     // fondo oscurece
     ctx.fillStyle = `rgba(20, 8, 45, ${0.55 * t})`;
     ctx.fillRect(0, 0, W, H);
-    // silueta gigante de Star Platinum (cuerpo humanoide musculoso morado)
+    // silueta gigante de Puño Estelar (cuerpo humanoide musculoso morado)
     const cx = player.x;
     const cy = player.y - 30;
     const scale = 1 + t * 0.4;
@@ -7162,15 +7163,15 @@ function draw() {
     ctx.fillStyle = `rgba(255, 220, 80, ${0.8 * t})`;
     ctx.fillRect(-32, -82, 64, 12);
     ctx.restore();
-    // texto ZA WARUDO (carga)
+    // texto ALTO TEMPORAL (carga)
     const textAlpha = Math.min(1, t * 2);
     ctx.font = `bold ${44 + t * 24}px monospace`;
     ctx.textAlign = 'center';
     ctx.fillStyle = `rgba(255, 220, 80, ${textAlpha})`;
-    ctx.fillText('ZA WARUDO...', W / 2, 90);
+    ctx.fillText('ALTO TEMPORAL...', W / 2, 90);
     ctx.textAlign = 'left';
   } else if (starPlatinumPhase === 2) {
-    // Fase 2 (60 frames): "THE WORLD" flash + tiempo se congela
+    // Fase 2 (60 frames): "MUNDO DETENIDO" flash + tiempo se congela
     const t = 1 - starPlatinumTimer / 60;
     ctx.fillStyle = `rgba(0, 0, 0, ${0.7 + 0.2 * Math.sin(frame * 0.4)})`;
     ctx.fillRect(0, 0, W, H);
@@ -7185,14 +7186,14 @@ function draw() {
       ctx.lineTo(cx + Math.cos(ang) * 1200, cy + Math.sin(ang) * 1200);
       ctx.stroke();
     }
-    // texto THE WORLD
+    // texto MUNDO DETENIDO
     const size = 80 + t * 80;
     ctx.font = `bold ${size}px monospace`;
     ctx.textAlign = 'center';
     ctx.shadowColor = '#fc4';
     ctx.shadowBlur = 28;
     ctx.fillStyle = `rgba(255, 240, 120, ${Math.min(1, t * 2.5)})`;
-    ctx.fillText('THE WORLD', W / 2, H / 2 + 20);
+    ctx.fillText('MUNDO DETENIDO', W / 2, H / 2 + 20);
     ctx.font = `bold 24px monospace`;
     ctx.fillStyle = `rgba(200, 160, 255, ${Math.min(1, t * 2)})`;
     ctx.fillText('— TOKI WO TOMARE! —', W / 2, H / 2 + 70);
@@ -7200,7 +7201,7 @@ function draw() {
     ctx.textAlign = 'left';
   }
 
-  // Nut King Call: DISASSEMBLE cutscene
+  // Pernos Letales: DISASSEMBLE cutscene
   if (nkcPhase === 1 || nkcPhase === 2) {
     const total = nkcPhase === 1 ? 1 - nkcTimer / 60 : 1;
     // fondo industrial
@@ -7299,7 +7300,7 @@ function draw() {
       ctx.shadowColor = '#c97';
       ctx.shadowBlur = 20;
       ctx.fillStyle = `rgba(255, 220, 140, ${Math.min(1, t * 2)})`;
-      ctx.fillText('NUT KING CALL', W / 2, 84);
+      ctx.fillText('PERNOS LETALES', W / 2, 84);
       ctx.font = `bold 16px monospace`;
       ctx.fillStyle = `rgba(220, 180, 120, ${Math.min(1, t * 1.8)})`;
       ctx.fillText('— afloja los pernos. —', W / 2, 114);
@@ -7319,7 +7320,7 @@ function draw() {
     }
   }
 
-  // D4C: LOVE TRAIN cutscene (fases) + render del tren mientras está activo
+  // Copias Dimensionales: BARRERA DORADA cutscene (fases) + render del tren mientras está activo
   if (ltPhase === 1 || ltPhase === 2) {
     const total = ltPhase === 1 ? 1 - ltTimer / 80 : 1;
     // fondo blanco/dorado
@@ -7425,12 +7426,12 @@ function draw() {
       ctx.shadowColor = '#f06';
       ctx.shadowBlur = 32;
       ctx.fillStyle = `rgba(255, 200, 230, ${Math.min(1, t * 2.5)})`;
-      ctx.fillText('LOVE TRAIN!', W / 2, H / 2 + 14);
+      ctx.fillText('BARRERA DORADA!', W / 2, H / 2 + 14);
       ctx.shadowBlur = 0;
       ctx.textAlign = 'left';
     }
   }
-  // Barrera dorada de Love Train mientras está activa
+  // Barrera dorada de Barrera Dorada mientras está activa
   if (ltActiveTimer > 0) {
     const barrierR = 90;
     const fadeIn = Math.min(1, (60 * 10 - ltActiveTimer) / 12);
@@ -7480,7 +7481,7 @@ function draw() {
     }
   }
 
-  // Scary Monsters: APEX PREDATOR cutscene
+  // Plaga Primigenia: APEX PREDATOR cutscene
   if (apexPhase === 1 || apexPhase === 2) {
     const total = apexPhase === 1 ? 1 - apexTimer / 70 : 1;
     // fondo selva oscura
@@ -7579,7 +7580,7 @@ function draw() {
       ctx.shadowColor = '#8e3';
       ctx.shadowBlur = 22;
       ctx.fillStyle = `rgba(200, 255, 140, ${Math.min(1, t * 2)})`;
-      ctx.fillText('SCARY MONSTERS', W / 2, 84);
+      ctx.fillText('PLAGA PRIMIGENIA', W / 2, 84);
       ctx.font = `bold 16px monospace`;
       ctx.fillStyle = `rgba(160, 230, 120, ${Math.min(1, t * 1.8)})`;
       ctx.fillText('— el rey come a los reyes. —', W / 2, 114);
@@ -7599,7 +7600,7 @@ function draw() {
     }
   }
 
-  // Miracle Man: DIVINE INTERVENTION cutscene
+  // Don del Milagro: DIVINE INTERVENTION cutscene
   if (mmPhase === 1 || mmPhase === 2) {
     const total = mmPhase === 1 ? 1 - mmTimer / 70 : 1;
     // fondo dorado celestial
@@ -7708,7 +7709,7 @@ function draw() {
       ctx.shadowColor = '#fc4';
       ctx.shadowBlur = 22;
       ctx.fillStyle = `rgba(255, 240, 140, ${Math.min(1, t * 2)})`;
-      ctx.fillText('MIRACLE MAN', W / 2, 84);
+      ctx.fillText('DON DEL MILAGRO', W / 2, 84);
       ctx.font = `bold 16px monospace`;
       ctx.fillStyle = `rgba(255, 220, 100, ${Math.min(1, t * 1.8)})`;
       ctx.fillText('— bendición sobre los marcados —', W / 2, 114);
@@ -7731,7 +7732,7 @@ function draw() {
     }
   }
 
-  // November Rain: TORMENTA FINAL cutscene
+  // Tormenta Torrencial: TORMENTA FINAL cutscene
   if (nrPhase === 1 || nrPhase === 2) {
     const total = nrPhase === 1 ? 1 - nrTimer / 70 : 1;
     // fondo azul tormenta
@@ -7763,7 +7764,7 @@ function draw() {
       ctx.ellipse(dx, dy, 2, 8, 0, 0, Math.PI * 2);
       ctx.fill();
     }
-    // silueta de November Rain — figura humanoide con paraguas/capa y nube en la cabeza
+    // silueta de Tormenta Torrencial — figura humanoide con paraguas/capa y nube en la cabeza
     const cx = player.x;
     const cy = player.y - 30;
     const scale = 1 + total * 0.4;
@@ -7832,7 +7833,7 @@ function draw() {
       ctx.shadowColor = '#8af';
       ctx.shadowBlur = 22;
       ctx.fillStyle = `rgba(200, 230, 255, ${Math.min(1, t * 2)})`;
-      ctx.fillText('NOVEMBER RAIN', W / 2, 80);
+      ctx.fillText('TORMENTA TORRENCIAL', W / 2, 80);
       ctx.font = `bold 16px monospace`;
       ctx.fillStyle = `rgba(150, 200, 240, ${Math.min(1, t * 1.8)})`;
       ctx.fillText('— el cielo llora sobre los enemigos —', W / 2, 110);
@@ -7855,7 +7856,7 @@ function draw() {
     }
   }
 
-  // Stone Free: STAND OUT cutscene
+  // Hilo Liberado: RUPTURA DE HILOS cutscene
   if (sfPhase === 1 || sfPhase === 2) {
     const total = sfPhase === 1 ? 1 - sfTimer / 60 : 1;
     ctx.fillStyle = `rgba(0, 30, 40, ${0.55 * total})`;
@@ -7879,7 +7880,7 @@ function draw() {
       }
       ctx.stroke();
     }
-    // silueta de Jolyne / Stone Free detrás del jugador
+    // silueta de Jolyne / Hilo Liberado detrás del jugador
     const cx = player.x;
     const cy = player.y - 24;
     const scale = 1 + total * 0.4;
@@ -7944,7 +7945,7 @@ function draw() {
       ctx.shadowColor = '#2cb';
       ctx.shadowBlur = 20;
       ctx.fillStyle = `rgba(180, 255, 240, ${Math.min(1, t * 2)})`;
-      ctx.fillText('STONE FREE', W / 2, 84);
+      ctx.fillText('HILO LIBERADO', W / 2, 84);
       ctx.font = `bold 18px monospace`;
       ctx.fillStyle = `rgba(120, 220, 200, ${Math.min(1, t * 1.8)})`;
       ctx.fillText('— desentrañando los hilos del destino —', W / 2, 114);
@@ -7958,13 +7959,13 @@ function draw() {
       ctx.shadowColor = '#2cb';
       ctx.shadowBlur = 28;
       ctx.fillStyle = `rgba(180, 255, 240, ${Math.min(1, t * 2.5)})`;
-      ctx.fillText('STAND OUT!', W / 2, H / 2 + 14);
+      ctx.fillText('RUPTURA DE HILOS!', W / 2, H / 2 + 14);
       ctx.shadowBlur = 0;
       ctx.textAlign = 'left';
     }
   }
 
-  // Red Hot Chili Pepper: ELECTRIC SCREAM cutscene
+  // Furia Eléctrica: ELECTRIC SCREAM cutscene
   if (rhcpPhase === 1 || rhcpPhase === 2) {
     const total = rhcpPhase === 1 ? 1 - rhcpTimer / 65 : 1;
     ctx.fillStyle = `rgba(20, 5, 0, ${0.6 * total})`;
@@ -8052,7 +8053,7 @@ function draw() {
       ctx.shadowColor = '#ff4';
       ctx.shadowBlur = 22;
       ctx.fillStyle = `rgba(255, 230, 80, ${Math.min(1, t * 2)})`;
-      ctx.fillText('RED HOT CHILI PEPPER', W / 2, 80);
+      ctx.fillText('FURIA ELÉCTRICA', W / 2, 80);
       ctx.font = `bold 18px monospace`;
       ctx.fillStyle = `rgba(255, 180, 80, ${Math.min(1, t * 1.8)})`;
       ctx.fillText(`Cargas: ${rhcpCharges} / 10`, W / 2, 112);
@@ -8075,7 +8076,7 @@ function draw() {
     }
   }
 
-  // Speed King: HEAT DETONATION cutscene
+  // Calor Cinético: HEAT DETONATION cutscene
   if (skPhase === 1 || skPhase === 2) {
     const total = skPhase === 1 ? 1 - skTimer / 70 : 1;
     // fondo naranja-oscuro
@@ -8094,7 +8095,7 @@ function draw() {
       ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(e.x, e.y, ringR * 0.6, 0, Math.PI * 2); ctx.stroke();
     }
-    // silueta de Speed King detrás del jugador (gordito, casquito, naranja)
+    // silueta de Calor Cinético detrás del jugador (gordito, casquito, naranja)
     const cx = player.x, cy = player.y - 20;
     const scale = 1 + total * 0.35;
     ctx.save();
@@ -8107,7 +8108,7 @@ function draw() {
     aurag.addColorStop(1, 'rgba(180, 60, 20, 0)');
     ctx.fillStyle = aurag;
     ctx.beginPath(); ctx.arc(0, 0, auraR, 0, Math.PI * 2); ctx.fill();
-    // cuerpo redondo de Speed King
+    // cuerpo redondo de Calor Cinético
     ctx.fillStyle = `rgba(220, 110, 40, ${0.9 * total})`;
     ctx.beginPath();
     ctx.ellipse(0, 50, 70, 80, 0, 0, Math.PI * 2);
@@ -8126,7 +8127,7 @@ function draw() {
     ctx.fillStyle = `rgba(255, 240, 120, ${total})`;
     ctx.fillRect(-22, 10, 44, 8);
     ctx.restore();
-    // texto SPEED KING (fase 1)
+    // texto CALOR CINÉTICO (fase 1)
     if (skPhase === 1) {
       const t = total;
       ctx.font = `bold ${44 + t * 24}px monospace`;
@@ -8134,7 +8135,7 @@ function draw() {
       ctx.shadowColor = '#f73';
       ctx.shadowBlur = 20;
       ctx.fillStyle = `rgba(255, 180, 60, ${Math.min(1, t * 2)})`;
-      ctx.fillText('SPEED KING', W / 2, 90);
+      ctx.fillText('CALOR CINÉTICO', W / 2, 90);
       ctx.font = `bold 18px monospace`;
       ctx.fillStyle = `rgba(255, 230, 100, ${Math.min(1, t * 1.8)})`;
       ctx.fillText('— calor → presión → explosión —', W / 2, 122);
@@ -8158,7 +8159,7 @@ function draw() {
     }
   }
 
-  // Killer Queen: Bites the Dust cutscene (ojos + reflejo del jugador)
+  // Reina Explosiva: Vuelta Mortal cutscene (ojos + reflejo del jugador)
   if (kqPhase === 1 || kqPhase === 2) {
     const totalT = kqPhase === 1 ? (1 - kqTimer / 80) : 1;
     // fondo oscuro
@@ -8184,7 +8185,7 @@ function draw() {
       ctx.strokeStyle = `rgba(120, 40, 60, ${growT})`;
       ctx.lineWidth = 3;
       ctx.stroke();
-      // iris (rosa Killer Queen)
+      // iris (rosa Reina Explosiva)
       const irisR = eyeH * (kqPhase === 2 ? 0.55 : 0.75);
       const irisGrd = ctx.createRadialGradient(eye.cx, eye.cy, 0, eye.cx, eye.cy, irisR);
       irisGrd.addColorStop(0, `rgba(255, 140, 180, ${growT})`);
@@ -8224,7 +8225,7 @@ function draw() {
       ctx.shadowColor = '#f48';
       ctx.shadowBlur = 28;
       ctx.fillStyle = `rgba(255, 120, 180, ${Math.min(1, t * 2)})`;
-      ctx.fillText('BITES THE DUST', W / 2, H * 0.5 + 14);
+      ctx.fillText('VUELTA MORTAL', W / 2, H * 0.5 + 14);
       ctx.font = `bold 22px monospace`;
       ctx.fillStyle = `rgba(255, 200, 220, ${Math.min(1, t * 2)})`;
       ctx.fillText('— TICK... TACK... —', W / 2, H * 0.5 + 50);
@@ -8237,18 +8238,18 @@ function draw() {
       ctx.shadowColor = '#f48';
       ctx.shadowBlur = 16;
       ctx.fillStyle = `rgba(255, 200, 220, ${Math.min(1, t * 2)})`;
-      ctx.fillText('KILLER QUEEN', W / 2, 70);
+      ctx.fillText('REINA EXPLOSIVA', W / 2, 70);
       ctx.shadowBlur = 0;
       ctx.textAlign = 'left';
     }
   }
 
-  // DIO: THE WORLD cutscene (amarillo)
+  // DIO: MUNDO DETENIDO cutscene (amarillo)
   if (dioPhase === 1) {
     const t = 1 - dioTimer / 90;
     ctx.fillStyle = `rgba(45, 30, 5, ${0.6 * t})`;
     ctx.fillRect(0, 0, W, H);
-    // silueta gigante de DIO/The World detrás del jugador (amarillo)
+    // silueta gigante de DIO/Mundo Detenido detrás del jugador (amarillo)
     const cx = player.x;
     const cy = player.y - 30;
     const scale = 1 + t * 0.4;
@@ -8294,14 +8295,14 @@ function draw() {
     ctx.fillStyle = `rgba(255, 240, 120, ${0.9 * t})`;
     ctx.fillRect(-36, -84, 72, 14);
     ctx.restore();
-    // texto ZA WARUDO!
+    // texto ALTO TEMPORAL!
     const textAlpha = Math.min(1, t * 2);
     ctx.font = `bold ${44 + t * 24}px monospace`;
     ctx.textAlign = 'center';
     ctx.shadowColor = '#fc4';
     ctx.shadowBlur = 18;
     ctx.fillStyle = `rgba(255, 240, 100, ${textAlpha})`;
-    ctx.fillText('ZA WARUDO!', W / 2, 90);
+    ctx.fillText('ALTO TEMPORAL!', W / 2, 90);
     ctx.shadowBlur = 0;
     ctx.textAlign = 'left';
   } else if (dioPhase === 2) {
@@ -8324,7 +8325,7 @@ function draw() {
     ctx.shadowColor = '#fc4';
     ctx.shadowBlur = 30;
     ctx.fillStyle = `rgba(255, 240, 100, ${Math.min(1, t * 2.5)})`;
-    ctx.fillText('THE WORLD', W / 2, H / 2 + 20);
+    ctx.fillText('MUNDO DETENIDO', W / 2, H / 2 + 20);
     ctx.font = `bold 24px monospace`;
     ctx.fillStyle = `rgba(255, 200, 60, ${Math.min(1, t * 2)})`;
     ctx.fillText('— TOKI WO TOMARE! —', W / 2, H / 2 + 70);
@@ -8332,7 +8333,7 @@ function draw() {
     ctx.textAlign = 'left';
   }
 
-  // Pistola Vórtice ultimate — TUSK ACT 4
+  // Pistola Vórtice ultimate — ESPIRAL ACTO 4
   if (vortexUltPhase === 1) {
     const t = 1 - vortexUltTimer / 60;
     ctx.fillStyle = `rgba(40, 25, 5, ${t * 0.85})`;
@@ -8416,7 +8417,7 @@ function draw() {
     ctx.beginPath(); ctx.arc(pX, pY, pR, 0, Math.PI * 2); ctx.stroke();
     ctx.fillStyle = '#fff';
     ctx.beginPath(); ctx.arc(pX - pR * 0.3, pY - pR * 0.36, pR * 0.22, 0, Math.PI * 2); ctx.fill();
-    // TUSK ACT 4 — texto dramático
+    // ESPIRAL ACTO 4 — texto dramático
     const pulse = 0.9 + 0.1 * Math.sin(frame * 0.35);
     ctx.save();
     ctx.font = 'bold 130px monospace';
@@ -8424,12 +8425,12 @@ function draw() {
     ctx.shadowColor = 'rgba(255, 180, 30, 0.95)';
     ctx.shadowBlur = 38;
     ctx.fillStyle = `rgba(255, 220, 90, ${pulse})`;
-    ctx.fillText('TUSK', W * 0.74, H * 0.34);
+    ctx.fillText('ESPIRAL', W * 0.74, H * 0.34);
     ctx.fillText('ACT 4', W * 0.74, H * 0.58);
     ctx.shadowBlur = 0;
     ctx.strokeStyle = `rgba(0, 0, 0, 0.9)`;
     ctx.lineWidth = 6;
-    ctx.strokeText('TUSK', W * 0.74, H * 0.34);
+    ctx.strokeText('ESPIRAL', W * 0.74, H * 0.34);
     ctx.strokeText('ACT 4', W * 0.74, H * 0.58);
     ctx.restore();
     ctx.textAlign = 'left';
@@ -8449,7 +8450,7 @@ function draw() {
     }
   }
 
-  // Wonder of U ultimate cutscene
+  // Calamidad ultimate cutscene
   if (wonderUltPhase === 1) {
     const t = 1 - wonderUltTimer / 60;
     ctx.fillStyle = `rgba(140, 10, 20, ${t * 0.85})`;
@@ -8539,7 +8540,7 @@ function draw() {
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 4;
     ctx.beginPath(); ctx.arc(vpx, lampY, 38, 0, Math.PI * 2); ctx.stroke();
-    // "WONDER OF U" — texto dramático
+    // "CALAMIDAD" — texto dramático
     const pulse = 0.88 + 0.12 * Math.sin(frame * 0.35);
     ctx.save();
     ctx.font = 'bold 90px monospace';
@@ -8547,11 +8548,11 @@ function draw() {
     ctx.shadowColor = 'rgba(0, 0, 0, 1)';
     ctx.shadowBlur = 22;
     ctx.fillStyle = `rgba(255, 230, 90, ${pulse})`;
-    ctx.fillText('WONDER OF U', W / 2, H * 0.94);
+    ctx.fillText('CALAMIDAD', W / 2, H * 0.94);
     ctx.shadowBlur = 0;
     ctx.strokeStyle = `rgba(0, 0, 0, 0.95)`;
     ctx.lineWidth = 5;
-    ctx.strokeText('WONDER OF U', W / 2, H * 0.94);
+    ctx.strokeText('CALAMIDAD', W / 2, H * 0.94);
     ctx.restore();
     ctx.textAlign = 'left';
     // "CALAMIDAD" pequeño arriba
@@ -8691,7 +8692,7 @@ function draw() {
     }
   }
 
-  // Tusk Act 2 — NAIL BARRAGE: flash dorado breve sobre el jugador (no tapa pantalla)
+  // Espiral Acto 2 — NAIL BARRAGE: flash dorado breve sobre el jugador (no tapa pantalla)
   if (tuskNailStormPhase === 1) {
     const t = tuskNailStormTimer / 22;
     ctx.save();
@@ -8706,7 +8707,7 @@ function draw() {
     ctx.textAlign = 'left';
   }
 
-  // Tusk Act 3 — WORMHOLE PUNCH cutscene
+  // Espiral Acto 3 — WORMHOLE PUNCH cutscene
   if (tuskWormholePhase === 1) {
     const t = 1 - tuskWormholeTimer / 70;
     ctx.fillStyle = `rgba(180, 100, 20, ${t * 0.7})`;
@@ -8741,11 +8742,11 @@ function draw() {
     ctx.shadowColor = 'rgba(255, 180, 80, 1)';
     ctx.shadowBlur = 32;
     ctx.fillStyle = `rgba(255, 220, 150, ${pulse})`;
-    ctx.fillText('TUSK ACT 3', W / 2, H * 0.22);
+    ctx.fillText('ESPIRAL ACTO 3', W / 2, H * 0.22);
     ctx.shadowBlur = 0;
     ctx.strokeStyle = 'rgba(50, 20, 0, 0.95)';
     ctx.lineWidth = 5;
-    ctx.strokeText('TUSK ACT 3', W / 2, H * 0.22);
+    ctx.strokeText('ESPIRAL ACTO 3', W / 2, H * 0.22);
     ctx.font = 'bold 38px monospace';
     ctx.fillStyle = `rgba(255, 220, 150, ${pulse})`;
     ctx.fillText('— WORMHOLE PUNCH —', W / 2, H * 0.92);
@@ -8754,7 +8755,7 @@ function draw() {
     ctx.textAlign = 'left';
   }
 
-  // White Snake — 11 NIGHTS cutscene
+  // Disco del Alma — ONCE DISCOS cutscene
   if (wsUltPhase === 1) {
     const t = 1 - wsUltTimer / 60;
     ctx.fillStyle = `rgba(220, 220, 230, ${t * 0.7})`;
@@ -8803,20 +8804,20 @@ function draw() {
     ctx.shadowColor = 'rgba(255, 255, 255, 0.95)';
     ctx.shadowBlur = 32;
     ctx.fillStyle = `rgba(255, 255, 255, ${pulse})`;
-    ctx.fillText('WHITE SNAKE', W / 2, H * 0.34);
+    ctx.fillText('DISCO DEL ALMA', W / 2, H * 0.34);
     ctx.shadowBlur = 0;
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
     ctx.lineWidth = 5;
-    ctx.strokeText('WHITE SNAKE', W / 2, H * 0.34);
+    ctx.strokeText('DISCO DEL ALMA', W / 2, H * 0.34);
     ctx.font = 'bold 60px monospace';
     ctx.fillStyle = `rgba(180, 220, 255, ${pulse})`;
-    ctx.fillText('— 11 NIGHTS —', W / 2, H * 0.78);
-    ctx.strokeText('— 11 NIGHTS —', W / 2, H * 0.78);
+    ctx.fillText('— ONCE DISCOS —', W / 2, H * 0.78);
+    ctx.strokeText('— ONCE DISCOS —', W / 2, H * 0.78);
     ctx.restore();
     ctx.textAlign = 'left';
   }
 
-  // C-Moon — GRAVITY INVERSION cutscene
+  // Gravedad Lunar — GRAVITY INVERSION cutscene
   if (cmUltPhase === 1) {
     const t = 1 - cmUltTimer / 70;
     ctx.fillStyle = `rgba(20, 40, 110, ${t * 0.85})`;
@@ -8874,11 +8875,11 @@ function draw() {
     ctx.shadowColor = 'rgba(120, 180, 255, 1)';
     ctx.shadowBlur = 40;
     ctx.fillStyle = `rgba(220, 240, 255, ${pulse})`;
-    ctx.fillText('C-MOON', W / 2, H * 0.32);
+    ctx.fillText('GRAVEDAD LUNAR', W / 2, H * 0.32);
     ctx.shadowBlur = 0;
     ctx.strokeStyle = 'rgba(0, 0, 40, 0.95)';
     ctx.lineWidth = 6;
-    ctx.strokeText('C-MOON', W / 2, H * 0.32);
+    ctx.strokeText('GRAVEDAD LUNAR', W / 2, H * 0.32);
     ctx.font = 'bold 44px monospace';
     ctx.fillStyle = `rgba(180, 220, 255, ${pulse})`;
     ctx.fillText('— GRAVITY INVERSION —', W / 2, H * 0.92);
@@ -8887,7 +8888,7 @@ function draw() {
     ctx.textAlign = 'left';
   }
 
-  // Made in Heaven — HEAVEN ASCENSION cutscene (Tierra girando + explotando)
+  // Cielo Acelerado — HEAVEN ASCENSION cutscene (Tierra girando + explotando)
   if (mihUltPhase === 1) {
     const t = 1 - mihUltTimer / 80;
     ctx.fillStyle = `rgba(255, 220, 130, ${t * 0.7})`;
@@ -9031,7 +9032,7 @@ function draw() {
     ctx.restore();
   }
 
-  // Paint It Black — DÍA cutscene: BLACK, EVERYTHING MUST BE BLACK
+  // Mancha Negra — DÍA cutscene: BLACK, EVERYTHING MUST BE BLACK
   if (pibDayPhase > 0) {
     // ===== Fase 1: pose + disparo de la bala gigante =====
     if (pibDayPhase === 1) {
@@ -9242,9 +9243,9 @@ function draw() {
     }
   }
 
-  // Paint It Black — NOCHE cutscene: dash con hitbox total + ráfaga de golpes
+  // Mancha Negra — NOCHE cutscene: dash con hitbox total + ráfaga de golpes
   if (pibNightPhase > 0) {
-    // ===== Fase 1: pose de carga + texto "PAINT IT BLACK" =====
+    // ===== Fase 1: pose de carga + texto "MANCHA NEGRA" =====
     if (pibNightPhase === 1) {
       const t = 1 - pibNightTimer / 60;
       ctx.fillStyle = `rgba(0,0,0,${0.55 + 0.3 * t})`;
@@ -9256,7 +9257,7 @@ function draw() {
         ctx.lineWidth = 4;
         ctx.beginPath(); ctx.arc(player.x, player.y, r, 0, Math.PI * 2); ctx.stroke();
       }
-      // texto PAINT IT BLACK con outline arcoíris
+      // texto MANCHA NEGRA con outline arcoíris
       ctx.textAlign = 'center';
       ctx.font = `900 ${72 + t * 36}px monospace`;
       ctx.shadowColor = `hsl(${(frame * 18) % 360}, 100%, 60%)`;
@@ -9264,8 +9265,8 @@ function draw() {
       ctx.fillStyle = '#000';
       ctx.strokeStyle = `hsl(${(frame * 18) % 360}, 100%, 60%)`;
       ctx.lineWidth = 5;
-      ctx.strokeText('PAINT IT BLACK', W / 2, H / 2);
-      ctx.fillText('PAINT IT BLACK', W / 2, H / 2);
+      ctx.strokeText('MANCHA NEGRA', W / 2, H / 2);
+      ctx.fillText('MANCHA NEGRA', W / 2, H / 2);
       ctx.shadowBlur = 0;
       ctx.textAlign = 'left';
     }
@@ -9521,11 +9522,11 @@ function drawUI() {
     ctx.fillStyle = STAND_COLORS[standForm];
     ctx.fillText(`27. ${STAND_LABELS[standForm]}`, 20, 98);
   } else if (active === 18) {
-    ctx.fillStyle = TUSK_COLORS[tuskAct];
-    ctx.fillText(`19. ${TUSK_LABELS[tuskAct]}`, 20, 98);
+    ctx.fillStyle = ESPIRAL_COLORS[tuskAct];
+    ctx.fillText(`19. ${ESPIRAL_LABELS[tuskAct]}`, 20, 98);
   } else if (active === 16 && geForm === 1) {
     ctx.fillStyle = '#fe6';
-    ctx.fillText(`17. Gold Experience Requiem`, 20, 98);
+    ctx.fillText(`17. Réquiem Dorado`, 20, 98);
   } else {
     ctx.fillStyle = ABILITIES[active].color;
     ctx.fillText(`${ABILITIES[active].name}`, 20, 98);
@@ -9591,13 +9592,13 @@ function drawUI() {
   if (active === 1) {
     if (sfPhase > 0) {
       ctx.fillStyle = '#5fe';
-      ctx.fillText(`🪢 STAND OUT!`, 280, 33);
+      ctx.fillText(`🪢 RUPTURA DE HILOS!`, 280, 33);
     } else if (sfCD > 0) {
       ctx.fillStyle = '#888';
-      ctx.fillText(`Y Stand Out: ${(sfCD / 60).toFixed(1)}s`, 280, 33);
+      ctx.fillText(`Y Ruptura: ${(sfCD / 60).toFixed(1)}s`, 280, 33);
     } else {
       ctx.fillStyle = '#5fe';
-      ctx.fillText(`Y Stand Out: LISTO`, 280, 33);
+      ctx.fillText(`Y Ruptura: LISTO`, 280, 33);
     }
   }
   if (active === 10) {
@@ -9670,58 +9671,58 @@ function drawUI() {
   if (active === 19) {
     if (ltActiveTimer > 0) {
       ctx.fillStyle = '#fd0';
-      ctx.fillText(`✨ LOVE TRAIN ${(ltActiveTimer / 60).toFixed(1)}s`, 280, 33);
+      ctx.fillText(`✨ BARRERA DORADA ${(ltActiveTimer / 60).toFixed(1)}s`, 280, 33);
     } else if (ltPhase > 0) {
       ctx.fillStyle = '#fd0';
-      ctx.fillText(`✨ LOVE TRAIN`, 280, 33);
+      ctx.fillText(`✨ BARRERA DORADA`, 280, 33);
     } else if (ltCD > 0) {
       ctx.fillStyle = '#888';
-      ctx.fillText(`L Love Train: ${(ltCD / 60).toFixed(0)}s`, 280, 33);
+      ctx.fillText(`L Barrera Dorada: ${(ltCD / 60).toFixed(0)}s`, 280, 33);
     } else {
       ctx.fillStyle = '#f06';
-      ctx.fillText(`L Love Train: LISTO`, 280, 33);
+      ctx.fillText(`L Barrera Dorada: LISTO`, 280, 33);
     }
   }
   if (active === 20) {
     if (starPlatinumPhase > 0) {
       ctx.fillStyle = '#ff0';
-      ctx.fillText(`⏱ ZA WARUDO`, 280, 33);
+      ctx.fillText(`⏱ ALTO TEMPORAL`, 280, 33);
     } else if (timeStopTimer > 0) {
       ctx.fillStyle = '#fc8';
-      ctx.fillText(`⏱ THE WORLD ${(timeStopTimer / 60).toFixed(1)}s`, 280, 33);
+      ctx.fillText(`⏱ MUNDO DETENIDO ${(timeStopTimer / 60).toFixed(1)}s`, 280, 33);
     } else if (timeStopCD > 0) {
       ctx.fillStyle = '#888';
-      ctx.fillText(`R The World: ${(timeStopCD / 60).toFixed(1)}s`, 280, 33);
+      ctx.fillText(`R Mundo Detenido: ${(timeStopCD / 60).toFixed(1)}s`, 280, 33);
     } else {
       ctx.fillStyle = '#c8f';
-      ctx.fillText(`R The World: LISTO`, 280, 33);
+      ctx.fillText(`R Mundo Detenido: LISTO`, 280, 33);
     }
   }
   if (active === 21) {
     if (dioPhase > 0) {
       ctx.fillStyle = '#fd2';
-      ctx.fillText(`⏱ ZA WARUDO!`, 280, 33);
+      ctx.fillText(`⏱ ALTO TEMPORAL!`, 280, 33);
     } else if (timeStopTimer > 0) {
       ctx.fillStyle = '#fd2';
-      ctx.fillText(`⏱ THE WORLD ${(timeStopTimer / 60).toFixed(1)}s — cuchillos cargando`, 280, 33);
+      ctx.fillText(`⏱ MUNDO DETENIDO ${(timeStopTimer / 60).toFixed(1)}s — cuchillos cargando`, 280, 33);
     } else if (timeStopCD > 0) {
       ctx.fillStyle = '#888';
-      ctx.fillText(`Z The World: ${(timeStopCD / 60).toFixed(1)}s`, 280, 33);
+      ctx.fillText(`Z Mundo Detenido: ${(timeStopCD / 60).toFixed(1)}s`, 280, 33);
     } else {
       ctx.fillStyle = '#fd2';
-      ctx.fillText(`Z The World: LISTO`, 280, 33);
+      ctx.fillText(`Z Mundo Detenido: LISTO`, 280, 33);
     }
   }
   if (active === 22) {
     if (kqPhase > 0) {
       ctx.fillStyle = '#f48';
-      ctx.fillText(`💖 BITES THE DUST`, 280, 33);
+      ctx.fillText(`💖 VUELTA MORTAL`, 280, 33);
     } else if (detonateAllCD > 0) {
       ctx.fillStyle = '#888';
-      ctx.fillText(`G Bites the Dust: ${(detonateAllCD / 60).toFixed(0)}s`, 280, 33);
+      ctx.fillText(`G Vuelta Mortal: ${(detonateAllCD / 60).toFixed(0)}s`, 280, 33);
     } else {
       ctx.fillStyle = '#f48';
-      ctx.fillText(`G Bites the Dust: LISTO`, 280, 33);
+      ctx.fillText(`G Vuelta Mortal: LISTO`, 280, 33);
     }
   }
   if (active === 17) {
@@ -9769,10 +9770,10 @@ function drawUI() {
       ctx.fillText(night ? `🌈 BLACK!` : `🖤 BLACK!`, 280, 33);
     } else if (pibLetterCD > 0) {
       ctx.fillStyle = '#888';
-      ctx.fillText(`P Paint It Black: ${(pibLetterCD / 60).toFixed(0)}s`, 280, 33);
+      ctx.fillText(`P Mancha Negra: ${(pibLetterCD / 60).toFixed(0)}s`, 280, 33);
     } else {
       ctx.fillStyle = night ? `hsl(${(frame * 12) % 360}, 100%, 60%)` : '#fff';
-      ctx.fillText(night ? `P Paint It Black: LISTO (NOCHE)` : `P Paint It Black: LISTO (DÍA)`, 280, 33);
+      ctx.fillText(night ? `P Mancha Negra: LISTO (NOCHE)` : `P Mancha Negra: LISTO (DÍA)`, 280, 33);
     }
     // Forma (balas / puños)
     ctx.fillStyle = '#bbf';
@@ -9809,7 +9810,7 @@ function drawUI() {
       ctx.fillStyle = tuskA3Kills >= 3000 ? '#fd6' : '#fff';
       ctx.fillText(`☠ Kills Act 3: ${Math.min(tuskA3Kills, 3000)}/3000`, 480, 33);
     } else if (tuskAct === 4) {
-      if (vortexUltPhase > 0) { ctx.fillStyle = '#fd6'; ctx.fillText(`✨ TUSK ACT 4`, 280, 33); }
+      if (vortexUltPhase > 0) { ctx.fillStyle = '#fd6'; ctx.fillText(`✨ ESPIRAL ACTO 4`, 280, 33); }
       else if (vortexUltCD > 0) { ctx.fillStyle = '#888'; ctx.fillText(`V Golden Ratio: ${(vortexUltCD / 60).toFixed(0)}s`, 280, 33); }
       else { ctx.fillStyle = '#fd6'; ctx.fillText(`V Golden Ratio: LISTO`, 280, 33); }
     }
@@ -9820,20 +9821,20 @@ function drawUI() {
       const acts = [1, 2, 3, 4].filter(a => tuskUnlocked.has(a));
       const idx = acts.indexOf(tuskAct);
       const nextAct = acts[(idx + 1) % acts.length];
-      ctx.fillText(`T → ${TUSK_LABELS[nextAct]}`, 280, 50);
+      ctx.fillText(`T → ${ESPIRAL_LABELS[nextAct]}`, 280, 50);
       ctx.font = '12px monospace';
     }
   }
   if (active === 16) {
     if (mudaPhase > 0) {
       ctx.fillStyle = '#fd0';
-      ctx.fillText(`👊 MUDA MUDA MUDA!`, 280, 33);
+      ctx.fillText(`👊 INÚTIL INÚTIL INÚTIL!`, 280, 33);
     } else if (mirageCD > 0) {
       ctx.fillStyle = '#888';
-      ctx.fillText(`K Muda Muda: ${(mirageCD / 60).toFixed(0)}s`, 280, 33);
+      ctx.fillText(`K Inútil: ${(mirageCD / 60).toFixed(0)}s`, 280, 33);
     } else {
       ctx.fillStyle = '#fd0';
-      ctx.fillText(`K Muda Muda: LISTO`, 280, 33);
+      ctx.fillText(`K Inútil: LISTO`, 280, 33);
     }
     if (geForm === 1) {
       if (gerReturnTimer > 0) {
@@ -9906,12 +9907,12 @@ function drawUI() {
       if (wsUltCD > 0) { ctx.fillStyle = '#888'; ctx.fillText(`K 11 Nights: ${(wsUltCD / 60).toFixed(1)}s`, 280, 33); }
       else { ctx.fillStyle = '#fff'; ctx.fillText(`K 11 Nights: LISTO`, 280, 33); }
       ctx.fillStyle = wsKills >= 500 ? '#48f' : '#fff';
-      ctx.fillText(`☠ Kills White Snake: ${Math.min(wsKills, 500)}/500`, 480, 33);
+      ctx.fillText(`☠ Kills Disco del Alma: ${Math.min(wsKills, 500)}/500`, 480, 33);
     } else if (standForm === 1) {
       if (cmUltCD > 0) { ctx.fillStyle = '#888'; ctx.fillText(`M Gravity: ${(cmUltCD / 60).toFixed(0)}s`, 280, 33); }
       else { ctx.fillStyle = '#48f'; ctx.fillText(`M Gravity Inversion: LISTO`, 280, 33); }
       ctx.fillStyle = cmKills >= 2000 ? '#fc6' : '#9cf';
-      ctx.fillText(`☠ Kills C-Moon: ${Math.min(cmKills, 2000)}/2000`, 480, 33);
+      ctx.fillText(`☠ Kills Gravedad Lunar: ${Math.min(cmKills, 2000)}/2000`, 480, 33);
     } else if (standForm === 2) {
       if (mihUltCD > 0) { ctx.fillStyle = '#888'; ctx.fillText(`H Heaven: ${(mihUltCD / 60).toFixed(0)}s`, 280, 33); }
       else { ctx.fillStyle = '#fc6'; ctx.fillText(`H Heaven Ascension: LISTO`, 280, 33); }
@@ -9929,8 +9930,8 @@ function drawUI() {
       ctx.font = '12px monospace';
     }
   }
-  // Toasts de desbloqueo de Tusk
-  function drawTuskUnlockToast(timer, title, hint, color, shadow) {
+  // Toasts de desbloqueo de Uña Espiral
+  function drawSpiralUnlockToast(timer, title, hint, color, shadow) {
     if (timer <= 0) return;
     const a = Math.min(1, timer / 60);
     ctx.save();
@@ -9954,7 +9955,7 @@ function drawUI() {
     ctx.shadowColor = 'rgba(255, 220, 130, 1)';
     ctx.shadowBlur = 22;
     ctx.fillStyle = `rgba(255, 240, 170, ${a})`;
-    ctx.fillText('¡TUSK ACT 2 DESBLOQUEADO!', W / 2, 130);
+    ctx.fillText('¡ESPIRAL ACTO 2 DESBLOQUEADO!', W / 2, 130);
     ctx.font = 'bold 16px monospace';
     ctx.fillStyle = `rgba(255, 240, 200, ${a})`;
     ctx.fillText('Pulsa T para cambiar entre Actos', W / 2, 158);
@@ -9969,7 +9970,7 @@ function drawUI() {
     ctx.shadowColor = 'rgba(255, 190, 100, 1)';
     ctx.shadowBlur = 24;
     ctx.fillStyle = `rgba(255, 220, 150, ${a})`;
-    ctx.fillText('¡TUSK ACT 3 DESBLOQUEADO!', W / 2, 130);
+    ctx.fillText('¡ESPIRAL ACTO 3 DESBLOQUEADO!', W / 2, 130);
     ctx.font = 'bold 16px monospace';
     ctx.fillStyle = `rgba(255, 240, 200, ${a})`;
     ctx.fillText('Z para Wormhole Punch · T para ciclar', W / 2, 158);
@@ -9984,7 +9985,7 @@ function drawUI() {
     ctx.shadowColor = 'rgba(255, 200, 60, 1)';
     ctx.shadowBlur = 28;
     ctx.fillStyle = `rgba(255, 230, 130, ${a})`;
-    ctx.fillText('¡TUSK ACT 4 DESBLOQUEADO!', W / 2, 130);
+    ctx.fillText('¡ESPIRAL ACTO 4 DESBLOQUEADO!', W / 2, 130);
     ctx.font = 'bold 16px monospace';
     ctx.fillStyle = `rgba(255, 240, 200, ${a})`;
     ctx.fillText('Golden Rotation. V para el ultimate.', W / 2, 158);
@@ -10000,7 +10001,7 @@ function drawUI() {
     ctx.shadowColor = 'rgba(80, 140, 255, 1)';
     ctx.shadowBlur = 22;
     ctx.fillStyle = `rgba(160, 200, 255, ${a})`;
-    ctx.fillText('¡C-MOON DESBLOQUEADO!', W / 2, 130);
+    ctx.fillText('¡GRAVEDAD LUNAR DESBLOQUEADO!', W / 2, 130);
     ctx.font = 'bold 16px monospace';
     ctx.fillStyle = `rgba(220, 235, 255, ${a})`;
     ctx.fillText('Pulsa L para cambiar entre stands', W / 2, 158);
@@ -10015,7 +10016,7 @@ function drawUI() {
     ctx.shadowColor = 'rgba(255, 200, 60, 1)';
     ctx.shadowBlur = 24;
     ctx.fillStyle = `rgba(255, 230, 150, ${a})`;
-    ctx.fillText('¡MADE IN HEAVEN DESBLOQUEADO!', W / 2, 130);
+    ctx.fillText('¡CIELO ACELERADO DESBLOQUEADO!', W / 2, 130);
     ctx.font = 'bold 16px monospace';
     ctx.fillStyle = `rgba(255, 240, 200, ${a})`;
     ctx.fillText('El tiempo te pertenece. Pulsa L para cambiar.', W / 2, 158);
@@ -10041,7 +10042,7 @@ function drawUI() {
     ctx.fillText(keyLabels[i] || '?', x + 2, hbY + 11);
     let pelletColor = ab.color;
     if (i === 26 && isOwned) pelletColor = STAND_COLORS[standForm];
-    else if (i === 17 && isOwned) pelletColor = TUSK_COLORS[tuskAct];
+    else if (i === 17 && isOwned) pelletColor = ESPIRAL_COLORS[tuskAct];
     ctx.fillStyle = isOwned ? pelletColor : '#333';
     ctx.beginPath(); ctx.arc(x + 13, hbY + 32, 5, 0, Math.PI * 2); ctx.fill();
     if (!isOwned) {
@@ -10249,6 +10250,15 @@ function restart() {
 function loop() {
   frame++;
 
+  if (raceMode) {
+    if (!racePaused) updateRace();
+    drawRace();
+    mouse.clicked = false;
+    consumeKeyPresses();
+    requestAnimationFrame(loop);
+    return;
+  }
+
   if (gameStarted && !shopOpen && !paused && !gameOver) {
     updatePlayer();
     updateGerReturn();
@@ -10288,6 +10298,11 @@ const sandboxPanel = document.getElementById('sandbox-panel');
 document.querySelectorAll('#modes button').forEach(btn => {
   btn.addEventListener('click', () => {
     const m = btn.dataset.mode;
+    if (m === 'race') {
+      document.getElementById('title').style.display = 'none';
+      startRaceMode();
+      return;
+    }
     applyMode(m);
     document.getElementById('title').style.display = 'none';
     gameStarted = true;
@@ -10298,9 +10313,9 @@ document.querySelectorAll('#modes button').forEach(btn => {
       // y todas las stands de Pucci desbloqueadas
       standFormUnlocked.add(1);
       standFormUnlocked.add(2);
-      // y todos los Tusk Acts desbloqueados
+      // y todos los Espiral Actos desbloqueados
       tuskUnlocked.add(2); tuskUnlocked.add(3); tuskUnlocked.add(4);
-      // Gold Experience empieza en su forma base; GER se gana con 4000 kills
+      // Vida Dorada empieza en su forma base; GER se gana con 4000 kills
       // (o con el botón "Desbloquear todo" del panel sandbox)
       gerUnlocked = false; geForm = 0; gerKills = 0;
       player.coins = 99999;
@@ -10384,6 +10399,2836 @@ document.getElementById('sb-darkness').addEventListener('click', () => {
   document.getElementById('sb-cycle-v').textContent = 'NOCHE';
   triggerDarknessMode();
 });
+
+// ============================================================
+// ===== STEEL BALL RUN — Modo Carrera (9 etapas) =============
+// ============================================================
+let raceMode = false;
+let racePaused = false;
+let racePhase = 'weapon-select'; // weapon-select, pre-stage, racing, post-stage, night, finale, defeat
+let raceStage = 1;
+const RACE_STAGES = 9;
+let raceWeapon = null;            // 'fists' | 'gun' | 'steelballs'
+const raceCollectedParts = [];    // partes del Santo Cadáver halladas
+let raceNightsDone = 0;           // cuántas noches han terminado (0..9)
+let raceNightFound = null;        // parte hallada esta noche (string o null)
+let raceNightSpot = 0;            // qué pista se está investigando
+let raceMessage = '';
+let racePhaseTimer = 0;
+
+const RACE_BODY_PARTS = [
+  '❤ Corazón',
+  '👁 Ojo Izquierdo',
+  '👁 Ojo Derecho',
+  '🦴 Columna',
+  '💪 Brazo Izquierdo',
+  '💪 Brazo Derecho',
+  '🦵 Pierna Izquierda',
+  '🦵 Pierna Derecha',
+  '💀 Cráneo'
+];
+
+const RACE_STAGE_NAMES = [
+  'Bajo Beach a Rocky Mountain Village',
+  'Rocky Mountain Village a Cannon City',
+  'Cannon City a Big Rock Place',
+  'Big Rock Place a Sand Town',
+  'Sand Town a Kansas City',
+  'Kansas City a Top of the Cliffs',
+  'Top of the Cliffs a Lake Forest',
+  'Lake Forest a Mountain Pass',
+  'Mountain Pass a Sugar Mountain — FINAL'
+];
+
+// Participantes numerados (#1, #2, ...) — sin nombres de la serie.
+const NPC_COUNT = 14;
+const NPC_PALETTE = ['#a33','#dd9','#fc4','#f8a','#cb6','#8cf','#6cf','#f6c','#cf6','#fcd','#8fc','#c8f','#fc8','#6fc'];
+// Habilidades cíclicas (cada participante recibe una según su número):
+// scratch / sand / luck / cream / lasso / steelball
+const NPC_ABIL_CYCLE = ['scratch', 'sand', 'luck', 'cream', 'lasso', 'steelball'];
+
+const racePlayer = {
+  x: W / 2, y: H - 180,
+  vx: 0, vy: 0,
+  baseSpeed: 5.4,
+  hp: 100, maxHp: 100,
+  progress: 0,
+  rank: 7,
+  draftTimer: 0,
+  draftBoost: 0,
+  dashTimer: 0,
+  iframe: 0,
+  attackCD: 0,
+  steelBallActive: null, // {x,y,vx,vy,phase:'out'|'back', target}
+  facingAngle: -Math.PI / 2,
+  // stand encontrado en las salas (reemplaza el arma como click). null = usar arma inicial.
+  stand: null,
+  standCD: 0,
+  lassoSlow: 0,    // frames con velocidad reducida por un lazo
+  sandStun: 0,     // frames con control reducido
+  scratchDot: 0,   // frames con sangrado
+  // dash con SPACE en la dirección de WASD — atravesar entre NPCs, CD 3s
+  sideDashTimer: 0,
+  sideDashCD: 0,
+  sideDashVX: 0,
+  sideDashVY: 0,
+  // resistencia (stamina del caballo)
+  stamina: 100, maxStamina: 100,
+  exhausted: false,
+};
+
+// ---- TIEMPO DETENIDO en carrera (sólo evoluciones, SP y TW) ----
+let raceTimeStopTimer = 0;
+let raceTimeStopCD = 0;
+
+// ============================================================
+// STANDS que se pueden obtener al hallar partes del cadáver.
+// Mientras más raro/mejor el stand, menor el peso (probabilidad).
+// "attack" describe el tipo de click. "timestop:true" → la Q lo detiene 1.5s.
+// ============================================================
+const RACE_STAND_POOL = [
+  // --- comunes (basura del cadáver) ---
+  { id: 'whip',        name: 'Látigo Místico', weight: 30, attack: 'whipchain', dmg: 11, cd: 14, color: '#fea' },
+  { id: 'threads',     name: 'Hilo Liberado',         weight: 26, attack: 'threadspread', dmg: 9, cd: 14, color: '#2cb' },
+  { id: 'breaker',     name: 'Puños Rompedores',   weight: 24, attack: 'burst',   dmg: 10, cd: 14, color: '#f8c' },
+  { id: 'arrow',       name: 'Flechas Perforantes',weight: 22, attack: 'standarrow', dmg: 16, cd: 18, color: '#cf8' },
+  { id: 'nutking',     name: 'Pernos Letales',      weight: 20, attack: 'ironbolt', dmg: 12, cd: 16, color: '#c97' },
+  // --- poco comunes ---
+  { id: 'rain',        name: 'Tormenta Torrencial',      weight: 14, attack: 'rainstrike', dmg: 11, cd: 22, color: '#69c' },
+  { id: 'flurry',      name: 'Frenesí de Estocadas', weight: 14, attack: 'flurry', dmg: 14, cd: 16, color: '#fef' },
+  { id: 'firebullet',  name: 'Bala Incendiaria',   weight: 13, attack: 'firetrail', dmg: 13, cd: 18, color: '#f73' },
+  { id: 'emerald',     name: 'Esmeraldas', weight: 12, attack: 'emeraldchain', dmg: 12, cd: 18, color: '#4f8' },
+  { id: 'speedking',   name: 'Calor Cinético',         weight: 12, attack: 'heatring', dmg: 14, cd: 18, color: '#f73' },
+  { id: 'shortrewind', name: 'Eco Temporal',       weight: 11, attack: 'rewindheal', dmg: 13, cd: 14, color: '#b9f' },
+  { id: 'spirit',      name: 'Furia Eléctrica', weight: 11, attack: 'lightning', dmg: 14, cd: 16, color: '#f63' },
+  { id: 'bastion',     name: 'Bastión Inmóvil',    weight: 11, attack: 'shieldburst', dmg: 30, cd: 70, color: '#a8f' },
+  { id: 'steelball',   name: 'Pelota Espiral', weight: 10, attack: 'spiral',  dmg: 18, cd: 24, color: '#cde' },
+  // --- raros ---
+  { id: 'bounty',      name: 'Don del Milagro',        weight:  6, attack: 'miracleshot', dmg: 22, cd: 16, color: '#fc4' },
+  { id: 'rewind',      name: 'Carmesí Eterno',       weight:  6, attack: 'kingcrimson', dmg: 26, cd: 22, color: '#d02' },
+  { id: 'detonate',    name: 'Reina Explosiva',       weight:  6, attack: 'dualbomb', dmg: 22, cd: 24, color: '#f48' },
+  { id: 'dash',        name: 'Embestida Fulgurante', weight: 6, attack: 'scratches', dmg: 14, cd: 10, color: '#6b3', passiveSpeed: 1.2 },
+  // --- raros con TIEMPO DETENIDO (evoluciones / SP / TW) ---
+  { id: 'mirage',      name: 'Vida Dorada',    weight:  5, attack: 'lifesteal', dmg: 20, cd: 16, color: '#fd0', timestop: true },
+  { id: 'starplatinum',name: 'Puño Estelar',      weight:  5, attack: 'ora',     dmg: 18, cd: 22, color: '#93f', timestop: true },
+  { id: 'theworld',    name: 'Mundo Detenido',          weight:  5, attack: 'knives',  dmg: 20, cd: 20, color: '#fd2', timestop: true },
+  // --- épicos ---
+  { id: 'vortex',      name: 'Espiral Acto 4',         weight:  3, attack: 'wormhole', dmg: 26, cd: 18, color: '#fd6', timestop: true },
+  { id: 'd4c',         name: 'Copias Dimensionales',                weight:  3, attack: 'clone',   dmg: 20, cd: 18, color: '#f06' },
+  { id: 'smoke',       name: 'Cortina de Humo',    weight:  3, attack: 'smoke',   dmg: 14, cd: 20, color: '#bbb' },
+  // --- legendarios ---
+  { id: 'bubble',      name: 'Burbujas Infinitas', weight: 1, attack: 'bubblepop', dmg: 24, cd: 18, color: '#9ff' },
+  { id: 'wonder',      name: 'Calamidad',        weight:  1, attack: 'calamity', dmg: 26, cd: 18, color: '#c30' },
+  { id: 'pucci',       name: 'Disco del Alma → Cielo Acelerado', weight: 1, attack: 'madeinheaven', dmg: 24, cd: 16, color: '#ddd', timestop: true },
+  { id: 'paintblack',  name: 'Mancha Negra',     weight:  1, attack: 'darkspike', dmg: 22, cd: 18, color: '#111' },
+];
+
+function pickRandomRaceStand() {
+  const total = RACE_STAND_POOL.reduce((s, e) => s + e.weight, 0);
+  let r = Math.random() * total;
+  for (const s of RACE_STAND_POOL) {
+    r -= s.weight;
+    if (r <= 0) return s;
+  }
+  return RACE_STAND_POOL[0];
+}
+
+function standCanTimestop(stand) {
+  return !!(stand && stand.timestop);
+}
+
+const raceNPCs = [];
+const raceProjectiles = []; // {x, y, vx, vy, kind, dmg, life, owner}
+const raceArrows = [];      // {progress, x, used}
+const raceObstacles = [];   // {progress, x, r, hit}
+const raceParticles = [];   // {x, y, vx, vy, life, color, size}
+
+let raceStageDist = 0;
+let raceStageTimer = 0;
+let raceFlashTimer = 0;
+let raceFlashColor = '#fff';
+let raceKillMessage = '';
+let raceKillMessageTimer = 0;
+
+const RACE_LANE_LEFT = 200;
+const RACE_LANE_RIGHT = W - 200;
+const RACE_LANES = [320, W / 2, W - 320];
+
+function startRaceMode() {
+  raceMode = true;
+  racePaused = false;
+  racePhase = 'weapon-select';
+  raceStage = 1;
+  raceWeapon = null;
+  raceCollectedParts.length = 0;
+  raceNightsDone = 0;
+  raceNightFound = null;
+  racePhaseTimer = 0;
+  raceMessage = '';
+  racePlayer.hp = 100; racePlayer.maxHp = 100;
+  racePlayer.stamina = 100; racePlayer.maxStamina = 100;
+  racePlayer.exhausted = false;
+  racePlayer.stand = null;
+  racePlayer.standCD = 0;
+  racePlayer.mihBoost = 0;
+  racePlayer.lassoSlow = 0;
+  racePlayer.sandStun = 0;
+  racePlayer.scratchDot = 0;
+  racePlayer.steelBallActive = null;
+  racePlayer.sideDashTimer = 0;
+  racePlayer.sideDashCD = 0;
+  racePlayer.sideDashVX = 0;
+  racePlayer.sideDashVY = 0;
+  raceTimeStopTimer = 0;
+  raceTimeStopCD = 0;
+}
+
+function exitRaceMode() {
+  raceMode = false;
+  racePaused = false;
+  document.getElementById('title').style.display = 'flex';
+}
+
+function setupRaceStage() {
+  // Carreras MUCHO más largas (~1.7x la pista anterior).
+  raceStageDist = 9000 + raceStage * 2400;
+  racePlayer.progress = 0;
+  racePlayer.x = W / 2;
+  racePlayer.y = H - 180;
+  racePlayer.vx = 0; racePlayer.vy = 0;
+  racePlayer.dashTimer = 0;
+  racePlayer.draftTimer = 0;
+  racePlayer.draftBoost = 0;
+  racePlayer.iframe = 0;
+  racePlayer.attackCD = 0;
+  racePlayer.standCD = 0;
+  racePlayer.mihBoost = 0;
+  racePlayer.stamina = racePlayer.maxStamina || 100;
+  racePlayer.exhausted = false;
+  racePlayer.lassoSlow = 0;
+  racePlayer.sandStun = 0;
+  racePlayer.scratchDot = 0;
+  racePlayer.sideDashTimer = 0;
+  racePlayer.sideDashCD = 0;
+  racePlayer.sideDashVX = 0;
+  racePlayer.sideDashVY = 0;
+  racePlayer.steelBallActive = null;
+  racePlayer.rank = NPC_COUNT + 1;
+  raceTimeStopTimer = 0;
+  raceTimeStopCD = 0;
+  // ❌ Sin cura entre etapas: el HP se arrastra si no descansaste en el campamento.
+  raceProjectiles.length = 0;
+  raceParticles.length = 0;
+  raceArrows.length = 0;
+  raceObstacles.length = 0;
+  raceStageTimer = 0;
+
+  // NPCs numerados — muchos participantes, todos duros
+  raceNPCs.length = 0;
+  const npcBase = 5.4 + raceStage * 0.30;
+  for (let i = 0; i < NPC_COUNT; i++) {
+    raceNPCs.push({
+      name: `#${i + 1}`,
+      color: NPC_PALETTE[i % NPC_PALETTE.length],
+      ability: NPC_ABIL_CYCLE[i % NPC_ABIL_CYCLE.length],
+      lane: i % 3,
+      x: RACE_LANES[i % 3] + rand(-40, 40),
+      progress: rand(80, 460),
+      speed: npcBase + rand(-0.2, 1.0),
+      baseSpeed: npcBase + rand(-0.2, 0.7),
+      hp: 90 + raceStage * 18, maxHp: 90 + raceStage * 18,
+      stamina: 100, maxStamina: 100,
+      exhausted: false,
+      stunned: 0,
+      slowTimer: 0,
+      laneChangeCD: rand(60, 180),
+      attackCD: rand(80, 180),         // dispara abilidad cada ~2-3s
+      lassoActive: 0,                  // frames con lazo enganchado al jugador
+      healCD: rand(240, 600),
+      arrowBoost: 0,                   // boost de velocidad por agarrar flecha
+    });
+  }
+
+  // flechas de dash — densidad ALTA (mucho más Mario-Kart). NPCs también las agarran.
+  for (let d = 250; d < raceStageDist - 150; d += rand(130, 240)) {
+    const lane = Math.floor(Math.random() * 3);
+    raceArrows.push({
+      progress: d,
+      x: RACE_LANES[lane] + rand(-60, 60),
+      used: false,
+    });
+  }
+  // pequeños tripletes de flechas cada cierto tramo
+  for (let d = 800; d < raceStageDist - 200; d += rand(900, 1400)) {
+    for (let k = 0; k < 3; k++) {
+      raceArrows.push({
+        progress: d + k * 40,
+        x: RACE_LANES[k % 3] + rand(-40, 40),
+        used: false,
+      });
+    }
+  }
+
+  // obstáculos — muchísimos más, variedad
+  const kinds = ['rock', 'cactus', 'log', 'pit'];
+  for (let d = 500; d < raceStageDist - 300; d += rand(180, 340)) {
+    const lane = Math.floor(Math.random() * 3);
+    raceObstacles.push({
+      progress: d,
+      x: RACE_LANES[lane] + rand(-40, 40),
+      r: 30,
+      hit: false,
+      kind: kinds[Math.floor(Math.random() * kinds.length)],
+    });
+  }
+}
+
+// ---------- update ----------
+function updateRace() {
+  racePhaseTimer++;
+  if (raceFlashTimer > 0) raceFlashTimer--;
+
+  if (keyPressed['escape']) {
+    exitRaceMode();
+    return;
+  }
+
+  switch (racePhase) {
+    case 'weapon-select':
+      updateRaceWeaponSelect();
+      break;
+    case 'pre-stage':
+      if (racePhaseTimer > 150 || keyPressed[' ']) {
+        racePhase = 'racing';
+        racePhaseTimer = 0;
+      }
+      break;
+    case 'racing':
+      updateRaceRacing();
+      break;
+    case 'post-stage':
+      if (racePhaseTimer > 90 && keyPressed[' ']) {
+        racePhase = 'night';
+        racePhaseTimer = 0;
+        startRaceNight();
+      }
+      break;
+    case 'night':
+      updateRaceNight();
+      break;
+    case 'finale':
+      if (keyPressed[' ']) exitRaceMode();
+      break;
+    case 'defeat':
+      if (keyPressed[' ']) {
+        startRaceMode();
+      }
+      break;
+  }
+}
+
+function updateRaceWeaponSelect() {
+  if (!mouse.clicked) return;
+  const cx = W / 2;
+  const cy = H / 2 + 30;
+  const boxW = 240, boxH = 200, gap = 30;
+  const startX = cx - (3 * boxW + 2 * gap) / 2;
+  const choices = ['fists', 'gun', 'steelballs'];
+  for (let i = 0; i < 3; i++) {
+    const x = startX + i * (boxW + gap);
+    if (mouse.x >= x && mouse.x <= x + boxW && mouse.y >= cy && mouse.y <= cy + boxH) {
+      raceWeapon = choices[i];
+      racePhase = 'pre-stage';
+      racePhaseTimer = 0;
+      setupRaceStage();
+      return;
+    }
+  }
+}
+
+function updateRaceRacing() {
+  const timeStopped = raceTimeStopTimer > 0;
+  if (raceTimeStopTimer > 0) raceTimeStopTimer--;
+  if (raceTimeStopCD > 0) raceTimeStopCD--;
+  if (raceKillMessageTimer > 0) raceKillMessageTimer--;
+
+  // ---- entrada ----
+  const left  = keys['a'] || keys['arrowleft'];
+  const right = keys['d'] || keys['arrowright'];
+  const up    = keys['w'] || keys['arrowup'];
+  const down  = keys['s'] || keys['arrowdown'];
+
+  // control reducido si te aturdió Sandman
+  const ctrlMul = racePlayer.sandStun > 0 ? 0.45 : 1.0;
+
+  racePlayer.vx *= 0.78;
+  if (left)  racePlayer.vx -= 1.1 * ctrlMul;
+  if (right) racePlayer.vx += 1.1 * ctrlMul;
+  racePlayer.vy *= 0.84;
+  if (up)   racePlayer.vy -= 0.6 * ctrlMul;
+  if (down) racePlayer.vy += 0.7 * ctrlMul;
+
+  racePlayer.x += racePlayer.vx;
+  racePlayer.y += racePlayer.vy;
+  racePlayer.x = Math.max(RACE_LANE_LEFT, Math.min(RACE_LANE_RIGHT, racePlayer.x));
+  racePlayer.y = Math.max(140, Math.min(H - 90, racePlayer.y));
+
+  // ---- DASH (sólo SPACE, CD 3s) — en la dirección de WASD ----
+  // Atraviesas a los NPCs y los empujas/golpeas con iframes durante el dash.
+  if (racePlayer.sideDashCD > 0) racePlayer.sideDashCD--;
+  if (keyPressed[' '] && racePlayer.sideDashTimer <= 0 && racePlayer.sideDashCD <= 0 && racePlayer.stamina >= 20) {
+    let dx = 0, dy = 0;
+    if (left)  dx -= 1;
+    if (right) dx += 1;
+    if (up)    dy -= 1;
+    if (down)  dy += 1;
+    if (dx !== 0 || dy !== 0) {
+      const mag = Math.hypot(dx, dy);
+      racePlayer.sideDashVX = dx / mag;
+      racePlayer.sideDashVY = dy / mag;
+      racePlayer.sideDashTimer = 14;
+      racePlayer.stamina = Math.max(0, racePlayer.stamina - 20);
+      racePlayer.sideDashCD = 180;            // 3 segundos
+      racePlayer.iframe = Math.max(racePlayer.iframe, 22);
+      raceFlashTimer = 14; raceFlashColor = '#6cf';
+      for (let k = 0; k < 18; k++) {
+        raceParticles.push({
+          x: racePlayer.x + rand(-10, 10), y: racePlayer.y + rand(-8, 8),
+          vx: -racePlayer.sideDashVX * rand(2, 6),
+          vy: -racePlayer.sideDashVY * rand(2, 6),
+          life: 26, color: '#6cf', size: 4
+        });
+      }
+    }
+  }
+  if (racePlayer.sideDashTimer > 0) {
+    racePlayer.sideDashTimer--;
+    racePlayer.x += racePlayer.sideDashVX * 26;
+    racePlayer.y += racePlayer.sideDashVY * 26;
+    racePlayer.x = Math.max(RACE_LANE_LEFT, Math.min(RACE_LANE_RIGHT, racePlayer.x));
+    racePlayer.y = Math.max(140, Math.min(H - 90, racePlayer.y));
+    // empuja y golpea NPCs en el camino
+    for (const n of raceNPCs) {
+      const sy = raceScreenY(n.progress);
+      if (Math.abs(sy - racePlayer.y) < 46 && Math.abs(n.x - racePlayer.x) < 52) {
+        n.x += racePlayer.sideDashVX * 18;
+        n.stunned = Math.max(n.stunned, 22);
+        n.slowTimer = Math.max(n.slowTimer, 60);
+        n.hp -= 10;
+        spawnRaceImpact(n.x, sy, '#6cf');
+      }
+    }
+    // estela
+    if (frame & 1) {
+      raceParticles.push({
+        x: racePlayer.x - racePlayer.sideDashVX * 18 + rand(-4, 4),
+        y: racePlayer.y - racePlayer.sideDashVY * 18 + rand(-4, 4),
+        vx: -racePlayer.sideDashVX * rand(1, 3),
+        vy: -racePlayer.sideDashVY * rand(1, 3),
+        life: 18, color: '#6cf', size: 3
+      });
+    }
+  }
+
+  // velocidad de avance + bonus pasivo de stand
+  let fwd = racePlayer.baseSpeed;
+  if (racePlayer.stand && racePlayer.stand.passiveSpeed) fwd += racePlayer.stand.passiveSpeed;
+  if (racePlayer.mihBoost > 0) { fwd += 2.4; racePlayer.mihBoost--; }
+
+  // --- RESISTENCIA del caballo del jugador ---
+  // sprint = mantener W; reducir = mantener S (recupera más rápido).
+  const sprinting = up && !racePlayer.exhausted;
+  if (sprinting) {
+    fwd += 1.1;
+    racePlayer.stamina -= 0.45;
+  } else if (down) {
+    fwd -= 2.6;
+    racePlayer.stamina += 0.5;
+  } else {
+    racePlayer.stamina -= 0.10;
+  }
+  // dash y boost también cuestan algo
+  if (racePlayer.dashTimer > 0) racePlayer.stamina -= 0.25;
+  if (racePlayer.draftBoost > 0) racePlayer.stamina -= 0.05;
+  racePlayer.stamina = Math.max(0, Math.min(racePlayer.maxStamina, racePlayer.stamina));
+  if (racePlayer.stamina <= 0) {
+    racePlayer.exhausted = true;
+  } else if (racePlayer.exhausted && racePlayer.stamina >= 30) {
+    racePlayer.exhausted = false;
+  }
+  // caballo agotado: tope bajo de velocidad
+  if (racePlayer.exhausted) {
+    fwd = Math.min(fwd, racePlayer.baseSpeed * 0.55);
+  }
+
+  if (racePlayer.lassoSlow > 0) { fwd *= 0.4; racePlayer.lassoSlow--; }
+  if (racePlayer.sandStun > 0)  { fwd *= 0.7; racePlayer.sandStun--; }
+  if (racePlayer.scratchDot > 0) {
+    racePlayer.scratchDot--;
+    if (racePlayer.scratchDot % 30 === 0 && racePlayer.iframe <= 0) {
+      racePlayer.hp -= 2;
+      spawnRaceImpact(racePlayer.x, racePlayer.y, '#f44');
+    }
+  }
+  fwd = Math.max(0.4, fwd);
+  if (racePlayer.dashTimer > 0) { fwd += 6.5; racePlayer.dashTimer--; }
+
+  // ---- DRAFTING (rebufo tipo Mario Kart) ----
+  let drafting = false;
+  for (const n of raceNPCs) {
+    const gap = n.progress - racePlayer.progress;
+    if (gap > 40 && gap < 240 && Math.abs(n.x - racePlayer.x) < 70) {
+      drafting = true;
+      break;
+    }
+  }
+  if (drafting) {
+    racePlayer.draftTimer = Math.min(75, racePlayer.draftTimer + 1);
+    if (racePlayer.draftTimer >= 60 && racePlayer.draftBoost <= 0) {
+      racePlayer.draftBoost = 110;
+      raceFlashTimer = 18; raceFlashColor = '#6cf';
+      for (let k = 0; k < 14; k++) {
+        raceParticles.push({
+          x: racePlayer.x + rand(-10, 10),
+          y: racePlayer.y + rand(-6, 6),
+          vx: rand(-1.5, 1.5),
+          vy: rand(1, 4),
+          life: 30, color: '#6cf', size: 4
+        });
+      }
+    }
+  } else {
+    racePlayer.draftTimer = Math.max(0, racePlayer.draftTimer - 1);
+  }
+  if (racePlayer.draftBoost > 0) {
+    fwd += 2.8;
+    racePlayer.draftBoost--;
+  }
+
+  racePlayer.progress += fwd;
+
+  // ---- NPCs ----
+  for (const n of raceNPCs) {
+    // sangrado (DoT) sigue corriendo aunque esté aturdido / tiempo detenido
+    if (n.bleed && n.bleed > 0) {
+      n.bleed--;
+      if (n.bleed % 20 === 0) {
+        n.hp -= 3;
+        spawnRaceImpact(n.x, raceScreenY(n.progress), '#f44');
+      }
+    }
+    if (timeStopped) continue;
+    if (n.stunned > 0) {
+      n.stunned--;
+      // recuperan resistencia mientras están aturdidos
+      n.stamina = Math.min(n.maxStamina, n.stamina + 0.5);
+      if (n.exhausted && n.stamina >= 25) n.exhausted = false;
+      continue;
+    }
+    n.laneChangeCD--;
+    if (n.laneChangeCD <= 0) {
+      // cambio de carril más inteligente: priorizan carriles con flecha cercana
+      let bestLane = Math.floor(Math.random() * 3);
+      let bestScore = -1;
+      for (let li = 0; li < 3; li++) {
+        let score = Math.random() * 0.5;
+        for (const a of raceArrows) {
+          if (a.used) continue;
+          const gap = a.progress - n.progress;
+          if (gap > 30 && gap < 700) {
+            const lx = RACE_LANES[li];
+            if (Math.abs(a.x - lx) < 90) score += 1.2 - gap / 800;
+          }
+        }
+        if (score > bestScore) { bestScore = score; bestLane = li; }
+      }
+      n.lane = bestLane;
+      n.laneChangeCD = rand(60, 160);
+    }
+    const targetX = RACE_LANES[n.lane];
+    n.x += (targetX - n.x) * 0.07;
+    // esquivar obstáculos
+    for (const o of raceObstacles) {
+      const gap = o.progress - n.progress;
+      if (gap > 20 && gap < 260 && Math.abs(o.x - n.x) < 60) {
+        n.x += (n.x < o.x ? -2.4 : 2.4);
+      }
+    }
+    // recoger flechas (más impacto: +1.0 boost prolongado)
+    for (const a of raceArrows) {
+      if (a.used) continue;
+      const gap = a.progress - n.progress;
+      if (Math.abs(gap) < 30 && Math.abs(a.x - n.x) < 36) {
+        a.used = true;
+        n.speed = Math.min(n.baseSpeed + 4.5, n.speed + 1.0);
+        n.arrowBoost = 60;
+        // chispas
+        for (let k = 0; k < 6; k++) {
+          raceParticles.push({
+            x: n.x + rand(-8, 8), y: raceScreenY(n.progress),
+            vx: rand(-2, 2), vy: rand(2, 5),
+            life: 22, color: '#fc4', size: 3
+          });
+        }
+      }
+    }
+    let sp = n.speed * (0.97 + Math.random() * 0.06);
+    if (n.slowTimer > 0) { sp *= 0.45; n.slowTimer--; }
+    if (n.arrowBoost > 0) { sp += 1.2; n.arrowBoost--; }
+
+    // ---- RESISTENCIA del caballo del NPC ----
+    // Drena al correr; recupera más si está aturdido o ralentizado.
+    let drain = 0.18;
+    if (n.arrowBoost > 0) drain = 0.38;
+    if (n.slowTimer > 0)  drain = -0.25;       // recupera mientras anda lento
+    n.stamina -= drain;
+    if (n.stamina <= 0) n.exhausted = true;
+    else if (n.exhausted && n.stamina >= 25) n.exhausted = false;
+    n.stamina = Math.max(0, Math.min(n.maxStamina, n.stamina));
+    if (n.exhausted) sp *= 0.55;               // caballo cansado: avanza apenas
+
+    n.progress += sp;
+    n.speed += (n.baseSpeed - n.speed) * 0.01;
+
+    // habilidades de combate
+    if (n.attackCD > 0) n.attackCD--;
+    if (n.healCD > 0) n.healCD--;
+    if (n.lassoActive > 0) n.lassoActive--;
+
+    const screenY = raceScreenY(n.progress);
+    const dy = screenY - racePlayer.y;
+    const dx = n.x - racePlayer.x;
+    const dist = Math.hypot(dx, dy);
+
+    if (n.attackCD <= 0 && screenY > -100 && screenY < H + 100) {
+      switch (n.ability) {
+        case 'scratch': {
+          // Diego: arañazo a corto rango — sangrado
+          if (dist < 110 && racePlayer.iframe <= 0) {
+            racePlayer.hp -= 6;
+            racePlayer.scratchDot = Math.max(racePlayer.scratchDot, 120);
+            racePlayer.iframe = 20;
+            spawnRaceImpact(racePlayer.x, racePlayer.y, '#f44');
+            shake = Math.max(shake, 6);
+          }
+          n.attackCD = rand(60, 110);
+          break;
+        }
+        case 'sand': {
+          // Sandman: bala de arena, aturde si pega
+          if (dist < 360) {
+            const ang = Math.atan2(-dy, -dx);
+            raceProjectiles.push({
+              x: n.x, y: screenY,
+              vx: Math.cos(ang) * 8, vy: Math.sin(ang) * 8,
+              kind: 'sand', dmg: 8, life: 70, color: '#dd9',
+              owner: 'npc', stun: 40,
+            });
+          }
+          n.attackCD = rand(90, 160);
+          break;
+        }
+        case 'luck': {
+          // Pocoloco: ráfaga de 3 balas erráticas + posible auto-boost
+          if (dist < 420) {
+            for (let k = 0; k < 3; k++) {
+              const ang = Math.atan2(-dy, -dx) + rand(-0.5, 0.5);
+              raceProjectiles.push({
+                x: n.x, y: screenY,
+                vx: Math.cos(ang) * 7, vy: Math.sin(ang) * 7,
+                kind: 'luck', dmg: 6, life: 70, color: '#fc4',
+                owner: 'npc',
+              });
+            }
+          }
+          if (Math.random() < 0.35) {
+            n.arrowBoost = Math.max(n.arrowBoost, 60);
+          }
+          n.attackCD = rand(120, 200);
+          break;
+        }
+        case 'cream': {
+          // Hot Pants: Cream Starter — se cura
+          if (n.healCD <= 0 && n.hp < n.maxHp) {
+            n.hp = Math.min(n.maxHp, n.hp + 30);
+            for (let k = 0; k < 10; k++) {
+              raceParticles.push({
+                x: n.x + rand(-12, 12), y: screenY + rand(-12, 12),
+                vx: rand(-1, 1), vy: rand(-2, -0.5),
+                life: 30, color: '#f8a', size: 3
+              });
+            }
+            n.healCD = rand(420, 720);
+          }
+          // y si está cerca, también dispara una bala de crema
+          if (dist < 320) {
+            const ang = Math.atan2(-dy, -dx);
+            raceProjectiles.push({
+              x: n.x, y: screenY,
+              vx: Math.cos(ang) * 9, vy: Math.sin(ang) * 9,
+              kind: 'cream', dmg: 9, life: 70, color: '#fbe',
+              owner: 'npc',
+            });
+          }
+          n.attackCD = rand(100, 170);
+          break;
+        }
+        case 'lasso': {
+          // Mountain Tim: lazo que frena al jugador 90 frames
+          if (dist < 280 && n.lassoActive <= 0) {
+            n.lassoActive = 90;
+            racePlayer.lassoSlow = Math.max(racePlayer.lassoSlow, 90);
+            spawnRaceImpact(racePlayer.x, racePlayer.y, '#cb6');
+            if (racePlayer.iframe <= 0) { racePlayer.hp -= 5; racePlayer.iframe = 18; }
+          }
+          n.attackCD = rand(150, 240);
+          break;
+        }
+        case 'steelball': {
+          // Gyro: bola espiral homing al jugador
+          if (dist < 460) {
+            const ang = Math.atan2(-dy, -dx);
+            raceProjectiles.push({
+              x: n.x, y: screenY,
+              vx: Math.cos(ang) * 7, vy: Math.sin(ang) * 7,
+              kind: 'spiralball', dmg: 12, life: 80, color: '#cde',
+              owner: 'npc', homing: 0.5, spin: 0,
+            });
+          }
+          n.attackCD = rand(100, 170);
+          break;
+        }
+      }
+    }
+  }
+
+  // ---- flechas → dash ----
+  for (const a of raceArrows) {
+    if (a.used) continue;
+    const gap = a.progress - racePlayer.progress;
+    if (Math.abs(gap) < 32 && Math.abs(a.x - racePlayer.x) < 40) {
+      a.used = true;
+      racePlayer.dashTimer = Math.max(racePlayer.dashTimer, 28);
+      raceFlashTimer = 12; raceFlashColor = '#fc4';
+      for (let k = 0; k < 10; k++) {
+        raceParticles.push({
+          x: racePlayer.x + rand(-10, 10),
+          y: racePlayer.y,
+          vx: rand(-2, 2),
+          vy: rand(2, 5),
+          life: 24, color: '#fc4', size: 4
+        });
+      }
+    }
+  }
+
+  // ---- obstáculos colisión jugador ----
+  for (const o of raceObstacles) {
+    if (o.hit) continue;
+    const gap = o.progress - racePlayer.progress;
+    if (Math.abs(gap) < 30 && Math.abs(o.x - racePlayer.x) < 36 && racePlayer.iframe <= 0) {
+      o.hit = true;
+      racePlayer.hp -= 10;
+      racePlayer.iframe = 50;
+      racePlayer.dashTimer = 0;
+      racePlayer.draftBoost = 0;
+      shake = 10;
+      raceFlashTimer = 14; raceFlashColor = '#f44';
+    }
+  }
+  if (racePlayer.iframe > 0) racePlayer.iframe--;
+  if (racePlayer.attackCD > 0) racePlayer.attackCD--;
+  if (racePlayer.standCD > 0) racePlayer.standCD--;
+
+  // ---- arma / stand ----
+  racePlayer.facingAngle = Math.atan2(mouse.y - racePlayer.y, mouse.x - racePlayer.x);
+  if (mouse.down) {
+    if (racePlayer.stand) {
+      if (racePlayer.standCD <= 0) doRaceStandAttack();
+    } else if (racePlayer.attackCD <= 0) {
+      doRaceAttack();
+    }
+  }
+  // Q → tiempo detenido 1.5s (sólo evoluciones, SP, TW)
+  if (keyPressed['q'] && standCanTimestop(racePlayer.stand) && raceTimeStopCD <= 0) {
+    raceTimeStopTimer = 90;     // 1.5s a 60fps
+    raceTimeStopCD = 60 * 12;   // 12s de cooldown
+    raceFlashTimer = 30; raceFlashColor = '#fd6';
+    for (let k = 0; k < 30; k++) {
+      raceParticles.push({
+        x: racePlayer.x + rand(-30, 30),
+        y: racePlayer.y + rand(-30, 30),
+        vx: rand(-3, 3), vy: rand(-3, 3),
+        life: 40, color: '#fd6', size: 4
+      });
+    }
+  }
+  updateRaceProjectiles();
+  updateRaceParticles();
+
+  // ---- contacto entre jugador y NPCs (empujar) ----
+  for (const n of raceNPCs) {
+    const screenY = raceScreenY(n.progress);
+    if (Math.abs(screenY - racePlayer.y) < 36 && Math.abs(n.x - racePlayer.x) < 40) {
+      // empuje horizontal
+      const dir = racePlayer.x < n.x ? -1 : 1;
+      racePlayer.x += dir * 1.5;
+      n.x -= dir * 1.5;
+      if (racePlayer.iframe <= 0) {
+        racePlayer.hp -= 1;
+        racePlayer.iframe = 12;
+      }
+    }
+  }
+
+  // ---- muerte de NPCs: cuando hp <= 0, explotan y desaparecen ----
+  for (let i = raceNPCs.length - 1; i >= 0; i--) {
+    const n = raceNPCs[i];
+    if (n.hp <= 0) {
+      const sy = raceScreenY(n.progress);
+      for (let k = 0; k < 36; k++) {
+        raceParticles.push({
+          x: n.x + rand(-18, 18), y: sy + rand(-18, 18),
+          vx: rand(-5, 5), vy: rand(-5, 5),
+          life: 50, color: k & 1 ? n.color : '#f44', size: 4
+        });
+      }
+      spawnRaceImpact(n.x, sy, '#fff');
+      shake = Math.max(shake, 8);
+      raceFlashTimer = Math.max(raceFlashTimer, 10);
+      raceFlashColor = '#f44';
+      raceKillMessage = `Participante ${n.name} eliminado`;
+      raceKillMessageTimer = 120;
+      raceNPCs.splice(i, 1);
+    }
+  }
+
+  // ---- ranking ----
+  let rank = 1;
+  for (const n of raceNPCs) if (n.progress > racePlayer.progress) rank++;
+  racePlayer.rank = rank;
+
+  // ---- fin de etapa / muerte ----
+  if (racePlayer.progress >= raceStageDist) {
+    finishRaceStage(true);
+  } else if (racePlayer.hp <= 0) {
+    finishRaceStage(false);
+  }
+
+  raceStageTimer++;
+}
+
+// posición Y en pantalla de algo con cierto "progress"
+function raceScreenY(progress) {
+  return racePlayer.y - (progress - racePlayer.progress);
+}
+
+function doRaceAttack() {
+  const ang = racePlayer.facingAngle;
+  if (raceWeapon === 'gun') {
+    raceProjectiles.push({
+      x: racePlayer.x, y: racePlayer.y,
+      vx: Math.cos(ang) * 14, vy: Math.sin(ang) * 14,
+      kind: 'bullet', dmg: 12, life: 60, color: '#fe6',
+      progressVel: 0, // sigue al jugador (camera relative)
+    });
+    racePlayer.attackCD = 14;
+  } else if (raceWeapon === 'fists') {
+    // golpe en arco amplio frente al jugador
+    const reach = 80;
+    const tx = racePlayer.x + Math.cos(ang) * reach;
+    const ty = racePlayer.y + Math.sin(ang) * reach;
+    for (const n of raceNPCs) {
+      const sy = raceScreenY(n.progress);
+      if (Math.hypot(n.x - tx, sy - ty) < 80) {
+        n.hp -= 18;
+        n.stunned = 18;
+        n.slowTimer = 50;
+        spawnRaceImpact(n.x, sy, '#fff');
+      }
+    }
+    spawnRaceImpact(tx, ty, '#fec');
+    racePlayer.attackCD = 22;
+  } else if (raceWeapon === 'steelballs') {
+    if (!racePlayer.steelBallActive) {
+      // buscar objetivo: NPC más cercano por delante
+      let target = null, best = Infinity;
+      for (const n of raceNPCs) {
+        const sy = raceScreenY(n.progress);
+        if (sy > racePlayer.y + 20) continue; // sólo por delante
+        const d = Math.hypot(n.x - racePlayer.x, sy - racePlayer.y);
+        if (d < best) { best = d; target = n; }
+      }
+      racePlayer.steelBallActive = {
+        x: racePlayer.x, y: racePlayer.y,
+        vx: Math.cos(ang) * 9, vy: Math.sin(ang) * 9,
+        phase: 'out', target, life: 0, hits: new Set(),
+      };
+      racePlayer.attackCD = 30;
+    }
+  }
+}
+
+function spawnRaceImpact(x, y, color) {
+  for (let i = 0; i < 8; i++) {
+    raceParticles.push({
+      x, y,
+      vx: rand(-3, 3), vy: rand(-3, 3),
+      life: 22, color, size: 3
+    });
+  }
+}
+
+// ============================================================
+// Click del STAND encontrado (suplanta el ataque del arma inicial).
+// ============================================================
+function doRaceStandAttack() {
+  const stand = racePlayer.stand;
+  const ang = racePlayer.facingAngle;
+  const cd = stand.cd;
+  const dmg = stand.dmg;
+  const col = stand.color;
+
+  switch (stand.attack) {
+    case 'single': {
+      raceProjectiles.push({
+        x: racePlayer.x, y: racePlayer.y,
+        vx: Math.cos(ang) * 14, vy: Math.sin(ang) * 14,
+        kind: 'standBullet', dmg, life: 70, color: col, owner: 'player',
+      });
+      break;
+    }
+    case 'spread': {
+      for (let k = -1; k <= 1; k++) {
+        const a = ang + k * 0.22;
+        raceProjectiles.push({
+          x: racePlayer.x, y: racePlayer.y,
+          vx: Math.cos(a) * 13, vy: Math.sin(a) * 13,
+          kind: 'standBullet', dmg, life: 70, color: col, owner: 'player',
+        });
+      }
+      break;
+    }
+    case 'burst': {
+      // Puños Rompedores: 4 puñetazos rápidos al frente
+      for (let k = 0; k < 4; k++) {
+        raceProjectiles.push({
+          x: racePlayer.x, y: racePlayer.y,
+          vx: Math.cos(ang) * (12 + k * 0.5), vy: Math.sin(ang) * (12 + k * 0.5),
+          kind: 'standBullet', dmg, life: 70, color: col, owner: 'player',
+          delay: k * 5,
+        });
+      }
+      break;
+    }
+    case 'whipchain': {
+      // Hermit Purple: el látigo se enreda y salta a 3 enemigos cercanos
+      let prevX = racePlayer.x, prevY = racePlayer.y;
+      const hit = new Set();
+      for (let k = 0; k < 3; k++) {
+        let best = null, bestD = Infinity;
+        for (const n of raceNPCs) {
+          if (hit.has(n) || n.hp <= 0) continue;
+          const sy = raceScreenY(n.progress);
+          const d = Math.hypot(n.x - prevX, sy - prevY);
+          if (d < bestD && d < 280) { bestD = d; best = n; }
+        }
+        if (!best) break;
+        hit.add(best);
+        const sy = raceScreenY(best.progress);
+        best.hp -= dmg;
+        best.stunned = 14;
+        best.slowTimer = 50;
+        spawnRaceImpact(best.x, sy, col);
+        for (let s = 0; s <= 10; s++) {
+          const t = s / 10;
+          raceParticles.push({
+            x: prevX + (best.x - prevX) * t,
+            y: prevY + (sy - prevY) * t,
+            vx: 0, vy: 0, life: 10, color: col, size: 3
+          });
+        }
+        prevX = best.x; prevY = sy;
+      }
+      break;
+    }
+    case 'threadspread': {
+      // Hilo Liberado: 5 hilos en abanico que ralentizan al impactar
+      for (let k = -2; k <= 2; k++) {
+        const a = ang + k * 0.18;
+        raceProjectiles.push({
+          x: racePlayer.x, y: racePlayer.y,
+          vx: Math.cos(a) * 12, vy: Math.sin(a) * 12,
+          kind: 'standThread', dmg, life: 80, color: col, owner: 'player',
+          slowOnHit: 90,
+        });
+      }
+      break;
+    }
+    case 'standarrow': {
+      // Flecha que perfora múltiples enemigos y aplica sangrado prolongado
+      raceProjectiles.push({
+        x: racePlayer.x, y: racePlayer.y,
+        vx: Math.cos(ang) * 17, vy: Math.sin(ang) * 17,
+        kind: 'standPierce', dmg, life: 110, color: col, owner: 'player',
+        pierce: true, hits: new Set(), bleedOnHit: 120,
+      });
+      break;
+    }
+    case 'ironbolt': {
+      // Pernos Letales: 3 pernos de metal con leve teledirección
+      let target = null, bestD = Infinity;
+      for (const n of raceNPCs) {
+        const sy = raceScreenY(n.progress);
+        const d = Math.hypot(n.x - racePlayer.x, sy - racePlayer.y);
+        if (d < bestD && d < 500) { bestD = d; target = n; }
+      }
+      for (let k = -1; k <= 1; k++) {
+        const a = ang + k * 0.15;
+        raceProjectiles.push({
+          x: racePlayer.x, y: racePlayer.y,
+          vx: Math.cos(a) * 13, vy: Math.sin(a) * 13,
+          kind: 'standBullet', dmg, life: 90, color: col, owner: 'player',
+          homing: 0.3, target,
+        });
+      }
+      break;
+    }
+    case 'pierce': {
+      raceProjectiles.push({
+        x: racePlayer.x, y: racePlayer.y,
+        vx: Math.cos(ang) * 16, vy: Math.sin(ang) * 16,
+        kind: 'standPierce', dmg, life: 90, color: col, owner: 'player',
+        pierce: true, hits: new Set(),
+      });
+      break;
+    }
+    case 'fire': {
+      raceProjectiles.push({
+        x: racePlayer.x, y: racePlayer.y,
+        vx: Math.cos(ang) * 12, vy: Math.sin(ang) * 12,
+        kind: 'fire', dmg, life: 60, color: col, owner: 'player',
+        leavesFire: true,
+      });
+      break;
+    }
+    case 'firetrail': {
+      // Bala Incendiaria: deja charcos de fuego en su trayecto
+      raceProjectiles.push({
+        x: racePlayer.x, y: racePlayer.y,
+        vx: Math.cos(ang) * 11, vy: Math.sin(ang) * 11,
+        kind: 'fireBullet', dmg, life: 90, color: col, owner: 'player',
+        leaveFireTrail: true, trailCD: 0,
+      });
+      break;
+    }
+    case 'rainstrike': {
+      // Tormenta Torrencial: 6 rayos caen del cielo sobre la zona del cursor
+      for (let k = 0; k < 6; k++) {
+        raceProjectiles.push({
+          x: mouse.x + rand(-80, 80), y: mouse.y - 240, vx: 0, vy: 16,
+          kind: 'rainBolt', dmg, life: 60, color: col, owner: 'player',
+          delay: k * 5,
+        });
+      }
+      break;
+    }
+    case 'storm': {
+      // nube en el cursor que daña 2.5s
+      raceProjectiles.push({
+        x: mouse.x, y: mouse.y, vx: 0, vy: 0,
+        kind: 'cloud', dmg, life: 150, color: col, owner: 'player',
+        cloud: true, tickCD: 0,
+      });
+      break;
+    }
+    case 'chain': {
+      // rayo que salta a los 3 NPCs más cercanos
+      let prevX = racePlayer.x, prevY = racePlayer.y;
+      const hit = new Set();
+      for (let k = 0; k < 3; k++) {
+        let best = null, bestD = Infinity;
+        for (const n of raceNPCs) {
+          if (hit.has(n) || n.hp <= 0) continue;
+          const sy = raceScreenY(n.progress);
+          const d = Math.hypot(n.x - prevX, sy - prevY);
+          if (d < bestD && d < 360) { bestD = d; best = n; }
+        }
+        if (!best) break;
+        hit.add(best);
+        const sy = raceScreenY(best.progress);
+        best.hp -= dmg;
+        best.stunned = 16;
+        best.slowTimer = 40;
+        spawnRaceImpact(best.x, sy, col);
+        const steps = 8;
+        for (let s = 0; s <= steps; s++) {
+          const t = s / steps;
+          raceParticles.push({
+            x: prevX + (best.x - prevX) * t + rand(-4, 4),
+            y: prevY + (sy - prevY) * t + rand(-4, 4),
+            vx: 0, vy: 0, life: 14, color: col, size: 3
+          });
+        }
+        prevX = best.x; prevY = sy;
+      }
+      break;
+    }
+    case 'emeraldchain': {
+      // Hierophant Green: rayo de esmeraldas que salta a 5 enemigos
+      let prevX = racePlayer.x, prevY = racePlayer.y;
+      const hit = new Set();
+      for (let k = 0; k < 5; k++) {
+        let best = null, bestD = Infinity;
+        for (const n of raceNPCs) {
+          if (hit.has(n) || n.hp <= 0) continue;
+          const sy = raceScreenY(n.progress);
+          const d = Math.hypot(n.x - prevX, sy - prevY);
+          if (d < bestD && d < 380) { bestD = d; best = n; }
+        }
+        if (!best) break;
+        hit.add(best);
+        const sy = raceScreenY(best.progress);
+        best.hp -= dmg;
+        best.stunned = 18;
+        best.slowTimer = 40;
+        spawnRaceImpact(best.x, sy, col);
+        for (let s = 0; s <= 10; s++) {
+          const t = s / 10;
+          raceParticles.push({
+            x: prevX + (best.x - prevX) * t + rand(-3, 3),
+            y: prevY + (sy - prevY) * t + rand(-3, 3),
+            vx: 0, vy: 0, life: 18, color: col, size: 4
+          });
+        }
+        prevX = best.x; prevY = sy;
+      }
+      break;
+    }
+    case 'lightning': {
+      // Furia Eléctrica: descarga eléctrica que toca TODOS los enemigos en 220px
+      for (const n of raceNPCs) {
+        const sy = raceScreenY(n.progress);
+        if (Math.hypot(n.x - racePlayer.x, sy - racePlayer.y) < 220) {
+          n.hp -= dmg;
+          n.stunned = 20;
+          n.slowTimer = 50;
+          spawnRaceImpact(n.x, sy, col);
+          for (let s = 0; s <= 8; s++) {
+            const t = s / 8;
+            raceParticles.push({
+              x: racePlayer.x + (n.x - racePlayer.x) * t + rand(-6, 6),
+              y: racePlayer.y + (sy - racePlayer.y) * t + rand(-6, 6),
+              vx: 0, vy: 0, life: 14, color: col, size: 3
+            });
+          }
+        }
+      }
+      raceFlashTimer = Math.max(raceFlashTimer, 14); raceFlashColor = col;
+      break;
+    }
+    case 'melee': {
+      // arco de melee en frente del jugador (hitbox ancha)
+      const reach = 95;
+      const tx = racePlayer.x + Math.cos(ang) * reach;
+      const ty = racePlayer.y + Math.sin(ang) * reach;
+      for (const n of raceNPCs) {
+        const sy = raceScreenY(n.progress);
+        if (Math.hypot(n.x - tx, sy - ty) < 100) {
+          n.hp -= dmg;
+          n.stunned = 18;
+          n.slowTimer = 50;
+          spawnRaceImpact(n.x, sy, col);
+        }
+      }
+      spawnRaceImpact(tx, ty, col);
+      break;
+    }
+    case 'flurry': {
+      // Frenesí de Estocadas: 4 estocadas en cono ancho
+      const reach = 100;
+      for (let k = 0; k < 4; k++) {
+        const off = (k - 1.5) * 0.13;
+        const tx = racePlayer.x + Math.cos(ang + off) * reach;
+        const ty = racePlayer.y + Math.sin(ang + off) * reach;
+        for (const n of raceNPCs) {
+          const sy = raceScreenY(n.progress);
+          if (Math.hypot(n.x - tx, sy - ty) < 85) {
+            n.hp -= dmg;
+            n.stunned = 12;
+            n.slowTimer = 40;
+            spawnRaceImpact(n.x, sy, col);
+          }
+        }
+        raceParticles.push({
+          x: tx, y: ty, vx: Math.cos(ang + off) * 3, vy: Math.sin(ang + off) * 3,
+          life: 14, color: col, size: 4
+        });
+      }
+      break;
+    }
+    case 'heatring': {
+      // Calor Cinético: anillo de calor en expansión alrededor del jugador
+      for (const n of raceNPCs) {
+        const sy = raceScreenY(n.progress);
+        const d = Math.hypot(n.x - racePlayer.x, sy - racePlayer.y);
+        if (d < 180) {
+          n.hp -= dmg;
+          n.stunned = 16;
+          n.slowTimer = 60;
+          spawnRaceImpact(n.x, sy, col);
+        }
+      }
+      for (let k = 0; k < 24; k++) {
+        const a = (k / 24) * Math.PI * 2;
+        raceParticles.push({
+          x: racePlayer.x + Math.cos(a) * 40,
+          y: racePlayer.y + Math.sin(a) * 40,
+          vx: Math.cos(a) * 6, vy: Math.sin(a) * 6,
+          life: 28, color: col, size: 5
+        });
+      }
+      raceFlashTimer = Math.max(raceFlashTimer, 16); raceFlashColor = col;
+      break;
+    }
+    case 'rewindheal': {
+      // Eco Temporal: melee que cura al impactar (deshace el daño recibido)
+      const reach = 95;
+      const tx = racePlayer.x + Math.cos(ang) * reach;
+      const ty = racePlayer.y + Math.sin(ang) * reach;
+      let hits = 0;
+      for (const n of raceNPCs) {
+        const sy = raceScreenY(n.progress);
+        if (Math.hypot(n.x - tx, sy - ty) < 100) {
+          n.hp -= dmg;
+          n.stunned = 14;
+          n.slowTimer = 45;
+          spawnRaceImpact(n.x, sy, col);
+          hits++;
+        }
+      }
+      if (hits > 0) racePlayer.hp = Math.min(racePlayer.maxHp, racePlayer.hp + 6 * hits);
+      spawnRaceImpact(tx, ty, col);
+      break;
+    }
+    case 'scratches': {
+      // Plaga Primigenia: arañazos cortos pero rápidos con sangrado (DoT)
+      const reach = 80;
+      const tx = racePlayer.x + Math.cos(ang) * reach;
+      const ty = racePlayer.y + Math.sin(ang) * reach;
+      for (const n of raceNPCs) {
+        const sy = raceScreenY(n.progress);
+        if (Math.hypot(n.x - tx, sy - ty) < 80) {
+          n.hp -= dmg;
+          n.stunned = 8;
+          n.slowTimer = 30;
+          n.bleed = Math.max(n.bleed || 0, 90);
+          spawnRaceImpact(n.x, sy, col);
+        }
+      }
+      for (let k = -1; k <= 1; k++) {
+        raceParticles.push({
+          x: tx + k * 6, y: ty + k * 4,
+          vx: Math.cos(ang) * 4, vy: Math.sin(ang) * 4,
+          life: 12, color: col, size: 3
+        });
+      }
+      break;
+    }
+    case 'ora': {
+      // Puño Estelar: ráfaga GOLPE GOLPE en cono amplio + onda de choque que perfora
+      const reach = 110;
+      const tx = racePlayer.x + Math.cos(ang) * reach;
+      const ty = racePlayer.y + Math.sin(ang) * reach;
+      for (const n of raceNPCs) {
+        const sy = raceScreenY(n.progress);
+        if (Math.hypot(n.x - tx, sy - ty) < 130) {
+          n.hp -= dmg * 4;       // 8 puños condensados
+          n.stunned = 26;
+          n.slowTimer = 70;
+          spawnRaceImpact(n.x, sy, col);
+        }
+      }
+      // proyectil de onda de choque que perfora hacia adelante
+      raceProjectiles.push({
+        x: racePlayer.x, y: racePlayer.y,
+        vx: Math.cos(ang) * 16, vy: Math.sin(ang) * 16,
+        kind: 'standPierce', dmg: Math.floor(dmg * 1.5), life: 50, color: col, owner: 'player',
+        pierce: true, hits: new Set(),
+      });
+      for (let k = 0; k < 10; k++) {
+        const off = k * 0.05;
+        raceParticles.push({
+          x: racePlayer.x + Math.cos(ang) * (20 + k * 9),
+          y: racePlayer.y + Math.sin(ang) * (20 + k * 9),
+          vx: Math.cos(ang + off) * 3, vy: Math.sin(ang + off) * 3,
+          life: 18, color: col, size: 4
+        });
+      }
+      break;
+    }
+    case 'knives': {
+      // Mundo Detenido: 5 cuchillos en abanico + mini-paro de tiempo de 0.4s al lanzar
+      for (let k = -2; k <= 2; k++) {
+        const a = ang + k * 0.13;
+        raceProjectiles.push({
+          x: racePlayer.x, y: racePlayer.y,
+          vx: Math.cos(a) * 16, vy: Math.sin(a) * 16,
+          kind: 'knife', dmg, life: 90, color: col, owner: 'player',
+        });
+      }
+      raceTimeStopTimer = Math.max(raceTimeStopTimer, 24); // 0.4s mini ALTO TEMPORAL
+      raceFlashTimer = Math.max(raceFlashTimer, 16); raceFlashColor = col;
+      break;
+    }
+    case 'spiral': {
+      // Gyro: pelota espiral teledirigida
+      if (!racePlayer.steelBallActive) {
+        let target = null, best = Infinity;
+        for (const n of raceNPCs) {
+          const sy = raceScreenY(n.progress);
+          if (sy > racePlayer.y + 20) continue;
+          const d = Math.hypot(n.x - racePlayer.x, sy - racePlayer.y);
+          if (d < best) { best = d; target = n; }
+        }
+        racePlayer.steelBallActive = {
+          x: racePlayer.x, y: racePlayer.y,
+          vx: Math.cos(ang) * 9, vy: Math.sin(ang) * 9,
+          phase: 'out', target, life: 0, hits: new Set(),
+          dmg, color: col,
+        };
+      }
+      break;
+    }
+    case 'bomb': {
+      raceProjectiles.push({
+        x: racePlayer.x, y: racePlayer.y,
+        vx: Math.cos(ang) * 8, vy: Math.sin(ang) * 8,
+        kind: 'bomb', dmg, life: 36, color: col, owner: 'player',
+        explodes: true, radius: 90,
+      });
+      break;
+    }
+    case 'dualbomb': {
+      // Reina Explosiva: bomba grande que explota dos veces (la segunda es Sheer Heart Attack)
+      raceProjectiles.push({
+        x: racePlayer.x, y: racePlayer.y,
+        vx: Math.cos(ang) * 9, vy: Math.sin(ang) * 9,
+        kind: 'bomb', dmg, life: 36, color: col, owner: 'player',
+        explodes: true, radius: 110, doubleExplode: true,
+      });
+      break;
+    }
+    case 'miracleshot': {
+      // Don del Milagro: triple disparo de alto daño
+      for (let k = 0; k < 3; k++) {
+        raceProjectiles.push({
+          x: racePlayer.x, y: racePlayer.y,
+          vx: Math.cos(ang) * 16, vy: Math.sin(ang) * 16,
+          kind: 'standBullet', dmg, life: 80, color: col, owner: 'player',
+          delay: k * 4,
+        });
+      }
+      break;
+    }
+    case 'kingcrimson': {
+      // Carmesí Eterno: melee que ejecuta enemigos con < 35% HP (borrando su tiempo)
+      const reach = 110;
+      const tx = racePlayer.x + Math.cos(ang) * reach;
+      const ty = racePlayer.y + Math.sin(ang) * reach;
+      for (const n of raceNPCs) {
+        const sy = raceScreenY(n.progress);
+        if (Math.hypot(n.x - tx, sy - ty) < 115) {
+          const max = n.maxHp || 100;
+          if (n.hp < max * 0.35) {
+            n.hp = 0;
+            for (let k = 0; k < 14; k++) {
+              raceParticles.push({
+                x: n.x + rand(-14, 14), y: sy + rand(-14, 14),
+                vx: rand(-3, 3), vy: rand(-3, 3),
+                life: 32, color: '#d02', size: 5
+              });
+            }
+          } else {
+            n.hp -= dmg;
+          }
+          n.stunned = 22;
+          n.slowTimer = 60;
+          spawnRaceImpact(n.x, sy, col);
+        }
+      }
+      spawnRaceImpact(tx, ty, col);
+      break;
+    }
+    case 'smoke': {
+      // cortina: iframe 90 + AoE de daño y stun
+      racePlayer.iframe = Math.max(racePlayer.iframe, 90);
+      for (let k = 0; k < 16; k++) {
+        raceParticles.push({
+          x: racePlayer.x + rand(-30, 30),
+          y: racePlayer.y + rand(-30, 30),
+          vx: rand(-1, 1), vy: rand(-2, 0),
+          life: 70, color: col, size: 6
+        });
+      }
+      for (const n of raceNPCs) {
+        const sy = raceScreenY(n.progress);
+        if (Math.hypot(n.x - racePlayer.x, sy - racePlayer.y) < 150) {
+          n.hp -= dmg;
+          n.stunned = 24;
+          n.slowTimer = 90;
+          spawnRaceImpact(n.x, sy, col);
+        }
+      }
+      break;
+    }
+    case 'bubbles': {
+      for (let k = -2; k <= 2; k++) {
+        const a = ang + k * 0.18;
+        raceProjectiles.push({
+          x: racePlayer.x, y: racePlayer.y,
+          vx: Math.cos(a) * 7, vy: Math.sin(a) * 7,
+          kind: 'bubble', dmg, life: 90, color: col, owner: 'player',
+          slowDecay: true,
+        });
+      }
+      break;
+    }
+    case 'bubblepop': {
+      // Soft & Wet: 5 burbujas que al estallar también propagan daño en cadena
+      for (let k = -2; k <= 2; k++) {
+        const a = ang + k * 0.18;
+        raceProjectiles.push({
+          x: racePlayer.x, y: racePlayer.y,
+          vx: Math.cos(a) * 8, vy: Math.sin(a) * 8,
+          kind: 'bubble', dmg, life: 100, color: col, owner: 'player',
+          slowDecay: true, popChain: true, explodes: true, radius: 65,
+        });
+      }
+      break;
+    }
+    case 'homing': {
+      let best = null, bestD = Infinity;
+      for (const n of raceNPCs) {
+        const sy = raceScreenY(n.progress);
+        const d = Math.hypot(n.x - racePlayer.x, sy - racePlayer.y);
+        if (d < bestD) { bestD = d; best = n; }
+      }
+      raceProjectiles.push({
+        x: racePlayer.x, y: racePlayer.y,
+        vx: Math.cos(ang) * 9, vy: Math.sin(ang) * 9,
+        kind: 'homing', dmg, life: 120, color: col, owner: 'player',
+        homing: 0.9, target: best,
+      });
+      break;
+    }
+    case 'calamity': {
+      // Calamidad: 3 proyectiles homing que dejan estela ardiente
+      const targets = [];
+      for (const n of raceNPCs) {
+        const sy = raceScreenY(n.progress);
+        const d = Math.hypot(n.x - racePlayer.x, sy - racePlayer.y);
+        targets.push({ n, d });
+      }
+      targets.sort((a, b) => a.d - b.d);
+      for (let k = 0; k < 3; k++) {
+        const tgt = targets[k] ? targets[k].n : null;
+        const off = (k - 1) * 0.35;
+        raceProjectiles.push({
+          x: racePlayer.x, y: racePlayer.y,
+          vx: Math.cos(ang + off) * 8, vy: Math.sin(ang + off) * 8,
+          kind: 'homing', dmg, life: 140, color: col, owner: 'player',
+          homing: 1.0, target: tgt, leaveFireTrail: true, trailCD: 0,
+        });
+      }
+      break;
+    }
+    case 'lifesteal': {
+      // Vida Dorada: bala perforante que cura por cada impacto (sentido de la vida)
+      raceProjectiles.push({
+        x: racePlayer.x, y: racePlayer.y,
+        vx: Math.cos(ang) * 15, vy: Math.sin(ang) * 15,
+        kind: 'standPierce', dmg, life: 110, color: col, owner: 'player',
+        pierce: true, hits: new Set(), healOnHit: 5,
+      });
+      break;
+    }
+    case 'wormhole': {
+      // Espiral Acto 4: uña-bala que perfora dimensiones (teletransporta hacia adelante cada 14 frames)
+      raceProjectiles.push({
+        x: racePlayer.x, y: racePlayer.y,
+        vx: Math.cos(ang) * 18, vy: Math.sin(ang) * 18,
+        kind: 'standPierce', dmg, life: 140, color: col, owner: 'player',
+        pierce: true, hits: new Set(), wormhole: true, wormholeCD: 14,
+      });
+      break;
+    }
+    case 'clone': {
+      // Copias Dimensionales: 3 clones dimensionales disparan en simultáneo
+      const positions = [
+        { x: racePlayer.x - 60, y: racePlayer.y },
+        { x: racePlayer.x,      y: racePlayer.y },
+        { x: racePlayer.x + 60, y: racePlayer.y },
+      ];
+      for (const pos of positions) {
+        raceProjectiles.push({
+          x: pos.x, y: pos.y,
+          vx: Math.cos(ang) * 14, vy: Math.sin(ang) * 14,
+          kind: 'standBullet', dmg, life: 80, color: col, owner: 'player',
+        });
+        for (let k = 0; k < 8; k++) {
+          raceParticles.push({
+            x: pos.x + rand(-8, 8), y: pos.y + rand(-8, 8),
+            vx: rand(-2, 2), vy: rand(-2, 2),
+            life: 22, color: col, size: 3
+          });
+        }
+      }
+      break;
+    }
+    case 'darkspike': {
+      // Mancha Negra: 5 púas oscuras que explotan al impactar
+      for (let k = -2; k <= 2; k++) {
+        const a = ang + k * 0.18;
+        raceProjectiles.push({
+          x: racePlayer.x, y: racePlayer.y,
+          vx: Math.cos(a) * 13, vy: Math.sin(a) * 13,
+          kind: 'darkSpike', dmg, life: 80, color: col, owner: 'player',
+          explodes: true, radius: 70,
+        });
+      }
+      break;
+    }
+    case 'madeinheaven': {
+      // Pucci: bala perforante + 2s de aceleración cósmica (jugador más rápido)
+      raceProjectiles.push({
+        x: racePlayer.x, y: racePlayer.y,
+        vx: Math.cos(ang) * 17, vy: Math.sin(ang) * 17,
+        kind: 'standPierce', dmg, life: 110, color: col, owner: 'player',
+        pierce: true, hits: new Set(),
+      });
+      racePlayer.mihBoost = 120;
+      raceFlashTimer = Math.max(raceFlashTimer, 18); raceFlashColor = col;
+      break;
+    }
+    case 'shield': {
+      racePlayer.iframe = Math.max(racePlayer.iframe, 60);
+      for (let k = 0; k < 20; k++) {
+        raceParticles.push({
+          x: racePlayer.x + Math.cos(k / 20 * Math.PI * 2) * 40,
+          y: racePlayer.y + Math.sin(k / 20 * Math.PI * 2) * 40,
+          vx: 0, vy: 0, life: 40, color: col, size: 4
+        });
+      }
+      break;
+    }
+    case 'shieldburst': {
+      // Bastión: iframe 90 + estallido AoE que daña y aturde a todo lo cercano
+      racePlayer.iframe = Math.max(racePlayer.iframe, 90);
+      for (const n of raceNPCs) {
+        const sy = raceScreenY(n.progress);
+        if (Math.hypot(n.x - racePlayer.x, sy - racePlayer.y) < 140) {
+          n.hp -= dmg;
+          n.stunned = 16;
+          n.slowTimer = 50;
+          spawnRaceImpact(n.x, sy, col);
+        }
+      }
+      for (let k = 0; k < 30; k++) {
+        const a = (k / 30) * Math.PI * 2;
+        raceParticles.push({
+          x: racePlayer.x + Math.cos(a) * 40,
+          y: racePlayer.y + Math.sin(a) * 40,
+          vx: Math.cos(a) * 4, vy: Math.sin(a) * 4,
+          life: 50, color: col, size: 5
+        });
+      }
+      raceFlashTimer = Math.max(raceFlashTimer, 14); raceFlashColor = col;
+      break;
+    }
+    default: {
+      raceProjectiles.push({
+        x: racePlayer.x, y: racePlayer.y,
+        vx: Math.cos(ang) * 12, vy: Math.sin(ang) * 12,
+        kind: 'standBullet', dmg, life: 70, color: col, owner: 'player',
+      });
+    }
+  }
+
+  racePlayer.standCD = cd;
+}
+
+function updateRaceProjectiles() {
+  const timeStopped = raceTimeStopTimer > 0;
+
+  // pelota de acero (del arma SBR o stand espiral)
+  const sb = racePlayer.steelBallActive;
+  if (sb) {
+    sb.life++;
+    const sbDmg = sb.dmg || 14;
+    const sbCol = sb.color || '#cde';
+    if (sb.phase === 'out') {
+      if (sb.target && sb.target.hp > 0) {
+        const ty = raceScreenY(sb.target.progress);
+        const dx = sb.target.x - sb.x;
+        const dy = ty - sb.y;
+        const d = Math.hypot(dx, dy) || 1;
+        sb.vx += (dx / d) * 0.7;
+        sb.vy += (dy / d) * 0.7;
+      }
+      const sp = Math.hypot(sb.vx, sb.vy);
+      const maxSp = 11;
+      if (sp > maxSp) { sb.vx = sb.vx / sp * maxSp; sb.vy = sb.vy / sp * maxSp; }
+      sb.x += sb.vx;
+      sb.y += sb.vy;
+      for (const n of raceNPCs) {
+        if (sb.hits.has(n)) continue;
+        const sy = raceScreenY(n.progress);
+        if (Math.hypot(n.x - sb.x, sy - sb.y) < 28) {
+          n.hp -= sbDmg;
+          n.stunned = 14;
+          n.slowTimer = 60;
+          sb.hits.add(n);
+          spawnRaceImpact(n.x, sy, sbCol);
+        }
+      }
+      if (sb.life > 50 || sb.x < 20 || sb.x > W - 20 || sb.y < 20 || sb.y > H - 20) {
+        sb.phase = 'back';
+      }
+    } else {
+      const dx = racePlayer.x - sb.x;
+      const dy = racePlayer.y - sb.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const sp = 12;
+      sb.vx = (dx / d) * sp;
+      sb.vy = (dy / d) * sp;
+      sb.x += sb.vx;
+      sb.y += sb.vy;
+      for (const n of raceNPCs) {
+        if (sb.hits.has(n)) continue;
+        const sy = raceScreenY(n.progress);
+        if (Math.hypot(n.x - sb.x, sy - sb.y) < 28) {
+          n.hp -= sbDmg;
+          n.stunned = 14;
+          n.slowTimer = 60;
+          sb.hits.add(n);
+          spawnRaceImpact(n.x, sy, sbCol);
+        }
+      }
+      if (d < 30) racePlayer.steelBallActive = null;
+    }
+  }
+
+  // proyectiles
+  for (let i = raceProjectiles.length - 1; i >= 0; i--) {
+    const p = raceProjectiles[i];
+    // delay (burst)
+    if (p.delay && p.delay > 0) { p.delay--; continue; }
+    // si el tiempo está detenido, balas enemigas quietas; las del jugador siguen
+    const isPlayer = (p.owner !== 'npc');
+    if (timeStopped && !isPlayer) continue;
+
+    // nubes/charcos estáticos pero tickean daño en área
+    if (p.cloud) {
+      p.life--;
+      p.tickCD = (p.tickCD || 0) - 1;
+      if (p.tickCD <= 0) {
+        for (const n of raceNPCs) {
+          const sy = raceScreenY(n.progress);
+          if (Math.hypot(n.x - p.x, sy - p.y) < 90) {
+            n.hp -= p.dmg;
+            n.slowTimer = 30;
+            spawnRaceImpact(n.x, sy, p.color);
+          }
+        }
+        p.tickCD = 18;
+      }
+      if (p.life <= 0) raceProjectiles.splice(i, 1);
+      continue;
+    }
+
+    // homing
+    if (p.homing && p.target && p.target.hp > 0) {
+      const ty = raceScreenY(p.target.progress);
+      const dx = p.target.x - p.x;
+      const dy = ty - p.y;
+      const d = Math.hypot(dx, dy) || 1;
+      p.vx += (dx / d) * p.homing;
+      p.vy += (dy / d) * p.homing;
+      const sp = Math.hypot(p.vx, p.vy);
+      if (sp > 12) { p.vx = p.vx / sp * 12; p.vy = p.vy / sp * 12; }
+    }
+    if (p.kind === 'spiralball' && p.owner === 'npc') {
+      // homing leve hacia el jugador
+      const dx = racePlayer.x - p.x;
+      const dy = racePlayer.y - p.y;
+      const d = Math.hypot(dx, dy) || 1;
+      p.vx += (dx / d) * (p.homing || 0.4);
+      p.vy += (dy / d) * (p.homing || 0.4);
+      const sp = Math.hypot(p.vx, p.vy);
+      if (sp > 10) { p.vx = p.vx / sp * 10; p.vy = p.vy / sp * 10; }
+      p.spin = (p.spin || 0) + 0.4;
+    }
+
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life--;
+
+    // Espiral Acto 4: teletransporte cuántico cada wormholeCD frames
+    if (p.wormhole) {
+      p.wormholeCD = (p.wormholeCD || 0) - 1;
+      if (p.wormholeCD <= 0) {
+        p.x += p.vx * 6;
+        p.y += p.vy * 6;
+        p.wormholeCD = 14;
+        for (let k = 0; k < 8; k++) {
+          raceParticles.push({
+            x: p.x + rand(-10, 10), y: p.y + rand(-10, 10),
+            vx: rand(-2, 2), vy: rand(-2, 2),
+            life: 18, color: p.color, size: 4
+          });
+        }
+      }
+    }
+
+    // estela de fuego: deja charcos que tickean daño
+    if (p.leaveFireTrail) {
+      p.trailCD = (p.trailCD || 0) - 1;
+      if (p.trailCD <= 0) {
+        raceProjectiles.push({
+          x: p.x, y: p.y, vx: 0, vy: 0,
+          kind: 'cloud', dmg: Math.max(3, Math.floor(p.dmg * 0.4)),
+          life: 80, color: p.color, owner: 'player',
+          cloud: true, tickCD: 0,
+        });
+        p.trailCD = 8;
+      }
+    }
+
+    // burbujas se ralentizan
+    if (p.slowDecay) { p.vx *= 0.94; p.vy *= 0.94; }
+
+    let hit = false;
+    if (isPlayer) {
+      // golpe a NPCs
+      for (const n of raceNPCs) {
+        if (p.hits && p.hits.has(n)) continue;
+        const sy = raceScreenY(n.progress);
+        if (Math.hypot(n.x - p.x, sy - p.y) < 28) {
+          n.hp -= p.dmg;
+          n.stunned = 10;
+          n.slowTimer = 40;
+          spawnRaceImpact(n.x, sy, p.color);
+          if (p.bleedOnHit) n.bleed = Math.max(n.bleed || 0, p.bleedOnHit);
+          if (p.slowOnHit) n.slowTimer = Math.max(n.slowTimer, p.slowOnHit);
+          if (p.healOnHit) racePlayer.hp = Math.min(racePlayer.maxHp, racePlayer.hp + p.healOnHit);
+          if (p.pierce && p.hits) { p.hits.add(n); continue; }
+          hit = true;
+          break;
+        }
+      }
+      // bombas explotan al impactar o al expirar
+      if (p.explodes && (hit || p.life <= 0)) {
+        for (const n of raceNPCs) {
+          const sy = raceScreenY(n.progress);
+          if (Math.hypot(n.x - p.x, sy - p.y) < (p.radius || 80)) {
+            n.hp -= p.dmg;
+            n.stunned = 16;
+            n.slowTimer = 60;
+            spawnRaceImpact(n.x, sy, p.color);
+          }
+        }
+        for (let k = 0; k < 16; k++) {
+          raceParticles.push({
+            x: p.x + rand(-10, 10), y: p.y + rand(-10, 10),
+            vx: rand(-3, 3), vy: rand(-3, 3),
+            life: 22, color: p.color, size: 4
+          });
+        }
+        // Reina Explosiva / Soft & Wet: segunda detonación retardada
+        if (p.doubleExplode) {
+          raceProjectiles.push({
+            x: p.x, y: p.y, vx: 0, vy: 0,
+            kind: 'bomb', dmg: Math.floor(p.dmg * 0.7),
+            life: 20, color: p.color, owner: 'player',
+            explodes: true, radius: (p.radius || 80) * 0.9,
+            delay: 18,
+          });
+        }
+        // Soft & Wet: la pop chain detona burbujas vecinas
+        if (p.popChain) {
+          for (const q of raceProjectiles) {
+            if (q === p || !q.popChain || q.life <= 0) continue;
+            if (Math.hypot(q.x - p.x, q.y - p.y) < 120) {
+              q.life = 1; // se hará pop en el siguiente frame
+              q.popChain = false; // evita cadena infinita
+            }
+          }
+        }
+        hit = true;
+      }
+    } else {
+      // golpe al jugador
+      if (Math.hypot(racePlayer.x - p.x, racePlayer.y - p.y) < 24 && racePlayer.iframe <= 0) {
+        racePlayer.hp -= p.dmg;
+        racePlayer.iframe = 22;
+        if (p.stun) racePlayer.sandStun = Math.max(racePlayer.sandStun, p.stun);
+        spawnRaceImpact(racePlayer.x, racePlayer.y, p.color);
+        shake = Math.max(shake, 6);
+        hit = true;
+      }
+    }
+
+    if (hit || p.life <= 0 || p.x < -40 || p.x > W + 40 || p.y < -40 || p.y > H + 40) {
+      raceProjectiles.splice(i, 1);
+    }
+  }
+}
+
+function updateRaceParticles() {
+  for (let i = raceParticles.length - 1; i >= 0; i--) {
+    const p = raceParticles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.08;
+    p.life--;
+    if (p.life <= 0) raceParticles.splice(i, 1);
+  }
+}
+
+function finishRaceStage(success) {
+  if (!success) {
+    racePhase = 'defeat';
+    racePhaseTimer = 0;
+    raceMessage = 'Tu caballo cayó. Recomenzar (ESPACIO)';
+    return;
+  }
+  racePhase = 'post-stage';
+  racePhaseTimer = 0;
+  raceMessage = `ETAPA ${raceStage} — TERMINASTE EN PUESTO #${racePlayer.rank}`;
+}
+
+// ---------- NOCHE / MAPA DE HABITACIONES ----------
+// Pequeño mapa cenital con varias salas; una es el campamento (descansas),
+// las demás se pueden registrar buscando partes del Santo Cadáver.
+// 30% de probabilidad por sala. Cada hallazgo otorga un Stand aleatorio (por rareza).
+const raceMapPlayer = { x: 0, y: 0, vx: 0, vy: 0 };
+let raceRooms = [];           // {x, y, w, h, kind:'camp'|'search'|'exit', label, searched, found}
+let raceRoomMsg = '';
+let raceRoomMsgTimer = 0;
+let raceRoomRested = false;
+let raceRoomLastFoundStand = null;   // stand encontrado en esta noche (efímero, para mostrar)
+let raceRoomLastFoundPart = null;
+
+function startRaceNight() {
+  raceRooms = [];
+  raceRoomMsg = 'WASD para moverte por el pueblo. E o ESPACIO sobre una sala para entrar.';
+  raceRoomMsgTimer = 240;
+  raceRoomRested = false;
+  raceRoomLastFoundStand = null;
+  raceRoomLastFoundPart = null;
+
+  // Distribuir 5 salas + campamento + puerta de salida en una cuadrícula 3x2.
+  const mapX = 160, mapY = 130;
+  const mapW = W - 320;
+  const mapH = H - 280;
+  const cellW = mapW / 3;
+  const cellH = mapH / 2;
+  const labels = [
+    { kind: 'camp',   label: '🏕 CAMPAMENTO' },
+    { kind: 'search', label: '🪨 CUEVA' },
+    { kind: 'search', label: '🌵 TUMBA' },
+    { kind: 'search', label: '🏚 RANCHO' },
+    { kind: 'search', label: '⛪ CAPILLA' },
+    { kind: 'search', label: '🌲 BOSQUE' },
+  ];
+  // mezclar la posición de las salas (excepto camp queda fija en superior izquierda)
+  const order = [0, 1, 2, 3, 4, 5];
+  for (let i = order.length - 1; i > 1; i--) {
+    const j = 1 + Math.floor(Math.random() * (i));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  for (let i = 0; i < order.length; i++) {
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    const slot = labels[order[i]];
+    raceRooms.push({
+      x: mapX + col * cellW + 22,
+      y: mapY + row * cellH + 22,
+      w: cellW - 44,
+      h: cellH - 44,
+      kind: slot.kind,
+      label: slot.label,
+      searched: false,
+      found: null,
+    });
+  }
+  // puerta de salida en la zona inferior derecha
+  raceRooms.push({
+    x: W - 200, y: H - 140,
+    w: 150, h: 90,
+    kind: 'exit', label: '🚪 SIGUIENTE ETAPA', searched: false, found: null,
+  });
+
+  // jugador del mapa empieza en el centro
+  raceMapPlayer.x = W / 2;
+  raceMapPlayer.y = H - 180;
+  raceMapPlayer.vx = 0;
+  raceMapPlayer.vy = 0;
+}
+
+function roomUnderPlayer() {
+  for (const r of raceRooms) {
+    if (raceMapPlayer.x >= r.x && raceMapPlayer.x <= r.x + r.w &&
+        raceMapPlayer.y >= r.y && raceMapPlayer.y <= r.y + r.h) {
+      return r;
+    }
+  }
+  return null;
+}
+
+function updateRaceNight() {
+  // mover el avatar
+  const left  = keys['a'] || keys['arrowleft'];
+  const right = keys['d'] || keys['arrowright'];
+  const up    = keys['w'] || keys['arrowup'];
+  const down  = keys['s'] || keys['arrowdown'];
+  const sp = 4.6;
+  raceMapPlayer.vx *= 0.7;
+  raceMapPlayer.vy *= 0.7;
+  if (left)  raceMapPlayer.vx -= sp * 0.5;
+  if (right) raceMapPlayer.vx += sp * 0.5;
+  if (up)    raceMapPlayer.vy -= sp * 0.5;
+  if (down)  raceMapPlayer.vy += sp * 0.5;
+  raceMapPlayer.x += raceMapPlayer.vx;
+  raceMapPlayer.y += raceMapPlayer.vy;
+  raceMapPlayer.x = Math.max(60, Math.min(W - 60, raceMapPlayer.x));
+  raceMapPlayer.y = Math.max(110, Math.min(H - 30, raceMapPlayer.y));
+
+  if (raceRoomMsgTimer > 0) raceRoomMsgTimer--;
+
+  const interact = keyPressed['e'] || keyPressed[' '];
+  if (!interact) return;
+  const room = roomUnderPlayer();
+  if (!room) return;
+
+  if (room.kind === 'camp') {
+    if (!raceRoomRested) {
+      raceRoomRested = true;
+      racePlayer.hp = racePlayer.maxHp;
+      raceRoomMsg = '🛌 Descansaste junto a la hoguera — vida restaurada al máximo.';
+      raceRoomMsgTimer = 240;
+    } else {
+      raceRoomMsg = 'Ya descansaste esta noche.';
+      raceRoomMsgTimer = 180;
+    }
+  } else if (room.kind === 'search') {
+    if (room.searched) {
+      raceRoomMsg = 'Ya buscaste aquí.';
+      raceRoomMsgTimer = 150;
+      return;
+    }
+    room.searched = true;
+    // 30% de probabilidad de encontrar parte
+    const isLastNight = raceNightsDone === RACE_STAGES - 1;
+    const noneYet = raceCollectedParts.length === 0;
+    const forced = isLastNight && noneYet;
+    const partsRemaining = RACE_BODY_PARTS.filter(p => !raceCollectedParts.includes(p));
+    if ((Math.random() < 0.30 || forced) && partsRemaining.length > 0) {
+      const part = partsRemaining[Math.floor(Math.random() * partsRemaining.length)];
+      raceCollectedParts.push(part);
+      // Conceder stand aleatorio según rareza (reemplaza el actual)
+      const stand = pickRandomRaceStand();
+      racePlayer.stand = { ...stand };
+      racePlayer.standCD = 0;
+      raceRoomLastFoundStand = stand;
+      raceRoomLastFoundPart = part;
+      room.found = { part, stand: stand.name };
+      raceRoomMsg = `✨ Hallaste ${part} — Stand obtenido: ${stand.name}`;
+      raceRoomMsgTimer = 360;
+    } else {
+      room.found = null;
+      raceRoomMsg = 'Sólo polvo y viento... nada útil.';
+      raceRoomMsgTimer = 180;
+    }
+  } else if (room.kind === 'exit') {
+    raceNightsDone++;
+    if (raceStage >= RACE_STAGES) {
+      racePhase = 'finale';
+      racePhaseTimer = 0;
+    } else {
+      raceStage++;
+      racePhase = 'pre-stage';
+      racePhaseTimer = 0;
+      setupRaceStage();
+    }
+  }
+}
+
+// ---------- DIBUJO ----------
+function drawRace() {
+  // fondo según fase
+  if (racePhase === 'night') {
+    drawRaceNight();
+  } else if (racePhase === 'weapon-select') {
+    drawRaceWeaponSelect();
+  } else if (racePhase === 'finale') {
+    drawRaceFinale();
+  } else if (racePhase === 'defeat') {
+    drawRaceDefeat();
+  } else {
+    drawRaceTrack();
+    if (racePhase === 'pre-stage') drawRacePreStage();
+    if (racePhase === 'post-stage') drawRacePostStage();
+  }
+  drawRaceHud();
+}
+
+function drawRaceTrack() {
+  // cielo / pradera
+  ctx.fillStyle = '#5b3';
+  ctx.fillRect(0, 0, W, H);
+
+  // bordes
+  ctx.fillStyle = '#2a4';
+  ctx.fillRect(0, 0, RACE_LANE_LEFT - 20, H);
+  ctx.fillRect(RACE_LANE_RIGHT + 20, 0, W - RACE_LANE_RIGHT - 20 + 20, H);
+
+  // pista
+  ctx.fillStyle = '#c9a26b';
+  ctx.fillRect(RACE_LANE_LEFT - 20, 0, RACE_LANE_RIGHT - RACE_LANE_LEFT + 40, H);
+
+  // marcas de avance (efecto scroll)
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  const stride = 60;
+  const offset = (racePlayer.progress % stride);
+  for (let y = -stride + offset; y < H + stride; y += stride) {
+    ctx.fillRect(W / 2 - 4, y, 8, 26);
+  }
+
+  // marcadores de carril
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([20, 24]);
+  for (let li = 1; li < 3; li++) {
+    const x = RACE_LANE_LEFT + li * (RACE_LANE_RIGHT - RACE_LANE_LEFT) / 3;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // línea de meta si está cerca
+  const finishY = raceScreenY(raceStageDist);
+  if (finishY > -20 && finishY < H + 20) {
+    drawRaceFinishLine(finishY);
+  }
+
+  // obstáculos
+  for (const o of raceObstacles) {
+    const sy = raceScreenY(o.progress);
+    if (sy < -60 || sy > H + 60) continue;
+    if (o.kind === 'rock') {
+      ctx.fillStyle = o.hit ? '#765' : '#876';
+      ctx.beginPath(); ctx.arc(o.x, sy, o.r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#543';
+      ctx.lineWidth = 3; ctx.stroke();
+    } else if (o.kind === 'log') {
+      // tronco caído atravesado en el camino
+      ctx.fillStyle = o.hit ? '#532' : '#754';
+      ctx.fillRect(o.x - 40, sy - 12, 80, 24);
+      ctx.strokeStyle = '#321';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(o.x - 40, sy - 12, 80, 24);
+      ctx.beginPath();
+      ctx.arc(o.x - 40, sy, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.arc(o.x + 40, sy, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#321';
+      for (let k = 0; k < 4; k++) {
+        ctx.fillRect(o.x - 36 + k * 22, sy - 8, 2, 16);
+      }
+    } else if (o.kind === 'pit') {
+      // socavón
+      ctx.fillStyle = o.hit ? '#020202' : '#0a0805';
+      ctx.beginPath(); ctx.ellipse(o.x, sy, 32, 14, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#321';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.ellipse(o.x, sy + 1, 24, 9, 0, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // cactus
+      ctx.fillStyle = '#3a2';
+      ctx.fillRect(o.x - 8, sy - 30, 16, 60);
+      ctx.fillRect(o.x - 22, sy - 6, 14, 22);
+      ctx.fillRect(o.x + 8, sy - 12, 14, 22);
+    }
+  }
+
+  // flechas dash
+  for (const a of raceArrows) {
+    if (a.used) continue;
+    const sy = raceScreenY(a.progress);
+    if (sy < -40 || sy > H + 40) continue;
+    drawRaceArrow(a.x, sy);
+  }
+
+  // NPCs
+  for (const n of raceNPCs) {
+    const sy = raceScreenY(n.progress);
+    if (sy < -80 || sy > H + 80) continue;
+    drawRaceHorse(n.x, sy, n.color, n.name, n.stunned > 0);
+    // barra HP del NPC (mini)
+    if (n.hp < n.maxHp) {
+      ctx.fillStyle = '#400';
+      ctx.fillRect(n.x - 22, sy - 44, 44, 5);
+      ctx.fillStyle = '#f44';
+      ctx.fillRect(n.x - 22, sy - 44, 44 * Math.max(0, n.hp) / n.maxHp, 5);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(n.x - 22, sy - 44, 44, 5);
+    }
+    // barra de RESISTENCIA del NPC (mini)
+    if (n.stamina < n.maxStamina) {
+      ctx.fillStyle = '#040';
+      ctx.fillRect(n.x - 22, sy - 38, 44, 3);
+      ctx.fillStyle = n.exhausted ? '#a55' : (n.stamina < 30 ? '#f95' : '#6e6');
+      ctx.fillRect(n.x - 22, sy - 38, 44 * Math.max(0, n.stamina) / n.maxStamina, 3);
+    }
+    // habilidad activa: lazo de Mountain Tim
+    if (n.ability === 'lasso' && n.lassoActive > 0) {
+      ctx.strokeStyle = withAlpha('#cb6', 0.7 + 0.3 * Math.sin(frame * 0.6));
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(n.x, sy);
+      ctx.lineTo(racePlayer.x, racePlayer.y);
+      ctx.stroke();
+    }
+  }
+
+  // jugador
+  const playerColor = raceWeapon === 'fists' ? '#fc4' : (raceWeapon === 'gun' ? '#c4f' : '#cde');
+  drawRaceHorse(racePlayer.x, racePlayer.y, playerColor, 'TÚ', racePlayer.iframe > 0 && (frame & 2));
+
+  // tiempo detenido — vignette dorada pulsante
+  if (raceTimeStopTimer > 0) {
+    const a = 0.18 + 0.12 * Math.sin(frame * 0.5);
+    ctx.fillStyle = withAlpha('#fd6', a);
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#fd6';
+    ctx.font = 'bold 28px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('TIEMPO DETENIDO', W / 2, 70);
+  }
+
+  // pelota de acero
+  const sb = racePlayer.steelBallActive;
+  if (sb) {
+    ctx.save();
+    ctx.translate(sb.x, sb.y);
+    ctx.rotate(sb.life * 0.4);
+    const grd = ctx.createRadialGradient(0, 0, 2, 0, 0, 14);
+    grd.addColorStop(0, '#fff');
+    grd.addColorStop(0.5, '#cde');
+    grd.addColorStop(1, '#789');
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(0, 0, 13, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#456';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.arc(0, 0, 9 - i * 2, i * 0.6, i * 0.6 + Math.PI * 1.4);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // proyectiles
+  for (const p of raceProjectiles) {
+    if (p.cloud) {
+      // tormenta / nube de Reina Explosiva / cortina de humo etc.
+      ctx.fillStyle = withAlpha(p.color, 0.35);
+      ctx.beginPath(); ctx.arc(p.x, p.y, 50, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = withAlpha(p.color, 0.6);
+      ctx.beginPath(); ctx.arc(p.x, p.y, 30, 0, Math.PI * 2); ctx.fill();
+    } else if (p.kind === 'spiralball') {
+      // bola espiral de Gyro
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.spin || 0);
+      const grd = ctx.createRadialGradient(0, 0, 2, 0, 0, 12);
+      grd.addColorStop(0, '#fff');
+      grd.addColorStop(1, p.color);
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#345';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI * 1.5); ctx.stroke();
+      ctx.restore();
+    } else if (p.kind === 'bomb' || p.explodes) {
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(p.x - 1, p.y - 12, 2, 5);
+    } else if (p.kind === 'knife') {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(Math.atan2(p.vy, p.vx));
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-12, -2, 24, 4);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(8, -3, 6, 6);
+      ctx.restore();
+    } else if (p.kind === 'standPierce' || p.pierce) {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(Math.atan2(p.vy, p.vx));
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-14, -3, 28, 6);
+      ctx.beginPath();
+      ctx.moveTo(14, -6); ctx.lineTo(22, 0); ctx.lineTo(14, 6);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    } else if (p.kind === 'bubble') {
+      ctx.fillStyle = withAlpha(p.color, 0.45);
+      ctx.beginPath(); ctx.arc(p.x, p.y, 14, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(p.x - 4, p.y - 4, 3, 0, Math.PI * 2); ctx.fill();
+    } else if (p.kind === 'rainBolt') {
+      // Tormenta Torrencial: rayo vertical largo
+      ctx.save();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y - 14); ctx.lineTo(p.x, p.y + 14);
+      ctx.stroke();
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 6;
+      ctx.globalAlpha = 0.55;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y - 20); ctx.lineTo(p.x, p.y + 20);
+      ctx.stroke();
+      ctx.restore();
+    } else if (p.kind === 'darkSpike') {
+      // Mancha Negra: púa oscura con halo
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(Math.atan2(p.vy, p.vx));
+      ctx.fillStyle = withAlpha('#a0f', 0.45);
+      ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#111';
+      ctx.beginPath();
+      ctx.moveTo(-14, -3); ctx.lineTo(10, 0); ctx.lineTo(-14, 3);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.restore();
+    } else if (p.kind === 'fireBullet') {
+      // Bala incendiaria: bola con llama
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      const grd = ctx.createRadialGradient(0, 0, 1, 0, 0, 10);
+      grd.addColorStop(0, '#fff');
+      grd.addColorStop(0.5, '#fd6');
+      grd.addColorStop(1, p.color);
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    } else if (p.kind === 'standThread') {
+      // Hilo Liberado: hilo brillante con dirección
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(Math.atan2(p.vy, p.vx));
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-16, 0); ctx.lineTo(10, 0);
+      ctx.stroke();
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 3;
+      ctx.globalAlpha = 0.6;
+      ctx.beginPath();
+      ctx.moveTo(-18, 0); ctx.lineTo(12, 0);
+      ctx.stroke();
+      ctx.restore();
+    } else {
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  // partículas
+  for (const p of raceParticles) {
+    ctx.globalAlpha = Math.max(0, p.life / 30);
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+  }
+  ctx.globalAlpha = 1;
+
+  // rebufo activo: estela
+  if (racePlayer.draftBoost > 0) {
+    ctx.strokeStyle = `rgba(120,200,255,${0.5 + 0.3 * Math.sin(frame * 0.3)})`;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(racePlayer.x - 18, racePlayer.y + 20);
+    ctx.lineTo(racePlayer.x - 24, racePlayer.y + 50);
+    ctx.moveTo(racePlayer.x + 18, racePlayer.y + 20);
+    ctx.lineTo(racePlayer.x + 24, racePlayer.y + 50);
+    ctx.stroke();
+  }
+
+  // flash global (rebufo, dash, daño)
+  if (raceFlashTimer > 0) {
+    ctx.fillStyle = withAlpha(raceFlashColor, raceFlashTimer / 36);
+    ctx.fillRect(0, 0, W, H);
+  }
+}
+
+function drawRaceFinishLine(y) {
+  const cell = 24;
+  for (let i = 0; i < (RACE_LANE_RIGHT - RACE_LANE_LEFT) / cell + 2; i++) {
+    for (let j = 0; j < 2; j++) {
+      const xx = RACE_LANE_LEFT + i * cell;
+      const yy = y + (j - 1) * cell;
+      ctx.fillStyle = ((i + j) & 1) ? '#fff' : '#000';
+      ctx.fillRect(xx, yy, cell, cell);
+    }
+  }
+  ctx.fillStyle = '#fd6';
+  ctx.font = 'bold 24px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('META', W / 2, y - 30);
+}
+
+function drawRaceArrow(x, y) {
+  ctx.save();
+  ctx.translate(x, y);
+  const pulse = 1 + 0.1 * Math.sin(frame * 0.2);
+  ctx.scale(pulse, pulse);
+  // base
+  ctx.fillStyle = '#fc4';
+  ctx.beginPath();
+  ctx.moveTo(0, -22);
+  ctx.lineTo(18, 6);
+  ctx.lineTo(8, 6);
+  ctx.lineTo(8, 20);
+  ctx.lineTo(-8, 20);
+  ctx.lineTo(-8, 6);
+  ctx.lineTo(-18, 6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#a73';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawRaceHorse(x, y, color, label, blink) {
+  if (blink) return;
+  ctx.save();
+  ctx.translate(x, y);
+  // sombra
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath(); ctx.ellipse(0, 26, 22, 6, 0, 0, Math.PI * 2); ctx.fill();
+  // cuerpo del caballo
+  ctx.fillStyle = '#643';
+  ctx.beginPath(); ctx.ellipse(0, 8, 18, 24, 0, 0, Math.PI * 2); ctx.fill();
+  // cabeza
+  ctx.fillStyle = '#543';
+  ctx.fillRect(-7, -22, 14, 18);
+  ctx.beginPath(); ctx.arc(0, -22, 7, Math.PI, 0); ctx.fill();
+  // crin
+  ctx.fillStyle = '#321';
+  ctx.fillRect(-4, -18, 8, 14);
+  // patas
+  ctx.fillStyle = '#321';
+  const gait = Math.sin(frame * 0.4 + x * 0.01) * 3;
+  ctx.fillRect(-14, 22 + gait, 5, 12);
+  ctx.fillRect(9, 22 - gait, 5, 12);
+  ctx.fillRect(-10, 24 - gait, 5, 10);
+  ctx.fillRect(5, 24 + gait, 5, 10);
+  // jinete
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(0, -2, 9, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#111';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  // sombrero
+  ctx.fillStyle = '#222';
+  ctx.fillRect(-12, -10, 24, 3);
+  ctx.fillRect(-7, -16, 14, 7);
+  // etiqueta
+  ctx.fillStyle = '#fff';
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 3;
+  ctx.font = 'bold 11px monospace';
+  ctx.textAlign = 'center';
+  ctx.strokeText(label, 0, -32);
+  ctx.fillText(label, 0, -32);
+  ctx.restore();
+}
+
+function drawRacePreStage() {
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fd6';
+  ctx.font = 'bold 56px monospace';
+  ctx.fillText(`ETAPA ${raceStage} / ${RACE_STAGES}`, W / 2, H / 2 - 50);
+  ctx.fillStyle = '#fff';
+  ctx.font = '20px monospace';
+  ctx.fillText(RACE_STAGE_NAMES[raceStage - 1], W / 2, H / 2 - 10);
+  ctx.fillStyle = '#aaa';
+  ctx.font = '14px monospace';
+  ctx.fillText('WASD mover · Click atacar · Q tiempo detenido (solo Stands evolutivos / SP / TW)', W / 2, H / 2 + 30);
+  ctx.fillText('SPACE = dash en la dirección que te mueves (WASD) — CD 3s · flechas dash · rebufo atrás de rival', W / 2, H / 2 + 54);
+  ctx.fillText(`${NPC_COUNT} participantes numerados — derribar uno lo elimina de la carrera`, W / 2, H / 2 + 78);
+  if (racePlayer.stand) {
+    ctx.fillStyle = racePlayer.stand.color;
+    ctx.font = 'bold 16px monospace';
+    ctx.fillText(`🎴 Stand activo: ${racePlayer.stand.name}${racePlayer.stand.timestop ? ' · Q = TIEMPO DETENIDO 1.5s' : ''}`, W / 2, H / 2 + 108);
+  }
+  ctx.fillStyle = '#888';
+  ctx.font = '14px monospace';
+  ctx.fillText('(SPACE para empezar)', W / 2, H / 2 + 140);
+}
+
+function drawRacePostStage() {
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fd6';
+  ctx.font = 'bold 48px monospace';
+  ctx.fillText('META CRUZADA', W / 2, H / 2 - 60);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 32px monospace';
+  ctx.fillText(`Puesto #${racePlayer.rank}`, W / 2, H / 2);
+  ctx.fillStyle = '#aaf';
+  ctx.font = '16px monospace';
+  ctx.fillText(`Etapa ${raceStage} de ${RACE_STAGES} completada`, W / 2, H / 2 + 36);
+  ctx.fillStyle = '#fec';
+  ctx.font = '14px monospace';
+  ctx.fillText(`HP actual ${Math.max(0, Math.floor(racePlayer.hp))}/${racePlayer.maxHp} — descansa en el campamento o se mantendrá así`, W / 2, H / 2 + 62);
+  ctx.fillStyle = '#888';
+  ctx.font = '14px monospace';
+  ctx.fillText('SPACE para explorar el pueblo →', W / 2, H / 2 + 90);
+}
+
+function drawRaceNight() {
+  // cielo nocturno
+  const grd = ctx.createLinearGradient(0, 0, 0, H);
+  grd.addColorStop(0, '#020414');
+  grd.addColorStop(1, '#0a1a30');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, W, H);
+  // estrellas
+  ctx.fillStyle = '#fff';
+  for (let i = 0; i < 80; i++) {
+    const sx = (i * 73 + raceNightsDone * 13) % W;
+    const sy = (i * 41) % (H / 2);
+    const tw = 0.4 + 0.6 * Math.sin(frame * 0.03 + i);
+    ctx.globalAlpha = tw;
+    ctx.fillRect(sx, sy, 2, 2);
+  }
+  ctx.globalAlpha = 1;
+  // luna pequeña esquina
+  ctx.fillStyle = 'rgba(240,240,255,0.7)';
+  ctx.beginPath(); ctx.arc(W - 70, 60, 22, 0, Math.PI * 2); ctx.fill();
+
+  // suelo del pueblo (rectángulo con arena)
+  ctx.fillStyle = 'rgba(110, 85, 50, 0.45)';
+  ctx.fillRect(80, 110, W - 160, H - 150);
+  // ruido / piedras
+  for (let i = 0; i < 24; i++) {
+    const sx = 90 + ((i * 137 + raceNightsDone * 17) % (W - 180));
+    const sy = 120 + ((i * 71) % (H - 160));
+    ctx.fillStyle = 'rgba(80,60,40,0.5)';
+    ctx.fillRect(sx, sy, 4, 4);
+  }
+
+  // título
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fd6';
+  ctx.font = 'bold 30px monospace';
+  ctx.fillText(`NOCHE ${raceNightsDone + 1} — PUEBLO FANTASMA`, W / 2, 50);
+  ctx.fillStyle = '#aaf';
+  ctx.font = '13px monospace';
+  ctx.fillText('Cada sala tiene 30% de hallar un trozo del Santo Cadáver (otorga Poder).', W / 2, 78);
+  ctx.fillText('🏕 Campamento: descansa para curar todo. Si no descansas, tu HP se mantiene.', W / 2, 96);
+
+  // dibujar salas
+  for (const r of raceRooms) {
+    const hover = roomUnderPlayer() === r;
+    let bg = '#181420', edge = '#664';
+    if (r.kind === 'camp') {
+      bg = raceRoomRested ? '#2a2218' : '#241e10';
+      edge = '#fa6';
+    } else if (r.kind === 'exit') {
+      bg = '#102018';
+      edge = '#6fa';
+    } else if (r.kind === 'search') {
+      bg = r.searched ? '#0c0c14' : '#1c1622';
+      edge = r.found ? '#fd6' : (r.searched ? '#445' : '#996');
+    }
+    ctx.fillStyle = bg;
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.strokeStyle = hover ? '#fff' : edge;
+    ctx.lineWidth = hover ? 4 : 2;
+    ctx.strokeRect(r.x, r.y, r.w, r.h);
+
+    // detalle interno
+    ctx.fillStyle = '#fec';
+    ctx.font = 'bold 14px monospace';
+    ctx.fillText(r.label, r.x + r.w / 2, r.y + 22);
+
+    // íconos / estado
+    if (r.kind === 'camp') {
+      // hoguera
+      const fy = r.y + r.h / 2 + 16;
+      const flicker = 8 + Math.sin(frame * 0.4) * 3;
+      ctx.fillStyle = '#f73';
+      ctx.beginPath(); ctx.arc(r.x + r.w / 2, fy, flicker, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fd6';
+      ctx.beginPath(); ctx.arc(r.x + r.w / 2, fy - 3, flicker - 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#aaf';
+      ctx.font = '11px monospace';
+      ctx.fillText(raceRoomRested ? '✓ descansado' : 'descansar para curar', r.x + r.w / 2, r.y + r.h - 10);
+    } else if (r.kind === 'search') {
+      if (r.searched) {
+        if (r.found) {
+          ctx.fillStyle = '#fd6';
+          ctx.font = 'bold 12px monospace';
+          ctx.fillText('✨ Trozo + Poder', r.x + r.w / 2, r.y + r.h / 2 + 6);
+          ctx.fillStyle = '#fec';
+          ctx.font = '10px monospace';
+          ctx.fillText(r.found.stand, r.x + r.w / 2, r.y + r.h / 2 + 22);
+        } else {
+          ctx.fillStyle = '#888';
+          ctx.font = '12px monospace';
+          ctx.fillText('vacío', r.x + r.w / 2, r.y + r.h / 2 + 4);
+        }
+      } else {
+        ctx.fillStyle = '#aaf';
+        ctx.font = '11px monospace';
+        ctx.fillText('30% trozo', r.x + r.w / 2, r.y + r.h - 10);
+      }
+    } else if (r.kind === 'exit') {
+      ctx.fillStyle = '#6fa';
+      ctx.font = '11px monospace';
+      ctx.fillText('entrar para correr', r.x + r.w / 2, r.y + r.h - 10);
+    }
+  }
+
+  // avatar del jugador (top-down)
+  ctx.save();
+  ctx.translate(raceMapPlayer.x, raceMapPlayer.y);
+  // sombra
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.beginPath(); ctx.ellipse(0, 12, 14, 5, 0, 0, Math.PI * 2); ctx.fill();
+  // cuerpo
+  ctx.fillStyle = '#fd6';
+  ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#111'; ctx.lineWidth = 2; ctx.stroke();
+  // sombrero
+  ctx.fillStyle = '#321';
+  ctx.fillRect(-12, -10, 24, 3);
+  ctx.fillRect(-7, -16, 14, 7);
+  ctx.restore();
+
+  // sala bajo el jugador → prompt de interacción
+  const here = roomUnderPlayer();
+  if (here) {
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.fillRect(W / 2 - 220, H - 50, 440, 32);
+    ctx.strokeStyle = '#fd6';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(W / 2 - 220, H - 50, 440, 32);
+    ctx.fillStyle = '#fd6';
+    ctx.font = 'bold 13px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`▶ ${here.label}  —  E / ESPACIO`, W / 2, H - 30);
+  }
+
+  // mensaje de feedback
+  if (raceRoomMsgTimer > 0 && raceRoomMsg) {
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.fillRect(W / 2 - 360, H - 90, 720, 28);
+    ctx.fillStyle = '#fec';
+    ctx.font = '13px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(raceRoomMsg, W / 2, H - 72);
+  }
+}
+
+function drawRaceWeaponSelect() {
+  // fondo
+  const grd = ctx.createLinearGradient(0, 0, 0, H);
+  grd.addColorStop(0, '#3a1e0a');
+  grd.addColorStop(1, '#0a0500');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fd6';
+  ctx.font = 'bold 56px monospace';
+  ctx.fillText('STEEL BALL RUN', W / 2, 120);
+  ctx.fillStyle = '#fff';
+  ctx.font = '18px monospace';
+  ctx.fillText('La gran carrera transcontinental — 9 etapas, partes del Santo Cadáver en juego', W / 2, 160);
+
+  ctx.fillStyle = '#fec';
+  ctx.font = 'bold 22px monospace';
+  ctx.fillText('Elige tu arma:', W / 2, H / 2 - 10);
+
+  const boxW = 240, boxH = 200, gap = 30;
+  const startX = W / 2 - (3 * boxW + 2 * gap) / 2;
+  const cy = H / 2 + 30;
+  const opts = [
+    { id: 'fists',      title: 'PUÑOS',           color: '#fc4', desc: 'Cuerpo a cuerpo brutal.\nAturde y frena al rival.' },
+    { id: 'gun',        title: 'PISTOLA',         color: '#c4f', desc: 'Bala recta y rápida.\nApunta con el ratón.' },
+    { id: 'steelballs', title: 'PELOTAS DE ACERO', color: '#cde', desc: 'Bola giratoria que\npersigue y vuelve a ti.' },
+  ];
+  for (let i = 0; i < 3; i++) {
+    const x = startX + i * (boxW + gap);
+    const hovered = mouse.x >= x && mouse.x <= x + boxW && mouse.y >= cy && mouse.y <= cy + boxH;
+    ctx.fillStyle = hovered ? '#332' : '#211';
+    ctx.fillRect(x, cy, boxW, boxH);
+    ctx.strokeStyle = hovered ? opts[i].color : '#765';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(x, cy, boxW, boxH);
+    ctx.fillStyle = opts[i].color;
+    ctx.font = 'bold 22px monospace';
+    ctx.fillText(opts[i].title, x + boxW / 2, cy + 50);
+    ctx.fillStyle = '#fff';
+    ctx.font = '13px monospace';
+    opts[i].desc.split('\n').forEach((l, li) => ctx.fillText(l, x + boxW / 2, cy + 100 + li * 20));
+  }
+
+  ctx.fillStyle = '#666';
+  ctx.font = '12px monospace';
+  ctx.fillText('ESC para volver al menú', W / 2, H - 30);
+}
+
+function drawRaceFinale() {
+  const grd = ctx.createLinearGradient(0, 0, 0, H);
+  grd.addColorStop(0, '#3a1e0a');
+  grd.addColorStop(1, '#0a0500');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fd6';
+  ctx.font = 'bold 56px monospace';
+  ctx.fillText('🏆 CRUZASTE EL CONTINENTE 🏆', W / 2, 110);
+  ctx.fillStyle = '#fff';
+  ctx.font = '22px monospace';
+  ctx.fillText('Steel Ball Run completada — 9 etapas', W / 2, 150);
+
+  ctx.fillStyle = '#fec';
+  ctx.font = 'bold 22px monospace';
+  ctx.fillText('Partes del Santo Cadáver recuperadas:', W / 2, 210);
+
+  // dibujar lista de partes
+  ctx.font = '20px monospace';
+  for (let i = 0; i < RACE_BODY_PARTS.length; i++) {
+    const p = RACE_BODY_PARTS[i];
+    const found = raceCollectedParts.includes(p);
+    ctx.fillStyle = found ? '#fd6' : '#444';
+    ctx.fillText((found ? '✓ ' : '✗ ') + p, W / 2, 250 + i * 28);
+  }
+
+  ctx.fillStyle = '#888';
+  ctx.font = '14px monospace';
+  ctx.fillText('SPACE para volver al menú principal', W / 2, H - 40);
+}
+
+function drawRaceDefeat() {
+  ctx.fillStyle = '#1a0408';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#f44';
+  ctx.font = 'bold 56px monospace';
+  ctx.fillText('DERROTA', W / 2, H / 2 - 40);
+  ctx.fillStyle = '#fff';
+  ctx.font = '20px monospace';
+  ctx.fillText(`Caíste en la etapa ${raceStage}`, W / 2, H / 2 + 10);
+  ctx.fillStyle = '#888';
+  ctx.font = '14px monospace';
+  ctx.fillText('SPACE para reintentar desde el principio · ESC para menú', W / 2, H / 2 + 60);
+}
+
+function drawRaceHud() {
+  // barra HP
+  ctx.fillStyle = '#222';
+  ctx.fillRect(20, 20, 240, 18);
+  ctx.fillStyle = '#f44';
+  ctx.fillRect(20, 20, 240 * Math.max(0, racePlayer.hp) / racePlayer.maxHp, 18);
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(20, 20, 240, 18);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 13px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(`HP ${Math.max(0, Math.floor(racePlayer.hp))}/${racePlayer.maxHp}`, 28, 33);
+
+  // barra de RESISTENCIA del caballo
+  ctx.fillStyle = '#222';
+  ctx.fillRect(20, 42, 240, 12);
+  const stFrac = Math.max(0, racePlayer.stamina) / racePlayer.maxStamina;
+  const stColor = racePlayer.exhausted ? '#a55' : (racePlayer.stamina < 30 ? '#f95' : '#6e6');
+  ctx.fillStyle = stColor;
+  ctx.fillRect(20, 42, 240 * stFrac, 12);
+  ctx.strokeStyle = '#fff';
+  ctx.strokeRect(20, 42, 240, 12);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 10px monospace';
+  const stLabel = racePlayer.exhausted ? '¡AGOTADO!' : `RESISTENCIA ${Math.floor(racePlayer.stamina)}`;
+  ctx.fillText(stLabel, 26, 52);
+
+  // etapa
+  ctx.fillStyle = '#fd6';
+  ctx.font = 'bold 16px monospace';
+  ctx.fillText(`ETAPA ${raceStage}/${RACE_STAGES}`, 20, 74);
+
+  if (racePhase === 'racing') {
+    // progreso barra
+    ctx.fillStyle = '#222';
+    ctx.fillRect(20, 84, 240, 10);
+    const frac = Math.min(1, racePlayer.progress / raceStageDist);
+    ctx.fillStyle = '#6cf';
+    ctx.fillRect(20, 84, 240 * frac, 10);
+    ctx.strokeStyle = '#fff';
+    ctx.strokeRect(20, 84, 240, 10);
+
+    // puesto
+    ctx.fillStyle = racePlayer.rank === 1 ? '#fd6' : (racePlayer.rank <= 3 ? '#aef' : '#fff');
+    ctx.font = 'bold 30px monospace';
+    ctx.fillText(`#${racePlayer.rank}`, 20, 122);
+
+    // medidor de rebufo
+    if (racePlayer.draftTimer > 0 || racePlayer.draftBoost > 0) {
+      ctx.fillStyle = '#222';
+      ctx.fillRect(20, 134, 100, 8);
+      ctx.fillStyle = racePlayer.draftBoost > 0 ? '#6cf' : '#48a';
+      const dFrac = racePlayer.draftBoost > 0 ? 1 : (racePlayer.draftTimer / 60);
+      ctx.fillRect(20, 134, 100 * dFrac, 8);
+      ctx.fillStyle = '#6cf';
+      ctx.font = 'bold 10px monospace';
+      ctx.fillText(racePlayer.draftBoost > 0 ? '¡REBUFO!' : 'Rebufo', 20, 152);
+    }
+
+    // SIDE DASH (Shift + A/D) — CD 3s
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#222';
+    ctx.fillRect(20, 164, 140, 8);
+    let dashFrac = 1;
+    if (racePlayer.sideDashCD > 0) dashFrac = 1 - racePlayer.sideDashCD / 180;
+    ctx.fillStyle = racePlayer.sideDashTimer > 0 ? '#6cf' : (racePlayer.sideDashCD > 0 ? '#368' : '#6cf');
+    ctx.fillRect(20, 164, 140 * dashFrac, 8);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(20, 164, 140, 8);
+    ctx.fillStyle = racePlayer.sideDashCD > 0 ? '#888' : '#6cf';
+    ctx.font = 'bold 10px monospace';
+    ctx.fillText(
+      racePlayer.sideDashTimer > 0
+        ? '⇄ ¡DASH!'
+        : (racePlayer.sideDashCD > 0
+            ? `⇄ SPACE · CD ${Math.ceil(racePlayer.sideDashCD/60*10)/10}s`
+            : '⇄ SPACE · DASH (en la dirección WASD)'),
+      20, 184
+    );
+
+    // arma actual
+    const wlabel = raceWeapon === 'fists' ? 'PUÑOS' : (raceWeapon === 'gun' ? 'PISTOLA' : 'PELOTAS DE ACERO');
+    ctx.fillStyle = '#fec';
+    ctx.font = '12px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(`Arma: ${wlabel}`, W - 20, 30);
+
+    // STAND activo (sustituye al click del arma)
+    if (racePlayer.stand) {
+      ctx.fillStyle = racePlayer.stand.color;
+      ctx.font = 'bold 12px monospace';
+      ctx.fillText(`🎴 Stand: ${racePlayer.stand.name}`, W - 20, 150);
+      // medidor CD del stand
+      ctx.fillStyle = '#222';
+      ctx.fillRect(W - 140, 156, 120, 6);
+      const cdFrac = racePlayer.standCD > 0 ? (1 - racePlayer.standCD / racePlayer.stand.cd) : 1;
+      ctx.fillStyle = racePlayer.stand.color;
+      ctx.fillRect(W - 140, 156, 120 * cdFrac, 6);
+      // tiempo detenido (sólo si el stand puede)
+      if (racePlayer.stand.timestop) {
+        ctx.font = '11px monospace';
+        if (raceTimeStopTimer > 0) {
+          ctx.fillStyle = '#fd6';
+          ctx.fillText(`Q: TIEMPO DETENIDO ${Math.ceil(raceTimeStopTimer/60*10)/10}s`, W - 20, 178);
+        } else if (raceTimeStopCD > 0) {
+          ctx.fillStyle = '#888';
+          ctx.fillText(`Q: CD ${Math.ceil(raceTimeStopCD/60)}s`, W - 20, 178);
+        } else {
+          ctx.fillStyle = '#fd6';
+          ctx.fillText(`Q: TIEMPO DETENIDO listo (1.5s)`, W - 20, 178);
+        }
+      }
+    }
+
+    // estados activos sobre el jugador
+    let statusY = 196;
+    ctx.font = '11px monospace';
+    if (racePlayer.lassoSlow > 0) {
+      ctx.fillStyle = '#cb6';
+      ctx.fillText(`🤠 Lazo: ${Math.ceil(racePlayer.lassoSlow/60*10)/10}s`, W - 20, statusY);
+      statusY += 14;
+    }
+    if (racePlayer.sandStun > 0) {
+      ctx.fillStyle = '#dd9';
+      ctx.fillText(`🌪 Aturdido: ${Math.ceil(racePlayer.sandStun/60*10)/10}s`, W - 20, statusY);
+      statusY += 14;
+    }
+    if (racePlayer.scratchDot > 0) {
+      ctx.fillStyle = '#f44';
+      ctx.fillText(`🩸 Sangrado: ${Math.ceil(racePlayer.scratchDot/60*10)/10}s`, W - 20, statusY);
+      statusY += 14;
+    }
+  }
+
+  // partes recolectadas
+  if (raceCollectedParts.length > 0) {
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#fd6';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillText(`Santo Cadáver: ${raceCollectedParts.length}/${RACE_STAGES}`, W - 20, 56);
+    for (let i = 0; i < raceCollectedParts.length; i++) {
+      ctx.fillStyle = '#fec';
+      ctx.font = '11px monospace';
+      ctx.fillText(raceCollectedParts[i], W - 20, 76 + i * 14);
+    }
+  }
+
+  // mensaje breve
+  if (raceMessage && (racePhase === 'racing' || racePhase === 'post-stage') && racePhaseTimer < 150) {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fd6';
+    ctx.font = 'bold 18px monospace';
+    ctx.fillText(raceMessage, W / 2, H - 40);
+  }
+
+  // mensaje de eliminación de NPC
+  if (raceKillMessageTimer > 0 && racePhase === 'racing') {
+    ctx.textAlign = 'center';
+    const a = Math.min(1, raceKillMessageTimer / 30);
+    ctx.fillStyle = withAlpha('#f44', a);
+    ctx.font = 'bold 22px monospace';
+    ctx.fillText('💀 ' + raceKillMessage, W / 2, 90);
+  }
+}
 
 loop();
 </script>
