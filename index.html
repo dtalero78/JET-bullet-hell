@@ -292,6 +292,8 @@ const ABILITIES = [
     desc: 'Poder evolutivo del el Sacerdote. Empieza como Disco del Alma (disco blanco DISC + K: ONCE DISCOS). 500 kills desbloquea Gravedad Lunar (discos lunares teledirigidos que aturden + M: GRAVITY INVERSION). 2000 kills más desbloquea Cielo Acelerado (velocidad sobrehumana + H: HEAVEN ASCENSION). L: cicla entre las poderes desbloqueados.', color: '#ddd' },
   { id: 'paintblack',  name: '28. Mancha Negra',         cost: 4800,
     desc: 'Dispara 5 balas negras que dejan charcos: enemigo tocado muere, sobrevivientes quedan MANCHADOS (paralizados y dañados al salir según tiempo en charco). De noche: balas y charcos con contorno arcoíris neón, velocidad y daño aumentados. P: DÍA → bala gigante de pintura, cutscene "BLACK, EVERYTHING MUST BE BLACK" + X negra en el corazón = muerte instantánea por presión. NOCHE → dash de hitbox total mientras grita BLACK en ráfaga (CD 35s).', color: '#000' },
+  { id: 'michael',     name: '29. Rey del Pop',           cost: 8000,
+    desc: 'El nuevo mejor poder: tres estilos que ciclas con M. THRILLER (puños) — combo de golpes ENORMES; cada enemigo que matas se levanta como un ZOMBIE bailarín aliado que ataca a los demás. PASO LUNAR (dash) — embestida hacia adelante con daño devastador, invulnerable y dejando estela de imágenes. CRIMINAL (balazos) — ráfaga densa de 7 disparos dorados súper rápidos y perforantes. Pulsa M para rotar entre los tres estilos.', color: '#e33' },
 ];
 
 const owned = new Set([0]); // start with whip
@@ -326,6 +328,17 @@ let pibDayTimer = 0;
 let pibDayTargets = []; // enemigos que la bala gigante tocó
 let pibNightPhase = 0; // 0 idle, 1 carga, 2 dash con ráfaga, 3 fade
 let pibNightTimer = 0;
+// Rey del Pop (Michael) — 0 = Thriller (puños+zombies), 1 = Paso Lunar (dash atrás), 2 = Criminal (balazos)
+let mjForm = 0;
+let mjDashTimer = 0;
+let mjDashAngle = 0;
+let mjDashHits = new Set();
+let mjPunchQueue = 0;
+let mjPunchTimer = 0;
+let mjPunchAngle = 0;
+let mjGhosts = []; // after-images del dash Paso Lunar
+const MJ_FORM_NAMES = ['Thriller (puños)', 'Paso Lunar (dash)', 'Criminal (balazos)'];
+const MJ_FORM_COLORS = ['#e33', '#5cf', '#fd6'];
 const bossHazards = []; // relojes, charcos, portales, pisotones, meteoros
 
 let nextEnemyId = 1;
@@ -915,6 +928,8 @@ function updatePlayer() {
   processFlurry();
   processBreakerCombo();
   processOraBarrage();
+  processMjPunch();
+  processMjDash();
   if (smokeFogTimer > 0) {
     player.iframe = Math.max(player.iframe, 3);
     const showPunch = frame % 10 === 0;
@@ -1313,6 +1328,12 @@ function updatePlayer() {
     pibLetterCD = 60 * 35;
     shake = 18;
     effects.push({ type: 'flash', life: 22, max: 22, color: '#000' });
+  }
+  if (active === 28 && keyPressed['m']) {
+    // Rey del Pop — ciclar estilo: Thriller → Paso Lunar → Criminal
+    mjForm = (mjForm + 1) % 3;
+    effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 20, max: 20, r: 0, color: MJ_FORM_COLORS[mjForm] });
+    effects.push({ type: 'flash', life: 12, max: 12, color: MJ_FORM_COLORS[mjForm] });
   }
   if (active === 14 && keyPressed['f'] && lesson3CD <= 0) {
     const ang = aimAngle();
@@ -1924,6 +1945,7 @@ function getAttackCD() {
   if (active === 26) return [280, 200, 90][standForm];
   if (active === 18) return [0, 220, 280, 240, 250][tuskAct];
   if (active === 27) return isNightWave(wave) ? 180 : 320;
+  if (active === 28) return [240, 650, 90][mjForm];
   return [340, 260, 500, 0, 280, 320, 600, 300, 200, 260, 280, 700, 280, 280, 360, 380, 520, 240, 250, 320, 520, 250, 380, 320, 110, 320][active];
 }
 
@@ -1962,6 +1984,7 @@ function doAttack() {
       else if (standForm === 2) mihAttack(a);
       break;
     case 27: paintItBlackAttack(a); break;
+    case 28: michaelAttack(a); break;
   }
 }
 
@@ -2249,6 +2272,132 @@ function dashAttack(angle) {
       x: player.x + rand(-6, 6), y: player.y + rand(-6, 6),
       vx: rand(-2, 2), vy: rand(-2, 2),
       life: 24, max: 24, color: '#8e3', r: 4
+    });
+  }
+}
+
+// 29. Rey del Pop — tres estilos ciclables con M
+function michaelAttack(angle) {
+  if (mjForm === 0) {
+    // THRILLER: combo de puños; los enemigos que mueren se levantan como zombies aliados
+    if (mjPunchQueue > 0) return;
+    mjPunchQueue = 3;
+    mjPunchTimer = 0;
+    mjPunchAngle = angle;
+  } else if (mjForm === 1) {
+    // PASO LUNAR: dash HACIA ADELANTE con daño brutal + after-images
+    if (mjDashTimer > 0) return;
+    mjDashTimer = 18;
+    mjDashAngle = angle; // hacia el cursor
+    mjDashHits = new Set();
+    player.iframe = Math.max(player.iframe, 26);
+    shake = Math.max(shake, 12);
+    effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 22, max: 22, r: 0, color: '#5cf' });
+  } else {
+    // CRIMINAL: ráfaga densa de balazos dorados, rápidos y perforantes
+    for (let s = -3; s <= 3; s++) {
+      const a = angle + s * 0.055 + rand(-0.015, 0.015);
+      projectiles.push({
+        x: player.x + Math.cos(a) * 18, y: player.y + Math.sin(a) * 18,
+        vx: Math.cos(a) * 30, vy: Math.sin(a) * 30,
+        r: 6, dmg: 170, life: 70, type: 'mjbullet', color: '#fd6',
+        hits: new Set(), pierce: 4, trail: []
+      });
+    }
+    // fogonazo
+    for (let p = 0; p < 8; p++) {
+      particles.push({
+        x: player.x + Math.cos(angle) * 18, y: player.y + Math.sin(angle) * 18,
+        vx: Math.cos(angle) * 4 + rand(-1.5, 1.5), vy: Math.sin(angle) * 4 + rand(-1.5, 1.5),
+        life: 10, max: 10, color: rand(0, 1) > 0.5 ? '#fd6' : '#fff', r: 2
+      });
+    }
+    shake = Math.max(shake, 5);
+  }
+}
+
+function processMjPunch() {
+  if (mjPunchQueue <= 0) return;
+  mjPunchTimer--;
+  if (mjPunchTimer > 0) return;
+  const a = mjPunchAngle + rand(-0.06, 0.06);
+  const range = 72;
+  const tx = player.x + Math.cos(a) * range;
+  const ty = player.y + Math.sin(a) * range;
+  // golpe en cono GRANDE; los enemigos que mueren se vuelven zombies bailarines aliados
+  const hitR = 78;
+  const hitRSq = hitR * hitR;
+  for (let j = 0; j < enemies.length; j++) {
+    const e = enemies[j];
+    if (e.ally) continue;
+    const dx = e.x - tx, dy = e.y - ty;
+    if (dx * dx + dy * dy < hitRSq + e.r * e.r) {
+      damageEnemy(e, 280, '#e33');
+      e.vx += Math.cos(a) * 10;
+      e.vy += Math.sin(a) * 10;
+      if (e.hp <= 0 && !e.ally) raiseZombie(e);
+    }
+  }
+  effects.push({ type: 'punch', x: tx, y: ty, life: 10, max: 10, color: '#e33', r: hitR });
+  effects.push({ type: 'shockwave', x: tx, y: ty, life: 14, max: 14, r: 0, color: '#f66' });
+  for (let p = 0; p < 9; p++) {
+    particles.push({
+      x: tx + rand(-12, 12), y: ty + rand(-12, 12),
+      vx: rand(-3, 3), vy: rand(-3, 3),
+      life: 16, max: 16, color: rand(0, 1) > 0.4 ? '#e33' : '#f88', r: 3 + rand(0, 2)
+    });
+  }
+  mjPunchQueue--;
+  mjPunchTimer = 4;
+}
+
+function processMjDash() {
+  if (mjDashTimer <= 0) return;
+  const sp = 30;
+  // after-image en la posición actual antes de moverse
+  mjGhosts.push({ x: player.x, y: player.y, r: player.r, life: 16, max: 16, color: MJ_FORM_COLORS[1] });
+  player.x += Math.cos(mjDashAngle) * sp;
+  player.y += Math.sin(mjDashAngle) * sp;
+  player.iframe = Math.max(player.iframe, 4);
+  const dc = Math.cos(mjDashAngle), ds = Math.sin(mjDashAngle);
+  for (let j = 0; j < enemies.length; j++) {
+    const e = enemies[j];
+    if (e.ally) continue;
+    if (mjDashHits.has(e.id)) continue;
+    const rr = player.r + e.r + 16;
+    if (distSq(player, e) < rr * rr) {
+      damageEnemy(e, 520, '#5cf');
+      mjDashHits.add(e.id);
+      e.vx += dc * 20;
+      e.vy += ds * 20;
+      effects.push({ type: 'punch', x: e.x, y: e.y, life: 9, max: 9, color: '#5cf' });
+    }
+  }
+  for (let p = 0; p < 4; p++) {
+    particles.push({
+      x: player.x + rand(-8, 8), y: player.y + rand(-8, 8),
+      vx: -dc * 2 + rand(-1, 1), vy: -ds * 2 + rand(-1, 1),
+      life: 18, max: 18, color: '#9ef', r: 3
+    });
+  }
+  player.x = Math.max(player.r, Math.min(W - player.r, player.x));
+  player.y = Math.max(player.r, Math.min(H - player.r, player.y));
+  mjDashTimer--;
+}
+
+// Convierte un enemigo muerto en un zombie bailarín aliado (estilo Thriller)
+function raiseZombie(e) {
+  convertToAlly(e, false);
+  e.zombie = true;
+  e.allyLife = 1800;
+  e.danceCD = 0;
+  e.danceBob = rand(0, 6.28);
+  effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 18, max: 18, r: 0, color: '#7c4' });
+  for (let p = 0; p < 12; p++) {
+    particles.push({
+      x: e.x, y: e.y,
+      vx: rand(-3, 3), vy: rand(-4, -1),
+      life: 26, max: 26, color: rand(0, 1) > 0.5 ? '#7c4' : '#cf6', r: 3
     });
   }
 }
@@ -3592,7 +3741,7 @@ function updateEnemies() {
         const dSq = distSq(e, other);
         if (dSq < bestSq) { bestSq = dSq; target = other; }
       }
-      const speedMult = e.dino ? 2.0 : 1.4;
+      const speedMult = e.dino ? 2.0 : (e.zombie ? 1.6 : 1.4);
       if (target) {
         const a = angleBetween(e, target);
         const sp = e.speed * speedMult;
@@ -3605,6 +3754,7 @@ function updateEnemies() {
       e.x = Math.max(e.r, Math.min(W - e.r, e.x));
       e.y = Math.max(e.r, Math.min(H - e.r, e.y));
       if (e.dino && e.biteCD > 0) e.biteCD--;
+      if (e.zombie && e.danceCD > 0) e.danceCD--;
       for (let j = 0; j < enemies.length; j++) {
         const other = enemies[j];
         if (other === e || other.ally) continue;
@@ -3619,6 +3769,17 @@ function updateEnemies() {
               other.vy += (other.y - e.y) * 0.06;
               effects.push({ type: 'punch', x: other.x, y: other.y, life: 7, max: 7, color: '#cf6' });
               e.biteCD = 30;
+            }
+          } else if (e.zombie) {
+            damageEnemy(other, 3, '#7c4');
+            if (e.danceCD <= 0) {
+              // zarpazo bailarín cada 28 frames; los enemigos que mata se unen al baile
+              damageEnemy(other, 110, '#cf6');
+              other.vx += (other.x - e.x) * 0.05;
+              other.vy += (other.y - e.y) * 0.05;
+              effects.push({ type: 'punch', x: other.x, y: other.y, life: 7, max: 7, color: '#cf6' });
+              if (other.hp <= 0 && !other.ally) raiseZombie(other);
+              e.danceCD = 28;
             }
           } else {
             damageEnemy(other, 1, '#8ff');
@@ -4871,6 +5032,23 @@ function updateProjectiles() {
         }
       }
       if (p.pierce <= 0) consumed = true;
+    } else if (p.type === 'mjbullet') {
+      // balazo dorado de Criminal: perfora hasta pierce enemigos
+      for (let j = 0; j < enemies.length; j++) {
+        const e = enemies[j];
+        if (e.ally) continue;
+        if (p.hits.has(e.id)) continue;
+        const rr = e.r + p.r;
+        if (distSq(e, p) < rr * rr) {
+          damageEnemy(e, p.dmg, '#fd6');
+          p.hits.add(e.id);
+          p.pierce--;
+          for (let s = 0; s < 4; s++) {
+            particles.push({ x: p.x, y: p.y, vx: rand(-3, 3), vy: rand(-3, 3), life: 12, max: 12, color: rand(0, 1) > 0.5 ? '#fd6' : '#fff', r: 2 });
+          }
+          if (p.pierce <= 0) { consumed = true; break; }
+        }
+      }
     } else if (p.type === 'nutbolt') {
       // perno: golpea y clava un nut (consume el perno)
       for (let j = 0; j < enemies.length; j++) {
@@ -6575,7 +6753,7 @@ function draw() {
       ctx.globalAlpha = 0.15;
     }
     if (e.ally) {
-      ctx.fillStyle = e.dino ? '#6b3' : '#5cf';
+      ctx.fillStyle = e.dino ? '#6b3' : (e.zombie ? '#5a3' : '#5cf');
       ctx.globalAlpha = 0.5 + 0.5 * Math.min(1, e.allyLife / 60);
     } else if (e.zeroLoop) {
       const pul = 0.5 + 0.5 * Math.sin(frame * 0.5 + e.id);
@@ -6655,6 +6833,17 @@ function draw() {
       ctx.beginPath(); ctx.arc(e.x - 4, e.y - 2, 1.8, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.arc(e.x + 4, e.y - 2, 1.8, 0, Math.PI * 2); ctx.fill();
     }
+    // zombie bailarín aliado (Thriller): aura verde + ojos brillantes + meneo
+    if (e.zombie && e.ally) {
+      const bob = Math.sin(frame * 0.25 + (e.danceBob || 0));
+      const pul = 0.5 + 0.5 * Math.sin(frame * 0.14 + e.id);
+      ctx.strokeStyle = `rgba(120, 220, 120, ${0.4 + 0.3 * pul})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 3 + pul * 2, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#bf4';
+      ctx.beginPath(); ctx.arc(e.x - 4, e.y - 2 + bob, 2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(e.x + 4, e.y - 2 - bob, 2, 0, Math.PI * 2); ctx.fill();
+    }
     // espinas de dinosaurio (aliado dino o infectado)
     if ((e.dino && e.ally) || (e.infected > 0 && !e.ally)) {
       ctx.fillStyle = e.dino ? '#cf6' : '#8e3';
@@ -6682,15 +6871,15 @@ function draw() {
     const w = e.r * 2;
     if (e.ally) {
       const allyMax = e.dino ? 2400 : 1800;
-      const barColor = e.dino ? '#cf6' : '#5cf';
-      ctx.fillStyle = e.dino ? '#240' : '#024';
+      const barColor = e.dino ? '#cf6' : (e.zombie ? '#7c4' : '#5cf');
+      ctx.fillStyle = e.dino ? '#240' : (e.zombie ? '#132' : '#024');
       ctx.fillRect(e.x - w / 2, e.y - e.r - 9, w, 4);
       ctx.fillStyle = barColor;
       ctx.fillRect(e.x - w / 2, e.y - e.r - 9, w * (e.allyLife / allyMax), 4);
       ctx.fillStyle = barColor;
       ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(e.dino ? '🦖 DINO' : 'ALIADO', e.x, e.y - e.r - 14);
+      ctx.fillText(e.dino ? '🦖 DINO' : (e.zombie ? '🧟 ZOMBIE' : 'ALIADO'), e.x, e.y - e.r - 14);
       ctx.textAlign = 'left';
     } else {
       ctx.fillStyle = '#400';
@@ -6862,6 +7051,21 @@ function draw() {
   }
 
   // player
+  // after-images del Paso Lunar (Rey del Pop) — se dibujan detrás del jugador
+  for (let i = mjGhosts.length - 1; i >= 0; i--) {
+    const g = mjGhosts[i];
+    const al = g.life / g.max;
+    ctx.globalAlpha = al * 0.55;
+    ctx.fillStyle = g.color;
+    ctx.beginPath(); ctx.arc(g.x, g.y, g.r, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = al * 0.8;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(g.x, g.y, g.r, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+    g.life--;
+    if (g.life <= 0) mjGhosts.splice(i, 1);
+  }
   // aura rosa de Carmesí Inmortal
   if (active === 17) {
     const R = player.r + 18 + Math.sin(frame * 0.18) * 3;
@@ -6917,6 +7121,54 @@ function draw() {
   ctx.strokeStyle = '#fff';
   ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2); ctx.stroke();
+  // Rey del Pop: fedora negra grande + guante brillante
+  if (active === 28) {
+    const bob = Math.sin(frame * 0.12) * 1.5;          // leve meneo al ritmo
+    const brimW = player.r * 2.4;                       // ala ancha
+    const brimY = player.y - player.r - 4 + bob;        // justo encima de la cabeza
+    const crownW = player.r * 1.4;                      // copa
+    const crownH = player.r * 1.3;
+    ctx.save();
+    // sombra suave bajo el ala
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath();
+    ctx.ellipse(player.x, brimY + 2, brimW * 0.55, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // ala del fedora (elipse negra)
+    ctx.fillStyle = '#0a0a0a';
+    ctx.beginPath();
+    ctx.ellipse(player.x, brimY, brimW / 2, player.r * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // copa del fedora
+    ctx.fillStyle = '#161616';
+    ctx.beginPath();
+    ctx.moveTo(player.x - crownW / 2, brimY);
+    ctx.quadraticCurveTo(player.x - crownW / 2, brimY - crownH, player.x, brimY - crownH);
+    ctx.quadraticCurveTo(player.x + crownW / 2, brimY - crownH, player.x + crownW / 2, brimY);
+    ctx.closePath();
+    ctx.fill();
+    // hendidura central de la copa
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(player.x, brimY - crownH + 2);
+    ctx.lineTo(player.x, brimY - crownH * 0.45);
+    ctx.stroke();
+    // cinta de color según el estilo activo
+    ctx.fillStyle = MJ_FORM_COLORS[mjForm];
+    ctx.fillRect(player.x - crownW / 2, brimY - player.r * 0.42, crownW, player.r * 0.32);
+    // borde brillante del ala
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(player.x, brimY, brimW / 2, player.r * 0.5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    // destello del guante
+    const gp = 0.5 + 0.5 * Math.sin(frame * 0.4);
+    ctx.fillStyle = `rgba(255,255,255,${0.5 + 0.5 * gp})`;
+    ctx.beginPath(); ctx.arc(player.x + player.r * 0.7, player.y + player.r * 0.4, 2 + gp * 1.5, 0, Math.PI * 2); ctx.fill();
+  }
   if (player.frozen > 0) {
     ctx.strokeStyle = '#48f';
     ctx.lineWidth = 3;
@@ -9527,6 +9779,9 @@ function drawUI() {
   } else if (active === 16 && geForm === 1) {
     ctx.fillStyle = '#fe6';
     ctx.fillText(`17. Réquiem Dorado`, 20, 98);
+  } else if (active === 28) {
+    ctx.fillStyle = MJ_FORM_COLORS[mjForm];
+    ctx.fillText(`29. Rey del Pop — ${MJ_FORM_NAMES[mjForm]}`, 20, 98);
   } else {
     ctx.fillStyle = ABILITIES[active].color;
     ctx.fillText(`${ABILITIES[active].name}`, 20, 98);
@@ -9791,6 +10046,12 @@ function drawUI() {
         ctx.fillText(`N Clon Gigante: LISTO`, 480, 33);
       }
     }
+  }
+  if (active === 28) {
+    ctx.fillStyle = MJ_FORM_COLORS[mjForm];
+    ctx.fillText(`🎤 ${MJ_FORM_NAMES[mjForm]}`, 280, 33);
+    ctx.fillStyle = '#bbf';
+    ctx.fillText(`M → siguiente estilo`, 280, 50);
   }
   if (active === 18) {
     // Estado por Acto: ult + kill counter
@@ -10199,6 +10460,7 @@ function restart() {
   timeStopTimer = 0; timeStopCD = 0; rewindCD = 0; shortRewindCD = 0;
   shieldCharge = SHIELD_MAX; shieldCD = 0; shieldActive = false;
   dashTimer = 0; dashHits = new Set();
+  mjForm = 0; mjDashTimer = 0; mjDashHits = new Set(); mjPunchQueue = 0; mjPunchTimer = 0; mjGhosts = [];
   apexPhase = 0; apexTimer = 0; apexCD = 0;
   detonateAllCD = 0;
   lesson3CD = 0;
