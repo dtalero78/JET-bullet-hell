@@ -13608,6 +13608,28 @@ function peerIdForCode(code) { return 'jetsbr-v1-' + code; }
 function genCode() { return String(Math.floor(100000 + Math.random() * 900000)); }
 function olSetStatus(t) { const el = document.getElementById('ol-status'); if (el) el.textContent = t || ''; }
 
+// STUN (descubrir IP pública) + TURN gratis (relevo cuando el P2P directo
+// falla por NAT estricto). Sin TURN, muchas redes nunca conectan.
+const PEER_CONFIG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:global.stun.twilio.com:3478' },
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:80?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+  ],
+};
+const PEER_OPTS = { debug: 1, config: PEER_CONFIG };
+let _olConnectTimer = null;
+function olClearConnectTimer() { if (_olConnectTimer) { clearTimeout(_olConnectTimer); _olConnectTimer = null; } }
+function olArmConnectTimeout(secs, msg) {
+  olClearConnectTimer();
+  _olConnectTimer = setTimeout(() => {
+    if (!net.connected) olSetStatus(msg);
+  }, secs * 1000);
+}
+
 // ---------- panel show / hide ----------
 function olShow(which) {
   ['ol-home', 'ol-join', 'ol-lobby'].forEach(id => {
@@ -13632,7 +13654,7 @@ async function netCreateGame() {
   net.role = 'host';
   net.myReady = false; net.rivalReady = false; net.rivalPresent = false;
   net.code = genCode();
-  net.peer = new Peer(peerIdForCode(net.code), { debug: 1 });
+  net.peer = new Peer(peerIdForCode(net.code), PEER_OPTS);
   net.peer.on('open', () => { olSetStatus('Sala lista. Esperando a que alguien se una…'); renderLobby(); });
   net.peer.on('error', err => {
     if (err && err.type === 'unavailable-id') { netTeardownPeer(); netCreateGame(); return; }
@@ -13656,16 +13678,18 @@ async function netJoinGame(code) {
   net.role = 'guest';
   net.myReady = false; net.rivalReady = false; net.rivalPresent = false;
   net.code = code;
-  net.peer = new Peer({ debug: 1 });
+  net.peer = new Peer(PEER_OPTS);
   net.peer.on('open', () => {
-    olSetStatus('Conectando a la sala ' + code + '…');
+    olSetStatus('Conectando a la sala ' + code + '… (puede tardar ~10s)');
     const conn = net.peer.connect(peerIdForCode(code), { reliable: true });
     net.conn = conn;
     netSetupConn(conn);
+    olArmConnectTimeout(25, 'No se logró conectar. Verifica el código, que el anfitrión siga en la sala, y reintenta. En redes muy cerradas puede fallar.');
   });
   net.peer.on('error', err => {
     const t = err && err.type;
-    olSetStatus(t === 'peer-unavailable' ? ('No existe la sala ' + code + '.') : ('Error de red: ' + (t || err)));
+    olClearConnectTimer();
+    olSetStatus(t === 'peer-unavailable' ? ('No existe la sala ' + code + ' (¿el anfitrión la creó?).') : ('Error de red: ' + (t || err)));
   });
   olShow('ol-lobby');
   renderLobby();
@@ -13673,6 +13697,7 @@ async function netJoinGame(code) {
 
 function netSetupConn(conn) {
   conn.on('open', () => {
+    olClearConnectTimer();
     net.connected = true;
     net.rivalPresent = true;
     conn.send({ t: 'hello', name: net.myName, weapon: net.myWeapon, ready: net.myReady });
@@ -13686,6 +13711,14 @@ function netSetupConn(conn) {
     renderLobby();
   });
   conn.on('error', () => {});
+  // feedback del progreso de negociación ICE (ayuda a saber si está relevando por TURN)
+  conn.on('iceStateChanged', state => {
+    if (net.connected) return;
+    if (state === 'checking') olSetStatus('Negociando conexión… (probando rutas P2P/TURN)');
+    else if (state === 'connected' || state === 'completed') olSetStatus('Estableciendo canal…');
+    else if (state === 'failed') { olClearConnectTimer(); olSetStatus('La conexión P2P falló (NAT estricto). Reintenta o prueba otra red/datos móviles.'); }
+    else if (state === 'disconnected') olSetStatus('Conexión interrumpida, reintentando…');
+  });
 }
 
 function netSend(obj) {
