@@ -94,6 +94,16 @@
   #ol-status { margin-top: 12px; color: #8df; font-size: 13px; min-height: 18px; }
   #ol-weapons { margin: 10px 0; }
   #ol-weapons span { display: block; color: #cca; margin-bottom: 4px; font-size: 12px; }
+  #ol-list-box { margin: 10px 0; max-height: 260px; overflow-y: auto; }
+  .ol-room {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #14182f; border: 1px solid #335; border-radius: 6px;
+    padding: 10px 14px; margin: 6px auto; max-width: 380px; cursor: pointer;
+  }
+  .ol-room:hover { background: #1d2546; border-color: #6cf; }
+  .ol-room.full { opacity: 0.5; cursor: not-allowed; }
+  .ol-room .nm { color: #ff5; font-weight: bold; }
+  .ol-room .pc { color: #8df; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -118,10 +128,16 @@
 <div id="online-panel">
   <h2>🌐 STEEL BALL RUN — ONLINE 1v1</h2>
   <div id="ol-home">
-    <p>Corre la carrera contra otra persona en otro computador. Uno crea la partida y comparte el código; el otro se une con ese código.</p>
+    <p id="ol-home-msg">Corre la carrera contra alguien en tu misma red WiFi. Uno crea la partida; el otro la ve en la lista y se une.</p>
     <button id="ol-create">➕ Crear partida</button>
-    <button id="ol-join-btn">🔑 Unirse a partida</button>
+    <button id="ol-join-btn">🔍 Ver partidas en la WiFi</button>
     <div><button id="ol-home-back" class="ghost">← Volver al menú</button></div>
+  </div>
+  <div id="ol-list" style="display:none;">
+    <p>Partidas en esta red WiFi:</p>
+    <div id="ol-list-box"><p style="color:#889;">Buscando…</p></div>
+    <div><button id="ol-list-refresh">🔄 Actualizar</button>
+    <button id="ol-list-back" class="ghost">← Volver</button></div>
   </div>
   <div id="ol-join" style="display:none;">
     <p>Escribe el código de 6 dígitos de tu amigo:</p>
@@ -130,8 +146,8 @@
     <button id="ol-join-back" class="ghost">← Volver</button></div>
   </div>
   <div id="ol-lobby" style="display:none;">
-    <div id="ol-codebox">Código de la sala<br><span id="ol-code">——————</span></div>
-    <p id="ol-lobby-hint">Comparte el código. Cuando los dos pongan LISTO, empieza la carrera.</p>
+    <div id="ol-codebox">Sala<br><span id="ol-code">——————</span></div>
+    <p id="ol-lobby-hint">Cuando los dos pongan LISTO, empieza la carrera.</p>
     <div id="ol-weapons">
       <span>Tu montura:</span>
       <button class="ol-wp" data-wp="fists">👊 Puños</button>
@@ -10626,6 +10642,7 @@ const sandboxPanel = document.getElementById('sandbox-panel');
 document.querySelectorAll('#modes button').forEach(btn => {
   btn.addEventListener('click', () => {
     const m = btn.dataset.mode;
+    if (!m) return; // botones sin modo (ej. ONLINE) tienen su propio handler
     if (m === 'race') {
       document.getElementById('title').style.display = 'none';
       startRaceMode();
@@ -13588,6 +13605,11 @@ const net = {
   sendCD: 0,
   rival: null,        // {p,x,hp,wp,sc,stg,ph,fin}
   rivalTimeout: 0,
+  // --- LAN (mismo WiFi vía servidor local) ---
+  transport: 'peer',  // 'lan' si hay servidor local; si no, 'peer' (código por internet)
+  lanId: null,        // id de cliente
+  lanRoom: null,      // id de sala
+  lanES: null,        // EventSource (SSE)
 };
 
 let _peerJsLoad = null;
@@ -13632,21 +13654,162 @@ function olArmConnectTimeout(secs, msg) {
 
 // ---------- panel show / hide ----------
 function olShow(which) {
-  ['ol-home', 'ol-join', 'ol-lobby'].forEach(id => {
+  ['ol-home', 'ol-list', 'ol-join', 'ol-lobby'].forEach(id => {
     document.getElementById(id).style.display = (id === which) ? 'block' : 'none';
   });
 }
-function openOnlinePanel() {
+async function detectLanServer() {
+  try {
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), 2500);
+    const r = await fetch('/api/ping', { signal: ctrl.signal });
+    clearTimeout(to);
+    const j = await r.json();
+    return !!(j && j.ok);
+  } catch (e) { return false; }
+}
+async function openOnlinePanel() {
   document.getElementById('title').style.display = 'none';
   document.getElementById('online-panel').style.display = 'block';
   olShow('ol-home');
-  olSetStatus('');
+  olSetStatus('Detectando servidor de la WiFi…');
+  const hasLan = await detectLanServer();
+  net.transport = hasLan ? 'lan' : 'peer';
+  const msg = document.getElementById('ol-home-msg');
+  const joinBtn = document.getElementById('ol-join-btn');
+  if (hasLan) {
+    msg.textContent = 'Corre la carrera contra alguien en tu misma red WiFi. Uno crea la partida; el otro la ve en la lista y se une.';
+    joinBtn.textContent = '🔍 Ver partidas en la WiFi';
+    olSetStatus('Servidor WiFi detectado ✔');
+    netLanInit();
+  } else {
+    msg.textContent = 'No hay servidor WiFi (abriste la versión web). Puedes jugar por internet con un código: uno crea y comparte el código de 6 dígitos. Para el modo "misma WiFi" hay que correr el servidor local (server.js).';
+    joinBtn.textContent = '🔑 Unirse con código';
+    olSetStatus('Modo internet (código). Para WiFi, corre el servidor local.');
+  }
 }
 function closeOnlinePanel() {
   document.getElementById('online-panel').style.display = 'none';
 }
 
-// ---------- host ----------
+// ============================================================
+// ---------- LAN (mismo WiFi vía servidor local) -------------
+// ============================================================
+function lanApi(path, body) {
+  return fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  }).then(r => r.json().catch(() => ({})));
+}
+
+function netLanInit() {
+  if (net.lanES) return; // ya inicializado
+  net.lanId = 'c' + Math.random().toString(36).slice(2, 10);
+  net.lanES = new EventSource('/api/events?clientId=' + net.lanId);
+  net.lanES.onmessage = e => {
+    let ev; try { ev = JSON.parse(e.data); } catch (_) { return; }
+    onLanEvent(ev);
+  };
+  net.lanES.onerror = () => { /* SSE reintenta solo */ };
+}
+
+function onLanEvent(ev) {
+  if (!ev || !ev.type) return;
+  if (ev.type === 'room') {
+    applyLanRoom(ev);
+  } else if (ev.type === 'start') {
+    beginOnlineRace();
+  } else if (ev.type === 'peer') {
+    onNetData(ev.data);          // mensajes de juego (sync 's')
+  } else if (ev.type === 'peerleft') {
+    net.rivalPresent = false; net.rivalReady = false; net.rival = null;
+    olSetStatus('El rival salió de la sala.');
+    renderLobby();
+  }
+}
+
+function applyLanRoom(room) {
+  net.lanRoom = room.roomId;
+  net.code = room.name;
+  const me = room.players.find(p => p.id === net.lanId);
+  const rival = room.players.find(p => p.id !== net.lanId);
+  if (me && me.host !== undefined) net.role = me.host ? 'host' : 'guest';
+  net.rivalPresent = !!rival;
+  net.rivalReady = rival ? rival.ready : false;
+  net.rivalName = rival ? rival.name : '—';
+  net.rivalWeapon = rival ? rival.weapon : 'fists';
+  net.connected = !!rival;
+  if (net.active) return; // en plena carrera: no mostrar el lobby encima
+  if (me) net.myReady = me.ready;
+  document.getElementById('online-panel').style.display = 'block';
+  olShow('ol-lobby');
+  renderLobby();
+  if (net.rivalPresent) olSetStatus('¡Rival en la sala! Elige montura y pon LISTO.');
+  else olSetStatus('Esperando a que alguien se una desde la lista…');
+}
+
+async function netLanCreate() {
+  netLanInit();
+  olSetStatus('Creando partida…');
+  const r = await lanApi('/api/create', { clientId: net.lanId, name: 'Anfitrión', weapon: net.myWeapon });
+  if (r && r.roomId) {
+    net.lanRoom = r.roomId; net.code = r.name; net.role = 'host';
+    olShow('ol-lobby'); renderLobby();
+    olSetStatus('Sala "' + r.name + '" creada. Esperando rival…');
+  } else { olSetStatus('No se pudo crear la sala.'); }
+}
+
+async function netLanShowList() {
+  netLanInit();
+  olShow('ol-list');
+  await netLanRefreshList();
+}
+async function netLanRefreshList() {
+  const box = document.getElementById('ol-list-box');
+  box.innerHTML = '<p style="color:#889;">Buscando…</p>';
+  let data;
+  try { data = await fetch('/api/lobbies').then(r => r.json()); } catch (e) { data = null; }
+  const list = (data && data.lobbies) || [];
+  if (!list.length) {
+    box.innerHTML = '<p style="color:#889;">No hay partidas abiertas en esta WiFi. Pídele al otro que cree una, o crea tú.</p>';
+    return;
+  }
+  box.innerHTML = '';
+  list.forEach(rm => {
+    const div = document.createElement('div');
+    div.className = 'ol-room' + (rm.full ? ' full' : '');
+    div.innerHTML = `<span class="nm">🐎 ${rm.name}</span><span class="pc">${rm.players}/2 ${rm.full ? '(llena)' : ''}</span>`;
+    if (!rm.full) div.addEventListener('click', () => netLanJoin(rm.id, rm.name));
+    box.appendChild(div);
+  });
+}
+async function netLanJoin(roomId, name) {
+  olSetStatus('Uniéndote a "' + name + '"…');
+  const r = await lanApi('/api/join', { clientId: net.lanId, roomId, name: 'Rival', weapon: net.myWeapon });
+  if (r && r.roomId) {
+    net.lanRoom = r.roomId; net.code = r.name; net.role = 'guest';
+    olShow('ol-lobby'); renderLobby();
+  } else {
+    olSetStatus(r && r.error ? r.error : 'No se pudo unir.');
+    netLanRefreshList();
+  }
+}
+function netLanReadyToggle() {
+  net.myReady = !net.myReady;
+  lanApi('/api/ready', { clientId: net.lanId, roomId: net.lanRoom, ready: net.myReady, weapon: net.myWeapon });
+  renderLobby();
+}
+function netLanSetWeapon() {
+  lanApi('/api/ready', { clientId: net.lanId, roomId: net.lanRoom, ready: net.myReady, weapon: net.myWeapon });
+}
+function netLanLeave() {
+  if (net.lanRoom) lanApi('/api/leave', { clientId: net.lanId, roomId: net.lanRoom });
+  net.lanRoom = null;
+  net.connected = false; net.myReady = false; net.rivalReady = false; net.rivalPresent = false; net.rival = null;
+}
+
+// ---------- host (PeerJS / internet por código) ----------
 async function netCreateGame() {
   olSetStatus('Cargando red…');
   try { await loadPeerJS(); } catch (e) { olSetStatus(e.message); return; }
@@ -13722,6 +13885,10 @@ function netSetupConn(conn) {
 }
 
 function netSend(obj) {
+  if (net.transport === 'lan') {
+    if (net.lanRoom) lanApi('/api/msg', { clientId: net.lanId, roomId: net.lanRoom, data: obj });
+    return;
+  }
   if (net.conn && net.connected) { try { net.conn.send(obj); } catch (e) {} }
 }
 
@@ -13761,6 +13928,12 @@ function netMaybeStart() {
 }
 
 function toggleReady() {
+  if (net.transport === 'lan') {
+    if (!net.lanRoom) { olSetStatus('Primero crea o únete a una sala.'); return; }
+    if (!net.connected) { olSetStatus('Espera a que llegue un rival.'); return; }
+    netLanReadyToggle();
+    return;
+  }
   if (!net.connected) { olSetStatus('Aún no hay rival conectado.'); return; }
   net.myReady = !net.myReady;
   netSend({ t: 'ready', ready: net.myReady, name: net.myName, weapon: net.myWeapon });
@@ -13770,6 +13943,11 @@ function toggleReady() {
 
 function setMyWeapon(wp) {
   net.myWeapon = wp;
+  if (net.transport === 'lan') {
+    if (net.lanRoom) netLanSetWeapon();
+    renderLobby();
+    return;
+  }
   if (net.connected) netSend({ t: 'ready', ready: net.myReady, name: net.myName, weapon: net.myWeapon });
   renderLobby();
 }
@@ -13778,7 +13956,7 @@ function renderLobby() {
   const codeEl = document.getElementById('ol-code');
   if (codeEl) codeEl.textContent = net.code || '——————';
   const box = document.getElementById('ol-codebox');
-  if (box) box.firstChild.textContent = net.role === 'host' ? 'Código de tu sala' : 'Sala';
+  if (box) box.firstChild.textContent = net.transport === 'lan' ? 'Sala' : (net.role === 'host' ? 'Código de tu sala' : 'Sala');
   // montura seleccionada
   document.querySelectorAll('#ol-weapons .ol-wp').forEach(b => {
     b.classList.toggle('sel', b.dataset.wp === net.myWeapon);
@@ -13822,8 +14000,13 @@ function netTeardownPeer() {
 }
 
 function netLeave() {
-  netSend({ t: 'leave' });
-  netTeardownPeer();
+  if (net.transport === 'lan') {
+    netLanLeave();
+    if (net.lanES) { try { net.lanES.close(); } catch (e) {} net.lanES = null; }
+  } else {
+    netSend({ t: 'leave' });
+    netTeardownPeer();
+  }
   net.active = false; net.role = null; net.code = null;
   net.myReady = false; net.rivalReady = false; net.rivalPresent = false; net.rival = null;
 }
@@ -13910,8 +14093,15 @@ document.getElementById('ol-open').addEventListener('click', openOnlinePanel);
 document.getElementById('ol-home-back').addEventListener('click', () => {
   netLeave(); closeOnlinePanel(); document.getElementById('title').style.display = 'flex';
 });
-document.getElementById('ol-create').addEventListener('click', () => netCreateGame());
-document.getElementById('ol-join-btn').addEventListener('click', () => { olShow('ol-join'); olSetStatus(''); });
+document.getElementById('ol-create').addEventListener('click', () => {
+  if (net.transport === 'lan') netLanCreate(); else netCreateGame();
+});
+document.getElementById('ol-join-btn').addEventListener('click', () => {
+  if (net.transport === 'lan') { netLanShowList(); }
+  else { olShow('ol-join'); olSetStatus(''); }
+});
+document.getElementById('ol-list-refresh').addEventListener('click', () => netLanRefreshList());
+document.getElementById('ol-list-back').addEventListener('click', () => { olShow('ol-home'); olSetStatus(''); });
 document.getElementById('ol-join-back').addEventListener('click', () => { olShow('ol-home'); olSetStatus(''); });
 document.getElementById('ol-connect').addEventListener('click', () => {
   const code = (document.getElementById('ol-code-input').value || '').trim();
