@@ -59,6 +59,41 @@
   #sandbox-panel .val { color: #ff4; font-weight: bold; }
   #sandbox-panel .row { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
   #sandbox-panel hr { border: 0; border-top: 1px dashed #557; margin: 10px 0; }
+  #online-panel {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: rgba(10,12,30,0.97); border: 2px solid #6cf; border-radius: 10px;
+    padding: 24px 28px; min-width: 420px; max-width: 540px; color: #eee;
+    box-shadow: 0 0 36px #39f8; display: none; z-index: 30; text-align: center;
+    font-family: monospace;
+  }
+  #online-panel h2 { color: #8df; margin: 0 0 14px 0; }
+  #online-panel p { color: #aac; font-size: 13px; line-height: 1.5; }
+  #online-panel button {
+    padding: 11px 22px; font-size: 15px; background: #39c; color: #fff;
+    border: none; border-radius: 6px; cursor: pointer; margin: 6px; font-family: monospace;
+  }
+  #online-panel button:hover { filter: brightness(1.18); }
+  #online-panel button.ghost { background: #334; color: #bcd; }
+  #online-panel button.ol-wp { background: #225; color: #cde; border: 2px solid #335; padding: 8px 14px; }
+  #online-panel button.ol-wp.sel { background: #6cf; color: #012; border-color: #fff; font-weight: bold; }
+  #online-panel #ol-ready { background: #4a6; font-size: 18px; min-width: 200px; }
+  #online-panel #ol-ready.on { background: #2c4; box-shadow: 0 0 14px #4f8; }
+  #ol-code {
+    font-size: 40px; letter-spacing: 10px; color: #ff5; font-weight: bold;
+    text-shadow: 0 0 14px #fd0a; display: inline-block; padding: 4px 2px 4px 12px;
+  }
+  #ol-codebox { background: #11142e; border: 1px dashed #557; border-radius: 6px; padding: 10px; margin: 10px 0; }
+  #ol-code-input {
+    font-size: 30px; letter-spacing: 8px; text-align: center; width: 220px;
+    background: #11142e; color: #ff5; border: 2px solid #557; border-radius: 6px;
+    padding: 8px; font-family: monospace;
+  }
+  #ol-players { margin: 12px 0; }
+  #ol-players .pl { padding: 7px 10px; margin: 5px auto; border-radius: 6px; max-width: 320px; background: #14182f; border: 1px solid #335; }
+  #ol-players .pl.rdy { border-color: #4f8; color: #bfb; }
+  #ol-status { margin-top: 12px; color: #8df; font-size: 13px; min-height: 18px; }
+  #ol-weapons { margin: 10px 0; }
+  #ol-weapons span { display: block; color: #cca; margin-bottom: 4px; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -75,8 +110,39 @@
     <button class="hard" data-mode="hard">DIFÍCIL</button>
     <button class="sandbox" data-mode="sandbox">SANDBOX</button>
     <button class="race" data-mode="race" style="background:#c83; color:#fff;">🐎 STEEL BALL RUN</button>
+    <button id="ol-open" style="background:#39c; color:#fff;">🌐 STEEL BALL RUN ONLINE</button>
   </div>
   <p style="margin-top:30px; color:#556; font-size: 12px;">WASD mover · Click atacar · 1-9, 0, -, =, ], [ cambiar · B tienda · R/T/G poderes · M panel sandbox</p>
+</div>
+
+<div id="online-panel">
+  <h2>🌐 STEEL BALL RUN — ONLINE 1v1</h2>
+  <div id="ol-home">
+    <p>Corre la carrera contra otra persona en otro computador. Uno crea la partida y comparte el código; el otro se une con ese código.</p>
+    <button id="ol-create">➕ Crear partida</button>
+    <button id="ol-join-btn">🔑 Unirse a partida</button>
+    <div><button id="ol-home-back" class="ghost">← Volver al menú</button></div>
+  </div>
+  <div id="ol-join" style="display:none;">
+    <p>Escribe el código de 6 dígitos de tu amigo:</p>
+    <input id="ol-code-input" maxlength="6" inputmode="numeric" autocomplete="off" placeholder="000000">
+    <div><button id="ol-connect">Conectar</button>
+    <button id="ol-join-back" class="ghost">← Volver</button></div>
+  </div>
+  <div id="ol-lobby" style="display:none;">
+    <div id="ol-codebox">Código de la sala<br><span id="ol-code">——————</span></div>
+    <p id="ol-lobby-hint">Comparte el código. Cuando los dos pongan LISTO, empieza la carrera.</p>
+    <div id="ol-weapons">
+      <span>Tu montura:</span>
+      <button class="ol-wp" data-wp="fists">👊 Puños</button>
+      <button class="ol-wp" data-wp="gun">🔫 Pistola</button>
+      <button class="ol-wp" data-wp="steelballs">⚙ Pelotas</button>
+    </div>
+    <div id="ol-players"></div>
+    <button id="ol-ready">✔ LISTO</button>
+    <div><button id="ol-leave" class="ghost">Salir</button></div>
+  </div>
+  <div id="ol-status"></div>
 </div>
 
 <div id="sandbox-panel">
@@ -10848,6 +10914,7 @@ function startRaceMode() {
 function exitRaceMode() {
   raceMode = false;
   racePaused = false;
+  if (net.active) netLeave();
   document.getElementById('title').style.display = 'flex';
 }
 
@@ -10949,6 +11016,7 @@ function setupRaceStage() {
 function updateRace() {
   racePhaseTimer++;
   if (raceFlashTimer > 0) raceFlashTimer--;
+  netRaceTick();
 
   if (keyPressed['escape']) {
     exitRaceMode();
@@ -12644,6 +12712,7 @@ function drawRace() {
     if (racePhase === 'post-stage') drawRacePostStage();
   }
   drawRaceHud();
+  drawNetHud();
 }
 
 function drawRaceTrack() {
@@ -12765,6 +12834,9 @@ function drawRaceTrack() {
       ctx.stroke();
     }
   }
+
+  // rival online (proyectado por progreso, detrás del jugador local)
+  drawNetRival();
 
   // jugador
   const playerColor = raceWeapon === 'fists' ? '#fc4' : (raceWeapon === 'gun' ? '#c4f' : '#cde');
@@ -13491,6 +13563,337 @@ function drawRaceHud() {
     ctx.fillText('💀 ' + raceKillMessage, W / 2, 90);
   }
 }
+
+// ============================================================
+// ===== ONLINE 1v1 (PeerJS) — Steel Ball Run =================
+// Modelo: cada jugador corre su propia carrera; se sincroniza el
+// estado del corredor (progreso, posición, HP, montura) y se dibuja
+// al rival proyectado por progreso. Las distancias de etapa son
+// deterministas, así que comparar el avance es justo.
+// ============================================================
+const net = {
+  active: false,      // dentro de una carrera online
+  role: null,         // 'host' | 'guest'
+  peer: null,
+  conn: null,
+  code: null,
+  connected: false,
+  myName: 'Jugador',
+  myReady: false,
+  rivalReady: false,
+  rivalName: '—',
+  rivalPresent: false,
+  myWeapon: 'fists',
+  rivalWeapon: 'fists',
+  sendCD: 0,
+  rival: null,        // {p,x,hp,wp,sc,stg,ph,fin}
+  rivalTimeout: 0,
+};
+
+let _peerJsLoad = null;
+function loadPeerJS() {
+  if (window.Peer) return Promise.resolve();
+  if (_peerJsLoad) return _peerJsLoad;
+  _peerJsLoad = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
+    s.onload = () => res();
+    s.onerror = () => { _peerJsLoad = null; rej(new Error('No se pudo cargar la red (¿sin internet?).')); };
+    document.head.appendChild(s);
+  });
+  return _peerJsLoad;
+}
+
+function peerIdForCode(code) { return 'jetsbr-v1-' + code; }
+function genCode() { return String(Math.floor(100000 + Math.random() * 900000)); }
+function olSetStatus(t) { const el = document.getElementById('ol-status'); if (el) el.textContent = t || ''; }
+
+// ---------- panel show / hide ----------
+function olShow(which) {
+  ['ol-home', 'ol-join', 'ol-lobby'].forEach(id => {
+    document.getElementById(id).style.display = (id === which) ? 'block' : 'none';
+  });
+}
+function openOnlinePanel() {
+  document.getElementById('title').style.display = 'none';
+  document.getElementById('online-panel').style.display = 'block';
+  olShow('ol-home');
+  olSetStatus('');
+}
+function closeOnlinePanel() {
+  document.getElementById('online-panel').style.display = 'none';
+}
+
+// ---------- host ----------
+async function netCreateGame() {
+  olSetStatus('Cargando red…');
+  try { await loadPeerJS(); } catch (e) { olSetStatus(e.message); return; }
+  netTeardownPeer();
+  net.role = 'host';
+  net.myReady = false; net.rivalReady = false; net.rivalPresent = false;
+  net.code = genCode();
+  net.peer = new Peer(peerIdForCode(net.code), { debug: 1 });
+  net.peer.on('open', () => { olSetStatus('Sala lista. Esperando a que alguien se una…'); renderLobby(); });
+  net.peer.on('error', err => {
+    if (err && err.type === 'unavailable-id') { netTeardownPeer(); netCreateGame(); return; }
+    olSetStatus('Error de red: ' + (err && err.type || err));
+  });
+  net.peer.on('connection', conn => {
+    if (net.conn && net.connected) { try { conn.close(); } catch (e) {} return; }
+    net.conn = conn;
+    netSetupConn(conn);
+  });
+  olShow('ol-lobby');
+  renderLobby();
+}
+
+// ---------- guest ----------
+async function netJoinGame(code) {
+  if (!/^\d{6}$/.test(code)) { olSetStatus('El código debe tener 6 dígitos.'); return; }
+  olSetStatus('Cargando red…');
+  try { await loadPeerJS(); } catch (e) { olSetStatus(e.message); return; }
+  netTeardownPeer();
+  net.role = 'guest';
+  net.myReady = false; net.rivalReady = false; net.rivalPresent = false;
+  net.code = code;
+  net.peer = new Peer({ debug: 1 });
+  net.peer.on('open', () => {
+    olSetStatus('Conectando a la sala ' + code + '…');
+    const conn = net.peer.connect(peerIdForCode(code), { reliable: true });
+    net.conn = conn;
+    netSetupConn(conn);
+  });
+  net.peer.on('error', err => {
+    const t = err && err.type;
+    olSetStatus(t === 'peer-unavailable' ? ('No existe la sala ' + code + '.') : ('Error de red: ' + (t || err)));
+  });
+  olShow('ol-lobby');
+  renderLobby();
+}
+
+function netSetupConn(conn) {
+  conn.on('open', () => {
+    net.connected = true;
+    net.rivalPresent = true;
+    conn.send({ t: 'hello', name: net.myName, weapon: net.myWeapon, ready: net.myReady });
+    olSetStatus('¡Conectado! Elige montura y pon LISTO.');
+    renderLobby();
+  });
+  conn.on('data', d => onNetData(d));
+  conn.on('close', () => {
+    net.connected = false; net.rivalPresent = false; net.rivalReady = false; net.rival = null;
+    olSetStatus('El rival se desconectó.');
+    renderLobby();
+  });
+  conn.on('error', () => {});
+}
+
+function netSend(obj) {
+  if (net.conn && net.connected) { try { net.conn.send(obj); } catch (e) {} }
+}
+
+function onNetData(d) {
+  if (!d || !d.t) return;
+  if (d.t === 'hello') {
+    net.rivalPresent = true;
+    net.rivalName = d.name || 'Rival';
+    net.rivalWeapon = d.weapon || 'fists';
+    net.rivalReady = !!d.ready;
+    renderLobby();
+  } else if (d.t === 'ready') {
+    net.rivalReady = !!d.ready;
+    if (d.name) net.rivalName = d.name;
+    if (d.weapon) net.rivalWeapon = d.weapon;
+    renderLobby();
+    netMaybeStart();
+  } else if (d.t === 'start') {
+    beginOnlineRace();
+  } else if (d.t === 's') {
+    net.rival = d;
+    net.rivalTimeout = 150;
+  } else if (d.t === 'leave') {
+    net.connected = false; net.rivalPresent = false; net.rivalReady = false; net.rival = null;
+    olSetStatus('El rival salió.');
+    renderLobby();
+  }
+}
+
+// host decide el arranque cuando ambos están listos
+function netMaybeStart() {
+  if (net.role !== 'host') return;
+  if (net.connected && net.myReady && net.rivalReady) {
+    netSend({ t: 'start' });
+    beginOnlineRace();
+  }
+}
+
+function toggleReady() {
+  if (!net.connected) { olSetStatus('Aún no hay rival conectado.'); return; }
+  net.myReady = !net.myReady;
+  netSend({ t: 'ready', ready: net.myReady, name: net.myName, weapon: net.myWeapon });
+  renderLobby();
+  netMaybeStart();
+}
+
+function setMyWeapon(wp) {
+  net.myWeapon = wp;
+  if (net.connected) netSend({ t: 'ready', ready: net.myReady, name: net.myName, weapon: net.myWeapon });
+  renderLobby();
+}
+
+function renderLobby() {
+  const codeEl = document.getElementById('ol-code');
+  if (codeEl) codeEl.textContent = net.code || '——————';
+  const box = document.getElementById('ol-codebox');
+  if (box) box.firstChild.textContent = net.role === 'host' ? 'Código de tu sala' : 'Sala';
+  // montura seleccionada
+  document.querySelectorAll('#ol-weapons .ol-wp').forEach(b => {
+    b.classList.toggle('sel', b.dataset.wp === net.myWeapon);
+  });
+  // botón listo
+  const rb = document.getElementById('ol-ready');
+  if (rb) {
+    rb.textContent = net.myReady ? '✖ Cancelar listo' : '✔ LISTO';
+    rb.classList.toggle('on', net.myReady);
+  }
+  // lista de jugadores
+  const pl = document.getElementById('ol-players');
+  if (pl) {
+    const me = `<div class="pl ${net.myReady ? 'rdy' : ''}">🧍 Tú (${net.myWeapon}) — ${net.myReady ? 'LISTO ✔' : 'esperando…'}</div>`;
+    const rivalLine = net.rivalPresent
+      ? `<div class="pl ${net.rivalReady ? 'rdy' : ''}">🧑 Rival (${net.rivalWeapon}) — ${net.rivalReady ? 'LISTO ✔' : 'esperando…'}</div>`
+      : `<div class="pl">⌛ Esperando rival…</div>`;
+    pl.innerHTML = me + rivalLine;
+  }
+}
+
+function beginOnlineRace() {
+  closeOnlinePanel();
+  document.getElementById('title').style.display = 'none';
+  net.active = true;
+  net.rival = null;
+  net.rivalTimeout = 0;
+  net.sendCD = 0;
+  startRaceMode();          // pone raceMode=true, racePhase='weapon-select'
+  raceWeapon = net.myWeapon;
+  raceStage = 1;
+  setupRaceStage();
+  racePhase = 'racing';     // saltamos selección de arma y pre-stage
+  racePhaseTimer = 0;
+}
+
+function netTeardownPeer() {
+  if (net.conn) { try { net.conn.close(); } catch (e) {} net.conn = null; }
+  if (net.peer) { try { net.peer.destroy(); } catch (e) {} net.peer = null; }
+  net.connected = false;
+}
+
+function netLeave() {
+  netSend({ t: 'leave' });
+  netTeardownPeer();
+  net.active = false; net.role = null; net.code = null;
+  net.myReady = false; net.rivalReady = false; net.rivalPresent = false; net.rival = null;
+}
+
+// ---------- sync en carrera ----------
+function netRaceTick() {
+  if (!net.active) return;
+  if (net.rivalTimeout > 0) net.rivalTimeout--;
+  if (net.rivalTimeout <= 0) net.rival = null;
+  net.sendCD--;
+  if (net.sendCD <= 0) {
+    net.sendCD = 3; // ~20 envíos/seg
+    netSend({
+      t: 's',
+      p: Math.round(racePlayer.progress),
+      x: Math.round(racePlayer.x),
+      hp: Math.round(racePlayer.hp),
+      wp: raceWeapon,
+      sc: racePlayer.stand ? racePlayer.stand.color : null,
+      stg: raceStage,
+      ph: racePhase,
+      fin: racePhase === 'finale',
+    });
+  }
+}
+
+function drawNetRival() {
+  if (!net.active || !net.rival) return;
+  const r = net.rival;
+  if (r.stg !== raceStage) return; // en otra etapa: sólo en el HUD
+  const sy = raceScreenY(r.p);
+  const color = r.sc || (r.wp === 'fists' ? '#fc4' : r.wp === 'gun' ? '#c4f' : '#cde');
+  if (sy < -70 || sy > H + 70) {
+    // fuera de cámara: flecha indicadora en el borde
+    const edgeY = sy < 0 ? 60 : H - 50;
+    ctx.fillStyle = '#ff3';
+    ctx.font = 'bold 16px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(sy < 0 ? '▲ RIVAL ▲' : '▼ RIVAL ▼', Math.max(80, Math.min(W - 80, r.x)), edgeY);
+    ctx.textAlign = 'left';
+    return;
+  }
+  drawRaceHorse(r.x, sy, color, 'RIVAL', false);
+  // halo distintivo
+  ctx.strokeStyle = '#ff3';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(r.x, sy, 30, 0, Math.PI * 2); ctx.stroke();
+  // barra HP del rival
+  if (r.hp < 100) {
+    ctx.fillStyle = '#400'; ctx.fillRect(r.x - 22, sy - 44, 44, 5);
+    ctx.fillStyle = '#fd4'; ctx.fillRect(r.x - 22, sy - 44, 44 * Math.max(0, r.hp) / 100, 5);
+  }
+}
+
+function drawNetHud() {
+  if (!net.active) return;
+  const myPct = Math.min(100, racePlayer.progress / raceStageDist * 100);
+  ctx.save();
+  ctx.font = 'bold 14px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(W / 2 - 200, 6, 400, 26);
+  ctx.fillStyle = '#6cf';
+  ctx.fillText('🌐 ONLINE', W / 2, 24);
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#9f9';
+  ctx.fillText(`TÚ  E${raceStage}  ${myPct.toFixed(0)}%`, W / 2 - 192, 24);
+  ctx.textAlign = 'right';
+  if (net.rival) {
+    const rDist = 9000 + net.rival.stg * 2400;
+    const rPct = Math.min(100, net.rival.p / rDist * 100);
+    const rLbl = net.rival.fin ? 'META 🏁' : `E${net.rival.stg}  ${rPct.toFixed(0)}%`;
+    ctx.fillStyle = '#ff7';
+    ctx.fillText(`RIVAL  ${rLbl}`, W / 2 + 192, 24);
+  } else {
+    ctx.fillStyle = '#c66';
+    ctx.fillText('RIVAL  conectando…', W / 2 + 192, 24);
+  }
+  ctx.restore();
+}
+
+// ---------- wiring de botones del lobby ----------
+document.getElementById('ol-open').addEventListener('click', openOnlinePanel);
+document.getElementById('ol-home-back').addEventListener('click', () => {
+  netLeave(); closeOnlinePanel(); document.getElementById('title').style.display = 'flex';
+});
+document.getElementById('ol-create').addEventListener('click', () => netCreateGame());
+document.getElementById('ol-join-btn').addEventListener('click', () => { olShow('ol-join'); olSetStatus(''); });
+document.getElementById('ol-join-back').addEventListener('click', () => { olShow('ol-home'); olSetStatus(''); });
+document.getElementById('ol-connect').addEventListener('click', () => {
+  const code = (document.getElementById('ol-code-input').value || '').trim();
+  netJoinGame(code);
+});
+document.getElementById('ol-code-input').addEventListener('input', e => {
+  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+});
+document.getElementById('ol-ready').addEventListener('click', toggleReady);
+document.getElementById('ol-leave').addEventListener('click', () => {
+  netLeave(); olShow('ol-home'); olSetStatus('Saliste de la sala.');
+});
+document.querySelectorAll('#ol-weapons .ol-wp').forEach(b => {
+  b.addEventListener('click', () => setMyWeapon(b.dataset.wp));
+});
 
 loop();
 </script>
