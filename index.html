@@ -376,7 +376,21 @@ const ABILITIES = [
     desc: 'Dispara 5 balas negras que dejan charcos: enemigo tocado muere, sobrevivientes quedan MANCHADOS (paralizados y dañados al salir según tiempo en charco). De noche: balas y charcos con contorno arcoíris neón, velocidad y daño aumentados. P: DÍA → bala gigante de pintura, cutscene "BLACK, EVERYTHING MUST BE BLACK" + X negra en el corazón = muerte instantánea por presión. NOCHE → dash de hitbox total mientras grita BLACK en ráfaga (CD 35s).', color: '#000' },
   { id: 'michael',     name: '29. Rey del Pop',           cost: 8000,
     desc: 'El nuevo mejor poder: tres estilos que ciclas con M. THRILLER (puños) — combo de golpes ENORMES; cada enemigo que matas se levanta como un ZOMBIE bailarín aliado que ataca a los demás. PASO LUNAR (dash) — embestida hacia adelante con daño devastador, invulnerable y dejando estela de imágenes. CRIMINAL (balazos) — ráfaga densa de 7 disparos dorados súper rápidos y perforantes. Pulsa M para rotar entre los tres estilos.', color: '#e33' },
+  { id: 'lonesome', name: 'Oh! Lonesome Me (Cuerda)', cost: 300,
+    desc: 'Lanza una cuerda hacia el cursor: se engancha donde cae y te jala hasta ahi como un dash, danando a los enemigos en el camino. Quien sobreviva al tiron queda AMARRADO 5s sin poder moverse.', color: '#cb6' },
 ];
+
+// Orden de la TIENDA (y de la cadena de compra), desacoplado del indice de juego.
+// Coloca 'Oh! Lonesome Me' (29) justo despues de 'Pelota de Acero' (indice 14).
+const SHOP_ORDER = (() => {
+  const o = [];
+  for (let i = 0; i < ABILITIES.length; i++) {
+    if (i === 29) continue;        // se coloca manualmente abajo
+    o.push(i);
+    if (i === 14) o.push(29);
+  }
+  return o;
+})();
 
 const owned = new Set([0]); // start with whip
 let active = 0;
@@ -441,6 +455,10 @@ let rewindFrame = 0;
 let dashTimer = 0;
 let dashAngle = 0;
 let dashHits = new Set();
+// Oh! Lonesome Me (cuerda-dash)
+let lassoTimer = 0, lassoMax = 0;
+let lassoFromX = 0, lassoFromY = 0, lassoTX = 0, lassoTY = 0;
+let lassoHits = new Set();
 let apexPhase = 0;
 let apexTimer = 0;
 let apexCD = 0;
@@ -1012,6 +1030,7 @@ function updatePlayer() {
   processOraBarrage();
   processMjPunch();
   processMjDash();
+  processLasso();
   if (smokeFogTimer > 0) {
     player.iframe = Math.max(player.iframe, 3);
     const showPunch = frame % 10 === 0;
@@ -2028,6 +2047,7 @@ function getAttackCD() {
   if (active === 18) return [0, 220, 280, 240, 250][tuskAct];
   if (active === 27) return isNightWave(wave) ? 180 : 320;
   if (active === 28) return [240, 650, 90][mjForm];
+  if (active === 29) return 360;
   return [340, 260, 500, 0, 280, 320, 600, 300, 200, 260, 280, 700, 280, 280, 360, 380, 520, 240, 250, 320, 520, 250, 380, 320, 110, 320][active];
 }
 
@@ -2067,6 +2087,7 @@ function doAttack() {
       break;
     case 27: paintItBlackAttack(a); break;
     case 28: michaelAttack(a); break;
+    case 29: lassoAttack(a); break;
   }
 }
 
@@ -2482,6 +2503,69 @@ function raiseZombie(e) {
       life: 26, max: 26, color: rand(0, 1) > 0.5 ? '#7c4' : '#cf6', r: 3
     });
   }
+}
+
+// Oh! Lonesome Me: lanza una cuerda; te jala (dash) hasta donde cae,
+// dana en el camino y deja AMARRADO 5s a quien sobreviva.
+function lassoAttack(angle) {
+  if (lassoTimer > 0) return;
+  const range = 380;
+  const ca = Math.cos(angle), sa = Math.sin(angle);
+  let tx = player.x + ca * range, ty = player.y + sa * range;
+  // engancha al enemigo mas cercano sobre la linea del cursor
+  let best = null, bestAlong = 1e9;
+  for (const e of enemies) {
+    if (e.ally || e.hp <= 0) continue;
+    const dx = e.x - player.x, dy = e.y - player.y;
+    const along = dx * ca + dy * sa;
+    if (along < 24 || along > range) continue;
+    const perp = Math.abs(-dx * sa + dy * ca);
+    if (perp < e.r + 46 && along < bestAlong) { bestAlong = along; best = e; }
+  }
+  if (best) { tx = best.x; ty = best.y; }
+  tx = Math.max(player.r, Math.min(W - player.r, tx));
+  ty = Math.max(player.r, Math.min(H - player.r, ty));
+  lassoFromX = player.x; lassoFromY = player.y;
+  lassoTX = tx; lassoTY = ty;
+  const d = Math.hypot(tx - player.x, ty - player.y);
+  lassoMax = lassoTimer = Math.max(6, Math.min(16, Math.round(d / 30)));
+  lassoHits = new Set();
+  player.iframe = Math.max(player.iframe, lassoMax + 6);
+  shake = Math.max(shake, 8);
+  effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 14, max: 14, r: 0, color: '#cb6' });
+}
+
+function processLasso() {
+  if (lassoTimer <= 0) return;
+  const t = 1 - lassoTimer / lassoMax;
+  const ease = 1 - (1 - t) * (1 - t); // easeOut
+  player.x = lassoFromX + (lassoTX - lassoFromX) * ease;
+  player.y = lassoFromY + (lassoTY - lassoFromY) * ease;
+  player.iframe = Math.max(player.iframe, 3);
+  for (const e of enemies) {
+    if (e.ally || lassoHits.has(e.id)) continue;
+    const rr = player.r + e.r + 30;
+    if (distSq(player, e) < rr * rr) {
+      lassoHits.add(e.id);
+      damageEnemy(e, 240, '#cb6');
+      e.vx += rand(-3, 3); e.vy += rand(-3, 3);
+      effects.push({ type: 'punch', x: e.x, y: e.y, life: 7, max: 7, color: '#cb6', r: 34 });
+      if (e.hp > 0) {
+        e.frozen = Math.max(e.frozen || 0, 300); // amarrado 5s
+        e.tied = 300;
+      }
+    }
+  }
+  for (let p = 0; p < 3; p++) {
+    particles.push({
+      x: player.x + rand(-6, 6), y: player.y + rand(-6, 6),
+      vx: rand(-1.5, 1.5), vy: rand(-1.5, 1.5),
+      life: 16, max: 16, color: '#cb6', r: 3
+    });
+  }
+  player.x = Math.max(player.r, Math.min(W - player.r, player.x));
+  player.y = Math.max(player.r, Math.min(H - player.r, player.y));
+  lassoTimer--;
 }
 
 // 5. Flechas Perforantes — atraviesan y empujan
@@ -3765,6 +3849,7 @@ function updateEnemies() {
   enemies.forEach(e => {
     if (timeStopTimer > 0) return;
     if (e.geOvercharge > 0) e.geOvercharge--;
+    if (e.tied > 0) e.tied--;
     if (e.frozen > 0) { e.frozen--; return; }
     // rocas pegadas: más tiempo = más daño
     if (e.rocks && e.rocks.length > 0) {
@@ -6926,6 +7011,20 @@ function draw() {
       ctx.beginPath(); ctx.arc(e.x - 4, e.y - 2 + bob, 2, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.arc(e.x + 4, e.y - 2 - bob, 2, 0, Math.PI * 2); ctx.fill();
     }
+    // amarrado por Oh! Lonesome Me: cuerdas alrededor + icono
+    if (e.tied > 0 && !e.ally) {
+      ctx.strokeStyle = '#cb6';
+      ctx.lineWidth = 3;
+      for (let c = 0; c < 3; c++) {
+        const yy = e.y - e.r * 0.5 + c * e.r * 0.5;
+        ctx.beginPath(); ctx.ellipse(e.x, yy, e.r + 3, e.r * 0.32, 0, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.fillStyle = '#fda';
+      ctx.font = 'bold 12px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('🪢', e.x, e.y - e.r - 12);
+      ctx.textAlign = 'left';
+    }
     // espinas de dinosaurio (aliado dino o infectado)
     if ((e.dino && e.ally) || (e.infected > 0 && !e.ally)) {
       ctx.fillStyle = e.dino ? '#cf6' : '#8e3';
@@ -7196,6 +7295,21 @@ function draw() {
     ctx.setLineDash([4, 6]);
     ctx.beginPath(); ctx.arc(player.x, player.y, 220, 0, Math.PI * 2); ctx.stroke();
     ctx.setLineDash([]);
+  }
+  // cuerda de Oh! Lonesome Me durante el tiron
+  if (lassoTimer > 0) {
+    ctx.strokeStyle = '#cb6';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(player.x, player.y);
+    ctx.lineTo(lassoTX, lassoTY);
+    ctx.stroke();
+    ctx.strokeStyle = '#fda';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(player.x, player.y); ctx.lineTo(lassoTX, lassoTY); ctx.stroke();
+    // lazo en la punta
+    ctx.strokeStyle = '#cb6'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(lassoTX, lassoTY, 12, 0, Math.PI * 2); ctx.stroke();
   }
   const blink = player.iframe > 0 && player.iframe % 8 < 4;
   ctx.fillStyle = blink ? '#fff' : '#9cf';
@@ -10449,9 +10563,11 @@ function closeShop() {
 function renderShop() {
   let html = `<h2>Tienda — 💰 ${player.coins} monedas <span style="float:right; font-size:13px; color:#aa4">Modo: ${mode.toUpperCase()}</span></h2>`;
   html += `<div style="color:#aac; font-size:12px; margin-bottom:10px;">Compra en orden. Cada arma supera a la anterior. Click en el ítem para comprar.</div>`;
-  ABILITIES.forEach((ab, i) => {
+  SHOP_ORDER.forEach((i, pos) => {
+    const ab = ABILITIES[i];
+    const prev = pos === 0 ? -1 : SHOP_ORDER[pos - 1];
     const isOwned = owned.has(i);
-    const canBuy = i === 0 || owned.has(i - 1);
+    const canBuy = pos === 0 || owned.has(prev);
     const c = abilityCost(ab);
     const affordable = player.coins >= c;
     const cls = isOwned ? 'owned' : (!canBuy || !affordable ? 'locked' : '');
@@ -10482,7 +10598,9 @@ function abilityCost(ab) {
 function buyAbility(idx) {
   const ab = ABILITIES[idx];
   if (owned.has(idx)) return;
-  if (idx > 0 && !owned.has(idx - 1)) return;
+  const pos = SHOP_ORDER.indexOf(idx);
+  const prev = pos > 0 ? SHOP_ORDER[pos - 1] : -1;
+  if (prev >= 0 && !owned.has(prev)) return;
   const c = abilityCost(ab);
   if (player.coins < c) return;
   player.coins -= c;
@@ -10543,6 +10661,7 @@ function restart() {
   shieldCharge = SHIELD_MAX; shieldCD = 0; shieldActive = false;
   dashTimer = 0; dashHits = new Set();
   mjForm = 0; mjDashTimer = 0; mjDashHits = new Set(); mjPunchQueue = 0; mjPunchTimer = 0; mjGhosts = [];
+  lassoTimer = 0; lassoHits = new Set();
   apexPhase = 0; apexTimer = 0; apexCD = 0;
   detonateAllCD = 0;
   lesson3CD = 0;
