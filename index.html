@@ -641,6 +641,26 @@ function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 function distSq(a, b) { const dx = a.x - b.x, dy = a.y - b.y; return dx * dx + dy * dy; }
 function angleBetween(a, b) { return Math.atan2(b.y - a.y, b.x - a.x); }
 function aimAngle() { return Math.atan2(mouse.y - player.y, mouse.x - player.x); }
+
+// --- Helpers de efectos (reducen el boilerplate de effects/particles) ---
+function shockwave(x, y, color, life = 18) {
+  effects.push({ type: 'shockwave', x, y, life, max: life, r: 0, color });
+}
+function flashFx(color, life = 14) {
+  effects.push({ type: 'flash', life, max: life, color });
+}
+// Ráfaga de partículas con dispersión aleatoria. color puede ser string o función () => string.
+function burst(x, y, count, color, opts = {}) {
+  const spread = opts.spread ?? 3, life = opts.life ?? 16, r = opts.r ?? 3, jitter = opts.jitter ?? 0;
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x: x + (jitter ? rand(-jitter, jitter) : 0),
+      y: y + (jitter ? rand(-jitter, jitter) : 0),
+      vx: rand(-spread, spread), vy: rand(-spread, spread),
+      life, max: life, color: typeof color === 'function' ? color() : color, r
+    });
+  }
+}
 // Devuelve color + alpha como #RGBA / #RRGGBBAA válido. alpha en [0,1].
 // Concatenar '#fd6' + 'aa' = '#fd6aa' (5 hex = inválido). Esto evita ese bug.
 function withAlpha(color, alpha) {
@@ -1337,8 +1357,8 @@ function updatePlayer() {
   if (active === 18 && tuskAct === 4 && keyPressed['g']) {
     // Espiral Acto 4 — alternar moveset: puños dorados <-> balas hiper-veloces
     tuskForm = tuskForm === 0 ? 1 : 0;
-    effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 18, max: 18, r: 0, color: '#fd6' });
-    effects.push({ type: 'flash', life: 12, max: 12, color: '#fd6' });
+    shockwave(player.x, player.y, '#fd6', 18);
+    flashFx('#fd6', 12);
   }
   if (active === 16 && keyPressed['k'] && mirageCD <= 0 && mudaPhase === 0) {
     // Vida Dorada — INÚTIL INÚTIL INÚTIL: golpiza de vida en área + sobrecarga
@@ -1440,8 +1460,8 @@ function updatePlayer() {
   if (active === 28 && keyPressed['m']) {
     // Rey del Pop — ciclar estilo: Thriller → Paso Lunar → Criminal
     mjForm = (mjForm + 1) % 3;
-    effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 20, max: 20, r: 0, color: MJ_FORM_COLORS[mjForm] });
-    effects.push({ type: 'flash', life: 12, max: 12, color: MJ_FORM_COLORS[mjForm] });
+    shockwave(player.x, player.y, MJ_FORM_COLORS[mjForm], 20);
+    flashFx(MJ_FORM_COLORS[mjForm], 12);
   }
   if (active === 14 && keyPressed['f'] && lesson3CD <= 0) {
     const ang = aimAngle();
@@ -2402,7 +2422,7 @@ function michaelAttack(angle) {
     mjDashHits = new Set();
     player.iframe = Math.max(player.iframe, 26);
     shake = Math.max(shake, 12);
-    effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 22, max: 22, r: 0, color: '#5cf' });
+    shockwave(player.x, player.y, '#5cf', 22);
   } else {
     // CRIMINAL: ráfaga densa de balazos dorados, rápidos y perforantes
     for (let s = -3; s <= 3; s++) {
@@ -2502,7 +2522,7 @@ function raiseZombie(e) {
   e.allyLife = 1800;
   e.danceCD = 0;
   e.danceBob = rand(0, 6.28);
-  effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 18, max: 18, r: 0, color: '#7c4' });
+  shockwave(e.x, e.y, '#7c4', 18);
   for (let p = 0; p < 12; p++) {
     particles.push({
       x: e.x, y: e.y,
@@ -2539,7 +2559,7 @@ function lassoAttack(angle) {
   lassoHits = new Set();
   player.iframe = Math.max(player.iframe, lassoMax + 6);
   shake = Math.max(shake, 8);
-  effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 14, max: 14, r: 0, color: '#cb6' });
+  shockwave(player.x, player.y, '#cb6', 14);
 }
 
 function processLasso() {
@@ -2563,13 +2583,7 @@ function processLasso() {
       }
     }
   }
-  for (let p = 0; p < 3; p++) {
-    particles.push({
-      x: player.x + rand(-6, 6), y: player.y + rand(-6, 6),
-      vx: rand(-1.5, 1.5), vy: rand(-1.5, 1.5),
-      life: 16, max: 16, color: '#cb6', r: 3
-    });
-  }
+  burst(player.x, player.y, 3, '#cb6', { jitter: 6, spread: 1.5 });
   player.x = Math.max(player.r, Math.min(W - player.r, player.x));
   player.y = Math.max(player.r, Math.min(H - player.r, player.y));
   lassoTimer--;
@@ -3705,14 +3719,8 @@ function vortexAttack(angle) {
       }
     }
     effects.push({ type: 'punch', x: tx, y: ty, life: 9, max: 9, color: '#fd6', r: hitR });
-    effects.push({ type: 'shockwave', x: tx, y: ty, life: 14, max: 14, r: 0, color: '#fea' });
-    for (let p = 0; p < 8; p++) {
-      particles.push({
-        x: tx + rand(-10, 10), y: ty + rand(-10, 10),
-        vx: rand(-3, 3), vy: rand(-3, 3),
-        life: 16, max: 16, color: rand(0, 1) > 0.4 ? '#fd6' : '#fff', r: 3
-      });
-    }
+    shockwave(tx, ty, '#fea', 14);
+    burst(tx, ty, 8, () => rand(0, 1) > 0.4 ? '#fd6' : '#fff', { jitter: 10 });
   } else {
     // ACT 4 · BALAS HIPER-VELOCES: doradas, casi invisibles, con orbes girando + estela;
     // al impactar dejan al enemigo en GIRO INFINITO hasta morir.
