@@ -3452,10 +3452,12 @@ function detonateAllEnemies() {
 // Balas Vivientes — 6 balas numeradas (sin el Nº4). Cada disparo suelta las 6
 // balas amarillas numeradas que hacen ricochet de enemigo en enemigo.
 const SEX_PISTOLS_NUMS = [1, 2, 3, 5, 6, 7];
+const SEX_PISTOLS_PER_SHOT = 2;   // cuántas balas por disparo (rotan entre los 6 números)
+let sexPistolsShotIdx = 0;
 function sexPistolsAttack(angle) {
   // fogonazo del cañón
   const mx = player.x + Math.cos(angle) * 22, my = player.y + Math.sin(angle) * 22;
-  for (let s = 0; s < 6; s++) {
+  for (let s = 0; s < 4; s++) {
     particles.push({
       x: mx, y: my,
       vx: Math.cos(angle) * rand(2, 6) + rand(-2, 2),
@@ -3464,14 +3466,16 @@ function sexPistolsAttack(angle) {
     });
   }
   shake = Math.max(shake, 3);
-  // 6 Pistols, cada uno con su número y un ángulo de salida en abanico
-  for (let i = 0; i < 6; i++) {
-    const a = angle + (i - 2.5) * 0.14 + rand(-0.05, 0.05);
+  // 2 Pistols por disparo, rotando entre los 6 números y en abanico corto
+  for (let i = 0; i < SEX_PISTOLS_PER_SHOT; i++) {
+    const a = angle + (i - (SEX_PISTOLS_PER_SHOT - 1) / 2) * 0.16 + rand(-0.05, 0.05);
+    const num = SEX_PISTOLS_NUMS[sexPistolsShotIdx % SEX_PISTOLS_NUMS.length];
+    sexPistolsShotIdx++;
     projectiles.push({
       x: mx, y: my,
       vx: Math.cos(a) * 12, vy: Math.sin(a) * 12,
       r: 7, dmg: 26, life: 110, type: 'pistol', color: '#fd0',
-      num: SEX_PISTOLS_NUMS[i], hits: new Set(), target: null,
+      num, hits: new Set(), target: null,
       trail: [],
     });
   }
@@ -13353,11 +13357,13 @@ function nightSexPistols() {
     nightFx.push({ x: mx, y: my, life: 8, max: 8, color: rand(0, 1) > 0.5 ? '#fd0' : '#fff' });
   }
   raceShake = Math.max(raceShake, 2);
-  for (let i = 0; i < 6; i++) {
-    const a = ang + (i - 2.5) * 0.14 + rand(-0.05, 0.05);
+  for (let i = 0; i < SEX_PISTOLS_PER_SHOT; i++) {
+    const a = ang + (i - (SEX_PISTOLS_PER_SHOT - 1) / 2) * 0.16 + rand(-0.05, 0.05);
+    const num = SEX_PISTOLS_NUMS[sexPistolsShotIdx % SEX_PISTOLS_NUMS.length];
+    sexPistolsShotIdx++;
     nightBullets.push({
       x: mx, y: my, vx: Math.cos(a) * 10, vy: Math.sin(a) * 10,
-      r: 6, life: 120, num: SEX_PISTOLS_NUMS[i],
+      r: 6, life: 120, num,
       target: null, hits: new Set(), bounces: 0, trail: [],
     });
   }
