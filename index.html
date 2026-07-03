@@ -254,7 +254,7 @@ const W = canvas.width, H = canvas.height;
 
 const keys = {};
 const keyPressed = {};
-const mouse = { x: W/2, y: H/2, down: false };
+const mouse = { x: W/2, y: H/2, down: false, rdown: false };
 
 window.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
@@ -272,8 +272,14 @@ function getMousePos(evt) {
   };
 }
 canvas.addEventListener('mousemove', e => { const p = getMousePos(e); mouse.x = p.x; mouse.y = p.y; });
-canvas.addEventListener('mousedown', e => { mouse.down = true; mouse.clicked = true; });
-canvas.addEventListener('mouseup',   e => { mouse.down = false; });
+canvas.addEventListener('mousedown', e => {
+  if (e.button === 2) { mouse.rdown = true; }
+  else { mouse.down = true; mouse.clicked = true; }
+});
+canvas.addEventListener('mouseup',   e => {
+  if (e.button === 2) { mouse.rdown = false; }
+  else { mouse.down = false; }
+});
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 
 canvas.addEventListener('wheel', e => {
@@ -378,15 +384,19 @@ const ABILITIES = [
     desc: 'El nuevo mejor poder: tres estilos que ciclas con M. THRILLER (puños) — combo de golpes ENORMES; cada enemigo que matas se levanta como un ZOMBIE bailarín aliado que ataca a los demás. PASO LUNAR (dash) — embestida hacia adelante con daño devastador, invulnerable y dejando estela de imágenes. CRIMINAL (balazos) — ráfaga densa de 7 disparos dorados súper rápidos y perforantes. Pulsa M para rotar entre los tres estilos.', color: '#e33' },
   { id: 'lonesome', name: 'Oh! Lonesome Me (Cuerda)', cost: 300,
     desc: 'Lanza una cuerda hacia el cursor: se engancha donde cae y te jala hasta ahi como un dash, danando a los enemigos en el camino. Quien sobreviva al tiron queda AMARRADO 5s sin poder moverse.', color: '#cb6' },
+  { id: 'pistols', name: 'Balas Vivientes', cost: 470,
+    desc: 'Pistola de disparo rapido. Cada disparo suelta 6 balas amarillas vivientes numeradas Nº1, 2, 3, 5, 6 y 7 (sin el 4). Cada una hace RICOCHET: busca al enemigo mas cercano, lo golpea y rebota al siguiente, con daño que crece en cada rebote. Se espamean muchisimo.', color: '#fd0' },
 ];
 
 // Orden de la TIENDA (y de la cadena de compra), desacoplado del indice de juego.
-// Coloca 'Oh! Lonesome Me' (29) un puesto ANTES de 'Pelota de Acero' (indice 14).
+// Coloca 'Oh! Lonesome Me' (29) un puesto ANTES de 'Pelota de Acero' (indice 14)
+// y 'Balas Vivientes' (30) un puesto ANTES de 'Pernos Letales' (indice 9).
 const SHOP_ORDER = (() => {
   const o = [];
   for (let i = 0; i < ABILITIES.length; i++) {
-    if (i === 29) continue;        // se coloca manualmente abajo
-    if (i === 14) o.push(29);      // un puesto ANTES de Pelota de Acero
+    if (i === 29 || i === 30) continue;   // se colocan manualmente
+    if (i === 9)  o.push(30);             // Balas Vivientes antes de Pernos Letales
+    if (i === 14) o.push(29);             // Oh! Lonesome Me antes de Pelota de Acero
     o.push(i);
   }
   return o;
@@ -2075,6 +2085,7 @@ function getAttackCD() {
   if (active === 27) return isNightWave(wave) ? 180 : 320;
   if (active === 28) return [240, 650, 90][mjForm];
   if (active === 29) return 360;
+  if (active === 30) return 13;   // Balas Vivientes: disparo muy rápido (spam)
   return [340, 260, 500, 0, 280, 320, 600, 300, 200, 260, 280, 700, 280, 280, 360, 380, 520, 240, 250, 320, 520, 250, 380, 320, 110, 320][active];
 }
 
@@ -2115,6 +2126,7 @@ function doAttack() {
     case 27: paintItBlackAttack(a); break;
     case 28: michaelAttack(a); break;
     case 29: lassoAttack(a); break;
+    case 30: sexPistolsAttack(a); break;
   }
 }
 
@@ -3435,6 +3447,34 @@ function detonateAllEnemies() {
   // Bonus thematic: cura 30% HP al cerrar el bucle
   player.hp = Math.min(player.maxHp, player.hp + player.maxHp * 0.3);
   effects.push({ type: 'heal', life: 40, max: 40 });
+}
+
+// Balas Vivientes — 6 balas numeradas (sin el Nº4). Cada disparo suelta las 6
+// balas amarillas numeradas que hacen ricochet de enemigo en enemigo.
+const SEX_PISTOLS_NUMS = [1, 2, 3, 5, 6, 7];
+function sexPistolsAttack(angle) {
+  // fogonazo del cañón
+  const mx = player.x + Math.cos(angle) * 22, my = player.y + Math.sin(angle) * 22;
+  for (let s = 0; s < 6; s++) {
+    particles.push({
+      x: mx, y: my,
+      vx: Math.cos(angle) * rand(2, 6) + rand(-2, 2),
+      vy: Math.sin(angle) * rand(2, 6) + rand(-2, 2),
+      life: 12, max: 12, color: rand(0, 1) > 0.5 ? '#fd0' : '#fff', r: 2
+    });
+  }
+  shake = Math.max(shake, 3);
+  // 6 Pistols, cada uno con su número y un ángulo de salida en abanico
+  for (let i = 0; i < 6; i++) {
+    const a = angle + (i - 2.5) * 0.14 + rand(-0.05, 0.05);
+    projectiles.push({
+      x: mx, y: my,
+      vx: Math.cos(a) * 12, vy: Math.sin(a) * 12,
+      r: 7, dmg: 26, life: 110, type: 'pistol', color: '#fd0',
+      num: SEX_PISTOLS_NUMS[i], hits: new Set(), target: null,
+      trail: [],
+    });
+  }
 }
 
 // 25. Pernos Letales — pernos que se clavan en enemigos
@@ -5487,6 +5527,55 @@ function updateProjectiles() {
           if (j < i) i--; // ajustar índice externo
         }
       }
+    } else if (p.type === 'pistol') {
+      // Balas Vivientes: RICOCHET teledirigido de enemigo en enemigo, con daño creciente.
+      if (p.hitCD > 0) p.hitCD--;
+      let needNew = !p.target || p.target.dead || p.target.ally || p.target.hp <= 0 || p.hits.has(p.target.id);
+      if (needNew) {
+        let nearest = null, bestSq = 1e18;
+        for (let j = 0; j < enemies.length; j++) {
+          const e = enemies[j];
+          if (e.ally || p.hits.has(e.id)) continue;
+          const dSq = distSq(e, p);
+          if (dSq < bestSq) { bestSq = dSq; nearest = e; }
+        }
+        // si ya rebotó en todos, resetea memoria para seguir golpeando (sostén en jefes / pocos enemigos)
+        if (!nearest) {
+          for (let j = 0; j < enemies.length; j++) {
+            const e = enemies[j];
+            if (e.ally) continue;
+            const dSq = distSq(e, p);
+            if (dSq < bestSq) { bestSq = dSq; nearest = e; }
+          }
+          if (nearest) p.hits.clear();
+        }
+        p.target = nearest;
+      }
+      if (p.target) {
+        const ang = angleBetween(p, p.target);
+        const sp = 13;
+        p.vx = p.vx * 0.8 + Math.cos(ang) * sp * 0.4;
+        p.vy = p.vy * 0.8 + Math.sin(ang) * sp * 0.4;
+      }
+      if (p.hitCD <= 0) {
+        for (let j = 0; j < enemies.length; j++) {
+          const e = enemies[j];
+          if (e.ally || p.hits.has(e.id)) continue;
+          const rr = e.r + p.r;
+          if (distSq(e, p) < rr * rr) {
+            damageEnemy(e, p.dmg, '#fd0');
+            p.hits.add(e.id);
+            p.dmg = Math.min(p.dmg * 1.18, 130);  // el rebote acumula fuerza (cap)
+            p.hitCD = 6;                           // no golpear al mismo objetivo cada frame
+            p.target = null;                       // rebota: busca el siguiente
+            effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 10, max: 10, r: 0, color: '#fd0' });
+            for (let s = 0; s < 4; s++) {
+              particles.push({ x: e.x, y: e.y, vx: rand(-3, 3), vy: rand(-3, 3), life: 14, max: 14, color: rand(0, 1) > 0.5 ? '#fd0' : '#fff', r: 2 });
+            }
+            break;
+          }
+        }
+      }
     } else {
       for (let j = 0; j < enemies.length; j++) {
         const e = enemies[j];
@@ -6304,6 +6393,22 @@ function draw() {
       ctx.lineWidth = 0.8;
       ctx.strokeRect(-12, -2, 7, 4);
       ctx.restore();
+    }
+    if (p.type === 'pistol') {
+      // bolita amarilla numerada (una de las Balas Vivientes)
+      const g = ctx.createRadialGradient(p.x - 2, p.y - 2, 1, p.x, p.y, p.r + 2);
+      g.addColorStop(0, '#ffe');
+      g.addColorStop(0.6, '#fd0');
+      g.addColorStop(1, '#c90');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#630'; ctx.lineWidth = 1.5; ctx.stroke();
+      // número
+      ctx.fillStyle = '#402000';
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(String(p.num), p.x, p.y + 0.5);
+      ctx.textBaseline = 'alphabetic';
     }
     if (p.type === 'nutbolt') {
       // perno hexagonal con highlight
@@ -11018,6 +11123,28 @@ const NPC_PALETTE = ['#a33','#dd9','#fc4','#f8a','#cb6','#8cf','#6cf','#f6c','#c
 // Habilidades cíclicas (cada participante recibe una según su número):
 // scratch / sand / luck / cream / lasso / steelball
 const NPC_ABIL_CYCLE = ['scratch', 'sand', 'luck', 'cream', 'lasso', 'steelball'];
+// Rivales canónicos de Steel Ball Run por habilidad (con nombres extra si se repite).
+const NPC_RIVAL_NAMES = {
+  scratch:   ['Diego Brando', 'Dr. Ferdinand', 'Diego (D4C)'],
+  sand:      ['Sandman', 'Soundman', 'Sand Runner'],
+  luck:      ['Pocoloco', 'Andre Boom', 'Fortune'],
+  cream:     ['Hot Pants', 'Sor. Blackmore', 'Cream Jinete'],
+  lasso:     ['Mountain Tim', 'Mrs. Robinson', 'Lazo Errante'],
+  steelball: ['Wekapipo', 'Magenta Magenta', 'Bola Rival'],
+};
+// Color e identidad de cada rival según su habilidad.
+const NPC_ABIL_COLOR = {
+  scratch: '#d43', sand: '#dca', luck: '#fc4', cream: '#f8a', lasso: '#cb6', steelball: '#8cf',
+};
+// Personalidad: sesgo de velocidad y agresividad (mult. de cadencia de ataque; <1 = ataca más seguido).
+const NPC_ABIL_TRAITS = {
+  scratch:   { spd: 0.9,  aggro: 0.7 },   // Diego: veloz y agresivo
+  sand:      { spd: 0.2,  aggro: 1.0 },
+  luck:      { spd: 0.0,  aggro: 1.15 },  // Pocoloco: errático
+  cream:     { spd: 0.1,  aggro: 1.0 },
+  lasso:     { spd: 0.3,  aggro: 0.95 },
+  steelball: { spd: 0.5,  aggro: 0.85 },  // Wekapipo: constante y peligroso
+};
 
 const racePlayer = {
   x: W / 2, y: H - 180,
@@ -11036,6 +11163,8 @@ const racePlayer = {
   // stand encontrado en las salas (reemplaza el arma como click). null = usar arma inicial.
   stand: null,
   standCD: 0,
+  standKills: 0,       // kills acumulados con el stand actual (para el despertar)
+  standAwakened: false,// despertar: forma base primero, se gana con kills (canon JoJo)
   lassoSlow: 0,    // frames con velocidad reducida por un lazo
   sandStun: 0,     // frames con control reducido
   scratchDot: 0,   // frames con sangrado
@@ -11065,6 +11194,7 @@ const RACE_STAND_POOL = [
   { id: 'breaker',     name: 'Puños Rompedores',   weight: 24, attack: 'burst',   dmg: 10, cd: 14, color: '#f8c' },
   { id: 'arrow',       name: 'Flechas Perforantes',weight: 22, attack: 'standarrow', dmg: 16, cd: 18, color: '#cf8' },
   { id: 'nutking',     name: 'Pernos Letales',      weight: 20, attack: 'ironbolt', dmg: 12, cd: 16, color: '#c97' },
+  { id: 'pistols',     name: 'Balas Vivientes',     weight: 18, attack: 'pistols', dmg: 14, cd: 14, color: '#fd0' },
   // --- poco comunes ---
   { id: 'rain',        name: 'Tormenta Torrencial',      weight: 14, attack: 'rainstrike', dmg: 11, cd: 22, color: '#69c' },
   { id: 'flurry',      name: 'Frenesí de Estocadas', weight: 14, attack: 'flurry', dmg: 14, cd: 16, color: '#fef' },
@@ -11109,6 +11239,33 @@ function standCanTimestop(stand) {
   return !!(stand && stand.timestop);
 }
 
+// Kills necesarios para DESPERTAR el stand (canon: forma base primero, despertar ganado con kills).
+const RACE_STAND_AWAKEN_KILLS = 12;
+
+// Suma un kill al stand equipado y lo despierta al llegar al umbral.
+function raceAddStandKill() {
+  const st = racePlayer.stand;
+  if (!st || racePlayer.standAwakened) return;
+  racePlayer.standKills++;
+  if (racePlayer.standKills >= RACE_STAND_AWAKEN_KILLS) {
+    racePlayer.standAwakened = true;
+    raceFlashTimer = 34; raceFlashColor = st.color;
+    raceShake = Math.max(raceShake, 8);
+    raceKillMessage = `⚡ ¡${st.name} HA DESPERTADO! +daño / -recarga`;
+    raceKillMessageTimer = 200;
+    // estallido dorado alrededor del jugador
+    for (let k = 0; k < 40; k++) {
+      const a = rand(0, Math.PI * 2), sp = rand(2, 7);
+      raceParticles.push({
+        x: racePlayer.x, y: racePlayer.y,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        life: 44, color: k & 1 ? '#fd6' : st.color, size: rand(3, 5)
+      });
+    }
+    raceParticles.push({ x: racePlayer.x, y: racePlayer.y, vx: 0, vy: 0, life: 26, color: '#fd6', ring: true, r: 8, growth: 5 });
+  }
+}
+
 const raceNPCs = [];
 const raceProjectiles = []; // {x, y, vx, vy, kind, dmg, life, owner}
 const raceArrows = [];      // {progress, x, used}
@@ -11119,6 +11276,10 @@ let raceStageDist = 0;
 let raceStageTimer = 0;
 let raceFlashTimer = 0;
 let raceFlashColor = '#fff';
+let raceShake = 0;          // temblor de pantalla en carrera (decae solo)
+let raceDustCD = 0;         // cadencia del polvo del desierto
+let raceFinalStretch = false; // true en el último tramo: rivales aceleran y atacan más
+let raceFinalAnnounced = false; // para anunciar la recta final una sola vez
 let raceKillMessage = '';
 let raceKillMessageTimer = 0;
 
@@ -11141,6 +11302,8 @@ function startRaceMode() {
   racePlayer.stamina = 100; racePlayer.maxStamina = 100;
   racePlayer.exhausted = false;
   racePlayer.stand = null;
+  racePlayer.standKills = 0;
+  racePlayer.standAwakened = false;
   racePlayer.standCD = 0;
   racePlayer.mihBoost = 0;
   racePlayer.lassoSlow = 0;
@@ -11195,20 +11358,32 @@ function setupRaceStage() {
   raceArrows.length = 0;
   raceObstacles.length = 0;
   raceStageTimer = 0;
+  raceFinalStretch = false;
+  raceFinalAnnounced = false;
+  raceShake = 0;
+  raceDustCD = 0;
 
   // NPCs numerados — muchos participantes, todos duros
   raceNPCs.length = 0;
   const npcBase = 5.4 + raceStage * 0.30;
+  const abilSeen = {};
   for (let i = 0; i < NPC_COUNT; i++) {
+    const abil = NPC_ABIL_CYCLE[i % NPC_ABIL_CYCLE.length];
+    const idx = abilSeen[abil] = (abilSeen[abil] || 0);
+    abilSeen[abil]++;
+    const names = NPC_RIVAL_NAMES[abil] || [`#${i + 1}`];
+    const nm = names[idx] || `${names[0]} ${idx + 1}`;
+    const trait = NPC_ABIL_TRAITS[abil] || { spd: 0, aggro: 1 };
     raceNPCs.push({
-      name: `#${i + 1}`,
-      color: NPC_PALETTE[i % NPC_PALETTE.length],
-      ability: NPC_ABIL_CYCLE[i % NPC_ABIL_CYCLE.length],
+      name: nm,
+      ability: abil,
+      color: NPC_ABIL_COLOR[abil] || NPC_PALETTE[i % NPC_PALETTE.length],
+      aggro: trait.aggro,
       lane: i % 3,
       x: RACE_LANES[i % 3] + rand(-40, 40),
       progress: rand(80, 460),
-      speed: npcBase + rand(-0.2, 1.0),
-      baseSpeed: npcBase + rand(-0.2, 0.7),
+      speed: npcBase + trait.spd + rand(-0.2, 1.0),
+      baseSpeed: npcBase + trait.spd + rand(-0.2, 0.7),
       hp: 90 + raceStage * 18, maxHp: 90 + raceStage * 18,
       stamina: 100, maxStamina: 100,
       exhausted: false,
@@ -11322,6 +11497,7 @@ function updateRaceWeaponSelect() {
 
 function updateRaceRacing() {
   const timeStopped = raceTimeStopTimer > 0;
+  const prevHp = racePlayer.hp;   // para detectar daño y disparar shake/flash
   if (raceTimeStopTimer > 0) raceTimeStopTimer--;
   if (raceTimeStopCD > 0) raceTimeStopCD--;
   if (raceKillMessageTimer > 0) raceKillMessageTimer--;
@@ -11389,7 +11565,7 @@ function updateRaceRacing() {
         n.stunned = Math.max(n.stunned, 22);
         n.slowTimer = Math.max(n.slowTimer, 60);
         n.hp -= 10;
-        spawnRaceImpact(n.x, sy, '#6cf');
+        spawnRaceImpact(n.x, sy, '#6cf', 1.5, n);
       }
     }
     // estela
@@ -11447,6 +11623,20 @@ function updateRaceRacing() {
   fwd = Math.max(0.4, fwd);
   if (racePlayer.dashTimer > 0) { fwd += 6.5; racePlayer.dashTimer--; }
 
+  // polvo de la pista levantado por los cascos (más cuanto más rápido)
+  if (raceDustCD > 0) raceDustCD--;
+  if (fwd > racePlayer.baseSpeed * 0.9 && raceDustCD <= 0) {
+    raceDustCD = 3;
+    const dustCol = () => (Math.random() < 0.5 ? '#c9a26b' : '#b8905a');
+    for (let d = 0; d < 2; d++) {
+      raceParticles.push({
+        x: racePlayer.x + rand(-14, 14), y: racePlayer.y + 22,
+        vx: rand(-1.2, 1.2), vy: rand(0.5, 2), life: 20,
+        color: dustCol(), size: rand(3, 6)
+      });
+    }
+  }
+
   // ---- DRAFTING (rebufo tipo Mario Kart) ----
   let drafting = false;
   for (const n of raceNPCs) {
@@ -11483,6 +11673,7 @@ function updateRaceRacing() {
 
   // ---- NPCs ----
   for (const n of raceNPCs) {
+    if (n.hitFlash > 0) n.hitFlash--;
     // sangrado (DoT) sigue corriendo aunque esté aturdido / tiempo detenido
     if (n.bleed && n.bleed > 0) {
       n.bleed--;
@@ -11549,6 +11740,10 @@ function updateRaceRacing() {
     let sp = n.speed * (0.97 + Math.random() * 0.06);
     if (n.slowTimer > 0) { sp *= 0.45; n.slowTimer--; }
     if (n.arrowBoost > 0) { sp += 1.2; n.arrowBoost--; }
+    // recta final: todos los rivales dan el último tirón (más si van rezagados: emoción, no injusto)
+    if (raceFinalStretch && n.slowTimer <= 0) {
+      sp += n.progress < racePlayer.progress ? 1.3 : 0.7;
+    }
 
     // ---- RESISTENCIA del caballo del NPC ----
     // Drena al correr; recupera más si está aturdido o ralentizado.
@@ -11659,7 +11854,7 @@ function updateRaceRacing() {
           break;
         }
         case 'steelball': {
-          // Gyro: bola espiral homing al jugador
+          // Wekapipo/Gyro: bola espiral homing al jugador
           if (dist < 460) {
             const ang = Math.atan2(-dy, -dx);
             raceProjectiles.push({
@@ -11673,6 +11868,10 @@ function updateRaceRacing() {
           break;
         }
       }
+      // personalidad: los rivales agresivos atacan más seguido; en la RECTA FINAL todos aceleran su cadencia
+      let aggroMul = n.aggro || 1;
+      if (raceFinalStretch) aggroMul *= 0.65;
+      n.attackCD = Math.round(n.attackCD * aggroMul);
     }
   }
 
@@ -11771,8 +11970,11 @@ function updateRaceRacing() {
       shake = Math.max(shake, 8);
       raceFlashTimer = Math.max(raceFlashTimer, 10);
       raceFlashColor = '#f44';
-      raceKillMessage = `Participante ${n.name} eliminado`;
-      raceKillMessageTimer = 120;
+      if (!raceKillMessageTimer || raceKillMessageTimer < 100) {
+        raceKillMessage = `Participante ${n.name} eliminado`;
+        raceKillMessageTimer = 120;
+      }
+      raceAddStandKill();
       raceNPCs.splice(i, 1);
     }
   }
@@ -11782,10 +11984,29 @@ function updateRaceRacing() {
   for (const n of raceNPCs) if (n.progress > racePlayer.progress) rank++;
   racePlayer.rank = rank;
 
+  // ---- RECTA FINAL: último 22% de la pista ----
+  raceFinalStretch = racePlayer.progress > raceStageDist * 0.78;
+  if (raceFinalStretch && !raceFinalAnnounced) {
+    raceFinalAnnounced = true;
+    raceKillMessage = '🏁 ¡RECTA FINAL! Los rivales lo dan todo';
+    raceKillMessageTimer = 180;
+    raceFlashTimer = Math.max(raceFlashTimer, 18); raceFlashColor = '#fd6';
+    raceShake = Math.max(raceShake, 6);
+  }
+
+  // ---- feedback de daño recibido (cualquier fuente) ----
+  if (racePlayer.hp < prevHp && racePlayer.hp > 0) {
+    const dmgTaken = prevHp - racePlayer.hp;
+    raceShake = Math.max(raceShake, Math.min(9, 2 + dmgTaken * 0.4));
+    raceFlashTimer = Math.max(raceFlashTimer, 12); raceFlashColor = '#f33';
+    spawnRaceImpact(racePlayer.x, racePlayer.y, '#f44', Math.min(2, 0.8 + dmgTaken * 0.08));
+  }
+
   // ---- fin de etapa / muerte ----
   if (racePlayer.progress >= raceStageDist) {
     finishRaceStage(true);
   } else if (racePlayer.hp <= 0) {
+    raceShake = Math.max(raceShake, 12);
     finishRaceStage(false);
   }
 
@@ -11843,14 +12064,25 @@ function doRaceAttack() {
   }
 }
 
-function spawnRaceImpact(x, y, color) {
-  for (let i = 0; i < 8; i++) {
+// Impacto de carrera con "juice": núcleo brillante + esquirlas + anillo de choque.
+// power escala el tamaño/cantidad; con power>=1.5 añade temblor de pantalla.
+// Si se pasa target (un NPC), lo marca para el flash blanco de golpe.
+function spawnRaceImpact(x, y, color, power = 1, target = null) {
+  // núcleo brillante que se apaga rápido
+  raceParticles.push({ x, y, vx: 0, vy: 0, life: 9, color: '#fff', size: 6 * power, ring: false });
+  // esquirlas radiales
+  const n = Math.round(8 * power);
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, Math.PI * 2), sp = rand(1.5, 4.5) * power;
     raceParticles.push({
-      x, y,
-      vx: rand(-3, 3), vy: rand(-3, 3),
-      life: 22, color, size: 3
+      x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1.2,
+      life: 22, color, size: rand(2, 4)
     });
   }
+  // anillo de choque expansivo
+  raceParticles.push({ x, y, vx: 0, vy: 0, life: 15, color, size: 3, ring: true, r: 5, growth: 3.4 * power });
+  if (power >= 1.5) raceShake = Math.max(raceShake, 3.5 * power);
+  if (target) target.hitFlash = 8;
 }
 
 // ============================================================
@@ -11859,8 +12091,10 @@ function spawnRaceImpact(x, y, color) {
 function doRaceStandAttack() {
   const stand = racePlayer.stand;
   const ang = racePlayer.facingAngle;
-  const cd = stand.cd;
-  const dmg = stand.dmg;
+  const awake = racePlayer.standAwakened;
+  // despertado: +35% daño, -30% recarga (canon: la forma despierta es más fuerte)
+  const cd = awake ? Math.round(stand.cd * 0.7) : stand.cd;
+  const dmg = awake ? Math.round(stand.dmg * 1.35) : stand.dmg;
   const col = stand.color;
 
   switch (stand.attack) {
@@ -11870,6 +12104,20 @@ function doRaceStandAttack() {
         vx: Math.cos(ang) * 14, vy: Math.sin(ang) * 14,
         kind: 'standBullet', dmg, life: 70, color: col, owner: 'player',
       });
+      break;
+    }
+    case 'pistols': {
+      // Balas Vivientes: 6 balas numeradas (sin el 4) que hacen ricochet entre NPCs
+      const NUMS = [1, 2, 3, 5, 6, 7];
+      for (let i = 0; i < 6; i++) {
+        const a = ang + (i - 2.5) * 0.14 + rand(-0.05, 0.05);
+        raceProjectiles.push({
+          x: racePlayer.x, y: racePlayer.y,
+          vx: Math.cos(a) * 12, vy: Math.sin(a) * 12,
+          kind: 'pistolBall', dmg, life: 95, color: col, owner: 'player',
+          ricochet: true, homing: 0.6, hits: new Set(), target: null, num: NUMS[i],
+        });
+      }
       break;
     }
     case 'spread': {
@@ -12539,6 +12787,8 @@ function updateRaceProjectiles() {
   const sb = racePlayer.steelBallActive;
   if (sb) {
     sb.life++;
+    (sb.trail || (sb.trail = [])).push({ x: sb.x, y: sb.y });
+    if (sb.trail.length > 9) sb.trail.shift();
     const sbDmg = sb.dmg || 14;
     const sbCol = sb.color || '#cde';
     if (sb.phase === 'out') {
@@ -12563,7 +12813,7 @@ function updateRaceProjectiles() {
           n.stunned = 14;
           n.slowTimer = 60;
           sb.hits.add(n);
-          spawnRaceImpact(n.x, sy, sbCol);
+          spawnRaceImpact(n.x, sy, sbCol, 1.6, n);
         }
       }
       if (sb.life > 50 || sb.x < 20 || sb.x > W - 20 || sb.y < 20 || sb.y > H - 20) {
@@ -12586,7 +12836,7 @@ function updateRaceProjectiles() {
           n.stunned = 14;
           n.slowTimer = 60;
           sb.hits.add(n);
-          spawnRaceImpact(n.x, sy, sbCol);
+          spawnRaceImpact(n.x, sy, sbCol, 1.6, n);
         }
       }
       if (d < 30) racePlayer.steelBallActive = null;
@@ -12619,6 +12869,30 @@ function updateRaceProjectiles() {
       }
       if (p.life <= 0) raceProjectiles.splice(i, 1);
       continue;
+    }
+
+    // ricochet (Balas Vivientes): (re)elige el NPC más cercano no golpeado
+    if (p.ricochet) {
+      if (!p.target || p.target.hp <= 0 || (p.hits && p.hits.has(p.target))) {
+        let best = null, bd = 1e9;
+        for (const n of raceNPCs) {
+          if (n.hp <= 0 || (p.hits && p.hits.has(n))) continue;
+          const sy = raceScreenY(n.progress);
+          const d = Math.hypot(n.x - p.x, sy - p.y);
+          if (d < bd) { bd = d; best = n; }
+        }
+        // si ya rebotó en todos, resetea memoria para seguir golpeando
+        if (!best && p.hits) {
+          p.hits.clear();
+          for (const n of raceNPCs) {
+            if (n.hp <= 0) continue;
+            const sy = raceScreenY(n.progress);
+            const d = Math.hypot(n.x - p.x, sy - p.y);
+            if (d < bd) { bd = d; best = n; }
+          }
+        }
+        p.target = best;
+      }
     }
 
     // homing
@@ -12696,6 +12970,12 @@ function updateRaceProjectiles() {
           if (p.bleedOnHit) n.bleed = Math.max(n.bleed || 0, p.bleedOnHit);
           if (p.slowOnHit) n.slowTimer = Math.max(n.slowTimer, p.slowOnHit);
           if (p.healOnHit) racePlayer.hp = Math.min(racePlayer.maxHp, racePlayer.hp + p.healOnHit);
+          if (p.ricochet && p.hits) {
+            p.hits.add(n);
+            p.dmg = Math.min(p.dmg * 1.15, 80); // el rebote acumula fuerza (cap)
+            p.target = null;                    // rebota: busca el siguiente
+            continue;
+          }
           if (p.pierce && p.hits) { p.hits.add(n); continue; }
           hit = true;
           break;
@@ -12760,11 +13040,16 @@ function updateRaceProjectiles() {
 }
 
 function updateRaceParticles() {
+  if (raceShake > 0.3) raceShake *= 0.86; else raceShake = 0;
   for (let i = raceParticles.length - 1; i >= 0; i--) {
     const p = raceParticles[i];
-    p.x += p.vx;
-    p.y += p.vy;
-    p.vy += 0.08;
+    if (p.ring) {
+      p.r += p.growth || 3;   // los anillos crecen y no caen
+    } else {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.08;
+    }
     p.life--;
     if (p.life <= 0) raceParticles.splice(i, 1);
   }
@@ -12786,7 +13071,7 @@ function finishRaceStage(success) {
 // Pequeño mapa cenital con varias salas; una es el campamento (descansas),
 // las demás se pueden registrar buscando partes del Santo Cadáver.
 // 30% de probabilidad por sala. Cada hallazgo otorga un Stand aleatorio (por rareza).
-const raceMapPlayer = { x: 0, y: 0, vx: 0, vy: 0, facing: -Math.PI / 2, iframe: 0, attackCD: 0, swing: 0 };
+const raceMapPlayer = { x: 0, y: 0, vx: 0, vy: 0, facing: -Math.PI / 2, iframe: 0, attackCD: 0, swing: 0, bulletCD: 0 };
 let raceRooms = [];           // {x, y, w, h, kind, spot, label, searched, found, part, stand, guards, cleared}
 let raceRoomMsg = '';
 let raceRoomMsgTimer = 0;
@@ -12796,6 +13081,8 @@ let raceRoomLastFoundPart = null;
 let nightEnemies = [];        // guardias del trozo durante un combate
 let nightCombat = null;       // sala cuyo combate está activo (o null)
 let nightFx = [];             // chispas de impacto del mini-mapa
+let nightProjectiles = [];    // disparos de los guardias tiradores
+let nightBullets = [];        // Balas Vivientes del jugador (ricochet) en el combate SBR
 
 // Cuántos guardias protegen un trozo según la rareza del Poder (peso menor = mejor = más guardias)
 function guardCountForStand(s) {
@@ -12873,6 +13160,7 @@ function startRaceNight() {
   nightEnemies = [];
   nightCombat = null;
   nightFx = [];
+  nightBullets = [];
   const searchRooms = raceRooms.filter(r => r.kind === 'search');
   const isLastNight = raceNightsDone === RACE_STAGES - 1;
   const noneYet = raceCollectedParts.length === 0;
@@ -12926,6 +13214,7 @@ function updateRaceNight() {
   raceMapPlayer.facing = Math.atan2(mouse.y - raceMapPlayer.y, mouse.x - raceMapPlayer.x);
 
   if (raceMapPlayer.attackCD > 0) raceMapPlayer.attackCD--;
+  if (raceMapPlayer.bulletCD > 0) raceMapPlayer.bulletCD--;
   if (raceMapPlayer.swing > 0) raceMapPlayer.swing--;
   if (raceMapPlayer.iframe > 0) raceMapPlayer.iframe--;
   if (raceRoomMsgTimer > 0) raceRoomMsgTimer--;
@@ -12934,6 +13223,7 @@ function updateRaceNight() {
   // ---- combate por un trozo ----
   if (nightCombat) {
     if (mouse.down) nightAttack();
+    if (mouse.rdown) nightSexPistols();
     updateNightCombat();
     return;
   }
@@ -12982,25 +13272,51 @@ function updateRaceNight() {
   }
 }
 
+// Tipos de guardia nocturno: perfiles de stat + comportamiento.
+const NIGHT_ENEMY_TYPES = {
+  grunt:   { r: 12, hpMul: 1.0,  spdMul: 1.0, touchDmg: 6,  color: '#c55', label: '' },
+  runner:  { r: 10, hpMul: 0.55, spdMul: 1.9, touchDmg: 4,  color: '#5c8', label: '' },   // rápido y frágil
+  brute:   { r: 19, hpMul: 2.2,  spdMul: 0.55, touchDmg: 13, color: '#96f', label: '' },  // lento, tanque, pega duro
+  shooter: { r: 11, hpMul: 0.8,  spdMul: 0.7, touchDmg: 5,  color: '#fa4', label: '', ranged: true }, // dispara a distancia
+};
+
 function startNightCombat(room) {
   nightCombat = room;
+  nightBullets = [];
+  raceMapPlayer.bulletCD = 0;
   nightEnemies = [];
+  nightProjectiles = [];
   const cx = room.x + room.w / 2, cy = room.y + room.h / 2;
   const tier = room.stand ? room.stand.weight : 20;
   const baseHp = 26 + Math.max(0, 20 - tier) * 4;   // más raro (peso bajo) = más HP
   const spd = 1.2 + Math.max(0, 14 - tier) * 0.06;
+  const rare = tier <= 8;   // salas raras traen más brutos y tiradores
   for (let i = 0; i < room.guards; i++) {
     const a = (i / room.guards) * Math.PI * 2 + Math.random();
     const d = 50 + Math.random() * 70;
+    // reparto de tipos: siempre algunos grunts; brutos/tiradores/runners para dar variedad
+    let type = 'grunt';
+    const roll = Math.random();
+    if (i === 0 && room.guards >= 5) type = 'brute';               // un tanque garantizado en grupos grandes
+    else if (roll < (rare ? 0.22 : 0.12)) type = 'brute';
+    else if (roll < (rare ? 0.48 : 0.34)) type = 'shooter';
+    else if (roll < (rare ? 0.70 : 0.58)) type = 'runner';
+    const t = NIGHT_ENEMY_TYPES[type];
+    const hp = Math.round(baseHp * t.hpMul);
     nightEnemies.push({
       x: Math.max(70, Math.min(W - 70, cx + Math.cos(a) * d)),
       y: Math.max(120, Math.min(H - 40, cy + Math.sin(a) * d)),
-      vx: 0, vy: 0, r: 12, hp: baseHp, maxHp: baseHp,
-      speed: spd + Math.random() * 0.5, touchCD: 0,
-      color: tier <= 5 ? '#d4f' : (tier <= 10 ? '#f84' : '#b66'),
+      vx: 0, vy: 0, r: t.r, hp, maxHp: hp,
+      speed: (spd + Math.random() * 0.5) * t.spdMul, touchCD: 0,
+      type, touchDmg: t.touchDmg, ranged: !!t.ranged, shootCD: rand(40, 120),
+      wob: Math.random() * Math.PI * 2,
+      color: t.color,
     });
   }
-  raceRoomMsg = `⚔ ${room.guards} guardias protegen ${room.part}. ¡Acaba con todos! (click para atacar)`;
+  const brutes = nightEnemies.filter(e => e.type === 'brute').length;
+  const shooters = nightEnemies.filter(e => e.type === 'shooter').length;
+  raceRoomMsg = `⚔ ${room.guards} guardias protegen ${room.part}` +
+    (brutes || shooters ? ` (${brutes}🛡 ${shooters}🏹)` : '') + '. ¡Acaba con todos!';
   raceRoomMsgTimer = 300;
   raceFlashTimer = 14; raceFlashColor = '#f44';
 }
@@ -13013,7 +13329,8 @@ function nightAttack() {
   const reach = 52, hitR = 46;
   const tx = raceMapPlayer.x + Math.cos(ang) * reach;
   const ty = raceMapPlayer.y + Math.sin(ang) * reach;
-  const dmg = racePlayer.stand ? Math.max(16, racePlayer.stand.dmg + 6) : 18;
+  let dmg = racePlayer.stand ? Math.max(16, racePlayer.stand.dmg + 6) : 18;
+  if (racePlayer.standAwakened) dmg = Math.round(dmg * 1.35);
   for (const e of nightEnemies) {
     if (Math.hypot(e.x - tx, e.y - ty) < hitR + e.r) {
       e.hp -= dmg;
@@ -13024,37 +13341,168 @@ function nightAttack() {
   }
 }
 
+// Balas Vivientes en el combate SBR: 6 balas numeradas (sin el Nº4) con ricochet.
+function nightSexPistols() {
+  if (raceMapPlayer.bulletCD > 0) return;
+  raceMapPlayer.bulletCD = 13;
+  const ang = raceMapPlayer.facing;
+  const mx = raceMapPlayer.x + Math.cos(ang) * 16;
+  const my = raceMapPlayer.y + Math.sin(ang) * 16;
+  // fogonazo
+  for (let s = 0; s < 4; s++) {
+    nightFx.push({ x: mx, y: my, life: 8, max: 8, color: rand(0, 1) > 0.5 ? '#fd0' : '#fff' });
+  }
+  raceShake = Math.max(raceShake, 2);
+  for (let i = 0; i < 6; i++) {
+    const a = ang + (i - 2.5) * 0.14 + rand(-0.05, 0.05);
+    nightBullets.push({
+      x: mx, y: my, vx: Math.cos(a) * 10, vy: Math.sin(a) * 10,
+      r: 6, life: 120, num: SEX_PISTOLS_NUMS[i],
+      target: null, hits: new Set(), bounces: 0, trail: [],
+    });
+  }
+}
+
+function updateNightBullets() {
+  const base = racePlayer.stand ? Math.max(10, Math.round(racePlayer.stand.dmg * 0.5)) : 12;
+  for (let i = nightBullets.length - 1; i >= 0; i--) {
+    const b = nightBullets[i];
+    b.life--;
+    // (re)elegir objetivo: enemigo vivo más cercano que aún no golpeó
+    let need = !b.target || b.target.hp <= 0 || nightEnemies.indexOf(b.target) === -1 || b.hits.has(b.target);
+    if (need) {
+      let nearest = null, bestSq = 1e18;
+      for (const e of nightEnemies) {
+        if (b.hits.has(e)) continue;
+        const dSq = (e.x - b.x) ** 2 + (e.y - b.y) ** 2;
+        if (dSq < bestSq) { bestSq = dSq; nearest = e; }
+      }
+      // si ya rebotó en todos, resetea memoria para seguir golpeando (jefes / pocos guardias)
+      if (!nearest && nightEnemies.length) {
+        b.hits.clear();
+        for (const e of nightEnemies) {
+          const dSq = (e.x - b.x) ** 2 + (e.y - b.y) ** 2;
+          if (dSq < bestSq) { bestSq = dSq; nearest = e; }
+        }
+      }
+      b.target = nearest;
+    }
+    // dirigirse al objetivo
+    if (b.target) {
+      const a = Math.atan2(b.target.y - b.y, b.target.x - b.x);
+      const sp = Math.hypot(b.vx, b.vy) || 10;
+      b.vx += (Math.cos(a) * sp - b.vx) * 0.22;
+      b.vy += (Math.sin(a) * sp - b.vy) * 0.22;
+    }
+    b.trail.push({ x: b.x, y: b.y });
+    if (b.trail.length > 6) b.trail.shift();
+    b.x += b.vx; b.y += b.vy;
+    // colisión + rebote
+    if (b.target && Math.hypot(b.x - b.target.x, b.y - b.target.y) < b.r + b.target.r) {
+      const dmg = base + b.bounces * 5;
+      b.target.hp -= dmg;
+      const a = Math.atan2(b.vy, b.vx);
+      b.target.vx += Math.cos(a) * 3;
+      b.target.vy += Math.sin(a) * 3;
+      nightFx.push({ x: b.target.x, y: b.target.y, life: 10, max: 10, color: '#fd0' });
+      b.hits.add(b.target);
+      b.bounces++;
+      b.target = null;
+    }
+    if (b.life <= 0 || b.x < 40 || b.x > W - 40 || b.y < 100 || b.y > H - 20) {
+      nightBullets.splice(i, 1);
+    }
+  }
+}
+
 function updateNightCombat() {
+  updateNightBullets();
   for (let i = nightEnemies.length - 1; i >= 0; i--) {
     const e = nightEnemies[i];
     if (e.hp <= 0) {
-      for (let p = 0; p < 6; p++) nightFx.push({ x: e.x, y: e.y, life: 16, max: 16, color: '#f66' });
+      // muerte con más juice: esquirlas del color propio + destello
+      for (let p = 0; p < 12; p++) nightFx.push({ x: e.x, y: e.y, life: 18, max: 18, color: p & 1 ? e.color : '#fff' });
+      raceAddStandKill();
+      // recompensa ocasional: los brutos/tiradores pueden soltar una cura pequeña
+      if ((e.type === 'brute' || e.type === 'shooter') && Math.random() < 0.5 && racePlayer.hp < racePlayer.maxHp) {
+        racePlayer.hp = Math.min(racePlayer.maxHp, racePlayer.hp + 8);
+        for (let p = 0; p < 8; p++) nightFx.push({ x: e.x, y: e.y, life: 24, max: 24, color: '#6f8' });
+      }
       nightEnemies.splice(i, 1);
       continue;
     }
+    const d = Math.hypot(e.x - raceMapPlayer.x, e.y - raceMapPlayer.y);
     const a = Math.atan2(raceMapPlayer.y - e.y, raceMapPlayer.x - e.x);
-    e.vx = e.vx * 0.86 + Math.cos(a) * e.speed * 0.4;
-    e.vy = e.vy * 0.86 + Math.sin(a) * e.speed * 0.4;
+    if (e.ranged) {
+      // tirador: mantiene distancia y dispara
+      let move = 0;
+      if (d < 150) move = -0.5;         // demasiado cerca: retrocede
+      else if (d > 260) move = 0.4;     // lejos: se acerca
+      e.vx = e.vx * 0.86 + Math.cos(a) * e.speed * move;
+      e.vy = e.vy * 0.86 + Math.sin(a) * e.speed * move;
+      if (e.shootCD > 0) e.shootCD--;
+      if (e.shootCD <= 0 && d < 340) {
+        nightProjectiles.push({
+          x: e.x, y: e.y, vx: Math.cos(a) * 4.4, vy: Math.sin(a) * 4.4,
+          life: 100, r: 5, dmg: 7, color: e.color,
+        });
+        e.shootCD = rand(70, 130);
+      }
+    } else {
+      // melee: persigue (el runner serpentea)
+      let ma = a;
+      if (e.type === 'runner') { e.wob += 0.25; ma += Math.sin(e.wob) * 0.6; }
+      e.vx = e.vx * 0.86 + Math.cos(ma) * e.speed * 0.4;
+      e.vy = e.vy * 0.86 + Math.sin(ma) * e.speed * 0.4;
+    }
     e.x += e.vx; e.y += e.vy;
     e.x = Math.max(64, Math.min(W - 64, e.x));
     e.y = Math.max(114, Math.min(H - 34, e.y));
     if (e.touchCD > 0) e.touchCD--;
-    const d = Math.hypot(e.x - raceMapPlayer.x, e.y - raceMapPlayer.y);
     if (d < e.r + 12 && e.touchCD <= 0 && raceMapPlayer.iframe <= 0) {
-      racePlayer.hp -= 6;
+      racePlayer.hp -= e.touchDmg || 6;
       raceMapPlayer.iframe = 32;
       e.touchCD = 30;
       raceFlashTimer = 10; raceFlashColor = '#f44';
+      if (e.type === 'brute') raceShake = Math.max(raceShake, 5);
       if (racePlayer.hp <= 0) {
         racePlayer.hp = 0;
-        nightCombat = null; nightEnemies = [];
+        nightCombat = null; nightEnemies = []; nightProjectiles = []; nightBullets = [];
         racePhase = 'defeat';
         racePhaseTimer = 0;
         return;
       }
     }
   }
+
+  // proyectiles de los tiradores
+  for (let i = nightProjectiles.length - 1; i >= 0; i--) {
+    const pr = nightProjectiles[i];
+    pr.x += pr.vx; pr.y += pr.vy; pr.life--;
+    const hit = Math.hypot(pr.x - raceMapPlayer.x, pr.y - raceMapPlayer.y) < pr.r + 12;
+    if (hit && raceMapPlayer.iframe <= 0) {
+      racePlayer.hp -= pr.dmg;
+      raceMapPlayer.iframe = 24;
+      raceFlashTimer = 10; raceFlashColor = '#f84';
+      for (let p = 0; p < 6; p++) nightFx.push({ x: pr.x, y: pr.y, life: 12, max: 12, color: pr.color });
+      nightProjectiles.splice(i, 1);
+      if (racePlayer.hp <= 0) {
+        racePlayer.hp = 0;
+        nightCombat = null; nightEnemies = []; nightProjectiles = []; nightBullets = [];
+        racePhase = 'defeat';
+        racePhaseTimer = 0;
+        return;
+      }
+      continue;
+    }
+    if (pr.life <= 0 || pr.x < 40 || pr.x > W - 40 || pr.y < 100 || pr.y > H - 20) {
+      nightProjectiles.splice(i, 1);
+    }
+  }
+
   if (nightEnemies.length === 0) {
+    nightProjectiles = [];
+    nightBullets = [];
     // victoria: reclamas el trozo + el Poder
     const room = nightCombat;
     room.searched = true;
@@ -13062,6 +13510,8 @@ function updateNightCombat() {
     raceCollectedParts.push(room.part);
     racePlayer.stand = { ...room.stand };
     racePlayer.standCD = 0;
+    racePlayer.standKills = 0;         // el stand nuevo empieza en forma base
+    racePlayer.standAwakened = false;
     raceRoomLastFoundStand = room.stand;
     raceRoomLastFoundPart = room.part;
     room.found = { part: room.part, stand: room.stand.name };
@@ -13092,18 +13542,21 @@ function drawRace() {
   } else if (racePhase === 'defeat') {
     drawRaceDefeat();
   } else {
+    ctx.save();
+    if (raceShake > 0) ctx.translate(rand(-raceShake, raceShake), rand(-raceShake, raceShake));
     drawRaceTrack();
     if (racePhase === 'pre-stage') drawRacePreStage();
     if (racePhase === 'post-stage') drawRacePostStage();
+    ctx.restore();
   }
   drawRaceHud();
   drawNetHud();
 }
 
 function drawRaceTrack() {
-  // cielo / pradera
+  // cielo / pradera (sobre-relleno para cubrir bordes durante el screen shake)
   ctx.fillStyle = '#5b3';
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(-16, -16, W + 32, H + 32);
 
   // bordes
   ctx.fillStyle = '#2a4';
@@ -13191,7 +13644,7 @@ function drawRaceTrack() {
   for (const n of raceNPCs) {
     const sy = raceScreenY(n.progress);
     if (sy < -80 || sy > H + 80) continue;
-    drawRaceHorse(n.x, sy, n.color, n.name, n.stunned > 0);
+    drawRaceHorse(n.x, sy, n.color, n.name, false, n.hitFlash || (n.stunned > 0 ? 4 : 0));
     // barra HP del NPC (mini)
     if (n.hp < n.maxHp) {
       ctx.fillStyle = '#400';
@@ -13223,8 +13676,40 @@ function drawRaceTrack() {
   // rival online (proyectado por progreso, detrás del jugador local)
   drawNetRival();
 
+  // aura del STAND equipado (bajo el jugador): color propio + intensa al despertar
+  if (racePlayer.stand) {
+    const st = racePlayer.stand;
+    const ready = racePlayer.standCD <= 0;
+    const awake = racePlayer.standAwakened;
+    const pulse = 0.5 + 0.5 * Math.sin(frame * (awake ? 0.3 : 0.18));
+    const baseR = awake ? 34 : 26;
+    const g = ctx.createRadialGradient(racePlayer.x, racePlayer.y, 4, racePlayer.x, racePlayer.y, baseR + pulse * 8);
+    g.addColorStop(0, withAlpha(st.color, awake ? 0.5 : 0.32));
+    g.addColorStop(1, withAlpha(st.color, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(racePlayer.x, racePlayer.y, baseR + pulse * 8, 0, Math.PI * 2); ctx.fill();
+    // anillo "listo para atacar"
+    if (ready) {
+      ctx.strokeStyle = withAlpha(awake ? '#fd6' : st.color, 0.4 + 0.4 * pulse);
+      ctx.lineWidth = awake ? 3 : 2;
+      ctx.beginPath(); ctx.arc(racePlayer.x, racePlayer.y, baseR, 0, Math.PI * 2); ctx.stroke();
+    }
+    // despertado: anillo dorado giratorio con destellos
+    if (awake) {
+      ctx.strokeStyle = withAlpha('#fd6', 0.7);
+      ctx.lineWidth = 2;
+      for (let s = 0; s < 3; s++) {
+        const a0 = frame * 0.05 + s * (Math.PI * 2 / 3);
+        ctx.beginPath();
+        ctx.arc(racePlayer.x, racePlayer.y, baseR + 6, a0, a0 + 1.1);
+        ctx.stroke();
+      }
+    }
+  }
+
   // jugador
-  const playerColor = raceWeapon === 'fists' ? '#fc4' : (raceWeapon === 'gun' ? '#c4f' : '#cde');
+  const playerColor = racePlayer.stand ? racePlayer.stand.color
+    : (raceWeapon === 'fists' ? '#fc4' : (raceWeapon === 'gun' ? '#c4f' : '#cde'));
   drawRaceHorse(racePlayer.x, racePlayer.y, playerColor, 'TÚ', racePlayer.iframe > 0 && (frame & 2));
 
   // tiempo detenido — vignette dorada pulsante
@@ -13241,6 +13726,16 @@ function drawRaceTrack() {
   // pelota de acero
   const sb = racePlayer.steelBallActive;
   if (sb) {
+    // estela de la pelota
+    if (sb.trail) {
+      for (let i = 0; i < sb.trail.length; i++) {
+        const t = sb.trail[i];
+        ctx.globalAlpha = (i / sb.trail.length) * 0.5;
+        ctx.fillStyle = sb.color || '#cde';
+        ctx.beginPath(); ctx.arc(t.x, t.y, 4 + i * 0.8, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
     ctx.save();
     ctx.translate(sb.x, sb.y);
     ctx.rotate(sb.life * 0.4);
@@ -13282,6 +13777,20 @@ function drawRaceTrack() {
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI * 1.5); ctx.stroke();
       ctx.restore();
+    } else if (p.kind === 'pistolBall') {
+      // Balas Vivientes: bolita amarilla numerada
+      const g = ctx.createRadialGradient(p.x - 2, p.y - 2, 1, p.x, p.y, 9);
+      g.addColorStop(0, '#ffe');
+      g.addColorStop(0.6, '#fd0');
+      g.addColorStop(1, '#c90');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#630'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = '#402000';
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(String(p.num), p.x, p.y + 0.5);
+      ctx.textBaseline = 'alphabetic';
     } else if (p.kind === 'bomb' || p.explodes) {
       ctx.fillStyle = p.color;
       ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, Math.PI * 2); ctx.fill();
@@ -13384,9 +13893,17 @@ function drawRaceTrack() {
 
   // partículas
   for (const p of raceParticles) {
-    ctx.globalAlpha = Math.max(0, p.life / 30);
-    ctx.fillStyle = p.color;
-    ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    ctx.globalAlpha = Math.max(0, p.life / (p.max || 30));
+    if (p.ring) {
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    }
   }
   ctx.globalAlpha = 1;
 
@@ -13448,7 +13965,7 @@ function drawRaceArrow(x, y) {
   ctx.restore();
 }
 
-function drawRaceHorse(x, y, color, label, blink) {
+function drawRaceHorse(x, y, color, label, blink, flash = 0) {
   if (blink) return;
   ctx.save();
   ctx.translate(x, y);
@@ -13490,6 +14007,19 @@ function drawRaceHorse(x, y, color, label, blink) {
   ctx.textAlign = 'center';
   ctx.strokeText(label, 0, -32);
   ctx.fillText(label, 0, -32);
+  // flash blanco de golpe + estrellitas de aturdimiento
+  if (flash > 0) {
+    ctx.globalAlpha = Math.min(0.7, flash / 8);
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.ellipse(0, 8, 18, 24, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#fd6';
+    ctx.font = 'bold 12px monospace';
+    for (let s = 0; s < 3; s++) {
+      const a = frame * 0.2 + s * (Math.PI * 2 / 3);
+      ctx.fillText('✦', Math.cos(a) * 13, -26 + Math.sin(a) * 4);
+    }
+  }
   ctx.restore();
 }
 
@@ -13612,17 +14142,53 @@ function drawRaceNight() {
     // cuerpo
     ctx.fillStyle = e.color;
     ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#200'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.strokeStyle = e.type === 'brute' ? '#405' : '#200';
+    ctx.lineWidth = e.type === 'brute' ? 4 : 2; ctx.stroke();
     // ojos
     ctx.fillStyle = '#ff5';
     ctx.beginPath(); ctx.arc(e.x - 4, e.y - 2, 1.8, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(e.x + 4, e.y - 2, 1.8, 0, Math.PI * 2); ctx.fill();
+    // glifo de tipo (identifica de un vistazo)
+    if (e.type !== 'grunt') {
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(e.type === 'brute' ? '🛡' : (e.type === 'shooter' ? '🏹' : '»'), e.x, e.y - e.r - 12);
+    }
     // HP
     if (e.hp < e.maxHp) {
       ctx.fillStyle = '#400'; ctx.fillRect(e.x - 12, e.y - e.r - 8, 24, 3);
       ctx.fillStyle = '#f55'; ctx.fillRect(e.x - 12, e.y - e.r - 8, 24 * Math.max(0, e.hp) / e.maxHp, 3);
     }
   }
+
+  // proyectiles de los tiradores nocturnos
+  for (const pr of nightProjectiles) {
+    ctx.fillStyle = withAlpha(pr.color, 0.35);
+    ctx.beginPath(); ctx.arc(pr.x, pr.y, pr.r + 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(pr.x, pr.y, pr.r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = pr.color; ctx.lineWidth = 2; ctx.stroke();
+  }
+
+  // Balas Vivientes del jugador (numeradas + estela)
+  for (const b of nightBullets) {
+    for (let t = 0; t < b.trail.length; t++) {
+      ctx.globalAlpha = (t / b.trail.length) * 0.4;
+      ctx.fillStyle = '#fd0';
+      ctx.beginPath(); ctx.arc(b.trail[t].x, b.trail[t].y, b.r * 0.6, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#fd0';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#a70'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = '#320';
+    ctx.font = 'bold 8px monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(b.num, b.x, b.y + 0.5);
+    ctx.textBaseline = 'alphabetic';
+  }
+  ctx.globalAlpha = 1;
 
   // avatar del jugador (top-down) + golpe
   ctx.save();
@@ -13652,11 +14218,11 @@ function drawRaceNight() {
   // banner de combate
   if (nightCombat) {
     ctx.fillStyle = 'rgba(60,0,0,0.6)';
-    ctx.fillRect(W / 2 - 220, 86, 440, 30);
+    ctx.fillRect(W / 2 - 330, 86, 660, 30);
     ctx.fillStyle = '#f66';
-    ctx.font = 'bold 16px monospace';
+    ctx.font = 'bold 13px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(`⚔ DERROTA A LOS GUARDIAS — quedan ${nightEnemies.length}`, W / 2, 107);
+    ctx.fillText(`⚔ DERROTA A LOS GUARDIAS — quedan ${nightEnemies.length}   ·   🖱 izq: golpe · der: Balas Vivientes`, W / 2, 107);
   }
 
   // sala bajo el jugador → prompt de interacción
@@ -13981,27 +14547,40 @@ function drawRaceHud() {
 
     // STAND activo (sustituye al click del arma)
     if (racePlayer.stand) {
-      ctx.fillStyle = racePlayer.stand.color;
+      const awake = racePlayer.standAwakened;
+      const effCd = awake ? Math.round(racePlayer.stand.cd * 0.7) : racePlayer.stand.cd;
+      ctx.fillStyle = awake ? '#fd6' : racePlayer.stand.color;
       ctx.font = 'bold 12px monospace';
-      ctx.fillText(`🎴 Stand: ${racePlayer.stand.name}`, W - 20, 150);
+      ctx.fillText(`🎴 ${racePlayer.stand.name}${awake ? ' ⚡DESPIERTO' : ''}`, W - 20, 150);
       // medidor CD del stand
       ctx.fillStyle = '#222';
       ctx.fillRect(W - 140, 156, 120, 6);
-      const cdFrac = racePlayer.standCD > 0 ? (1 - racePlayer.standCD / racePlayer.stand.cd) : 1;
+      const cdFrac = racePlayer.standCD > 0 ? (1 - racePlayer.standCD / Math.max(1, effCd)) : 1;
       ctx.fillStyle = racePlayer.stand.color;
       ctx.fillRect(W - 140, 156, 120 * cdFrac, 6);
+      // progreso de DESPERTAR (kills) — solo si aún no despierta
+      if (!awake) {
+        ctx.fillStyle = '#654';
+        ctx.fillRect(W - 140, 165, 120, 4);
+        ctx.fillStyle = '#fd6';
+        ctx.fillRect(W - 140, 165, 120 * Math.min(1, racePlayer.standKills / RACE_STAND_AWAKEN_KILLS), 4);
+        ctx.fillStyle = '#fd6';
+        ctx.font = '9px monospace';
+        ctx.fillText(`despertar ${racePlayer.standKills}/${RACE_STAND_AWAKEN_KILLS} kills`, W - 20, 176);
+      }
       // tiempo detenido (sólo si el stand puede)
       if (racePlayer.stand.timestop) {
+        const tsY = awake ? 178 : 186;
         ctx.font = '11px monospace';
         if (raceTimeStopTimer > 0) {
           ctx.fillStyle = '#fd6';
-          ctx.fillText(`Q: TIEMPO DETENIDO ${Math.ceil(raceTimeStopTimer/60*10)/10}s`, W - 20, 178);
+          ctx.fillText(`Q: TIEMPO DETENIDO ${Math.ceil(raceTimeStopTimer/60*10)/10}s`, W - 20, tsY);
         } else if (raceTimeStopCD > 0) {
           ctx.fillStyle = '#888';
-          ctx.fillText(`Q: CD ${Math.ceil(raceTimeStopCD/60)}s`, W - 20, 178);
+          ctx.fillText(`Q: CD ${Math.ceil(raceTimeStopCD/60)}s`, W - 20, tsY);
         } else {
           ctx.fillStyle = '#fd6';
-          ctx.fillText(`Q: TIEMPO DETENIDO listo (1.5s)`, W - 20, 178);
+          ctx.fillText(`Q: TIEMPO DETENIDO listo (1.5s)`, W - 20, tsY);
         }
       }
     }
@@ -14047,13 +14626,25 @@ function drawRaceHud() {
     ctx.fillText(raceMessage, W / 2, H - 40);
   }
 
-  // mensaje de eliminación de NPC
+  // recta final: banner pulsante + tinte dramático
+  if (raceFinalStretch && racePhase === 'racing') {
+    const p = 0.5 + 0.5 * Math.sin(frame * 0.35);
+    ctx.fillStyle = withAlpha('#f30', 0.06 + 0.05 * p);
+    ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = withAlpha('#fd6', 0.6 + 0.4 * p);
+    ctx.font = 'bold 26px monospace';
+    ctx.fillText('🏁 RECTA FINAL', W / 2, 118);
+  }
+
+  // mensaje de eliminación / eventos
   if (raceKillMessageTimer > 0 && racePhase === 'racing') {
     ctx.textAlign = 'center';
     const a = Math.min(1, raceKillMessageTimer / 30);
-    ctx.fillStyle = withAlpha('#f44', a);
+    const special = /^[^\x00-\x7F]/.test(raceKillMessage); // ya empieza con emoji propio
+    ctx.fillStyle = withAlpha(special ? '#fd6' : '#f44', a);
     ctx.font = 'bold 22px monospace';
-    ctx.fillText('💀 ' + raceKillMessage, W / 2, 90);
+    ctx.fillText((special ? '' : '💀 ') + raceKillMessage, W / 2, 90);
   }
 }
 
