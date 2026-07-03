@@ -331,7 +331,7 @@ const ABILITIES = [
   { id: 'breaker',  name: '3. Puños Rompedores',        cost: 120,
     desc: 'Ráfaga de 4 puños rosados rápidos en línea.', color: '#f8c' },
   { id: 'rain',     name: '4. Tormenta Torrencial',           cost: 250,
-    desc: 'Nube tormenta sobre el cursor con relámpagos y lluvia teardrop. Mantén click para apuntar. O: TORMENTA FINAL — cutscene + nube gigante cubre la pantalla 5s con lluvia caótica y daño global (CD 30s).', color: '#69c' },
+    desc: 'Una nube te sigue ENCIMA y su lluvia se vuelve arma: daña sola a los enemigos a tu alrededor (posiciónate para mojarlos). CLICK: RELÁMPAGO dirigido al cursor (área + parálisis; +daño a los mojados). Mojar y golpear carga el medidor DILUVIO; al llenarlo, pulsa O para desatar la TORMENTA FINAL que cubre la pantalla 5s.', color: '#69c' },
   { id: 'arrow',    name: '5. Flechas Perforantes',     cost: 300,
     desc: 'Flechas que atraviesan y empujan a los enemigos en su dirección.', color: '#cf8' },
   { id: 'bastion',     name: '6. Bastión Inmóvil',         cost: 400,
@@ -1417,10 +1417,11 @@ function updatePlayer() {
     sfCD = 60 * 15;
     shake = 10;
   }
-  if (active === 3 && keyPressed['o'] && nrCD <= 0) {
+  if (active === 3 && keyPressed['o'] && nrGauge >= 100 && nrPhase === 0 && stormTimer <= 0) {
+    // TORMENTA FINAL — se desata gastando el medidor Diluvio (cargado con juego activo)
     nrPhase = 1;
     nrTimer = 70;
-    nrCD = 60 * 30;
+    nrGauge = 0;
     shake = 14;
   }
   if (active === 11 && keyPressed['i'] && mmCD <= 0) {
@@ -2093,6 +2094,7 @@ function updatePlayer() {
 
 function getAttackCD() {
   if (active === 0) return whipForm === 1 ? 400 : 340;   // forma 1 (látigo-cuerda) más lenta
+  if (active === 3) return 240;   // Tormenta: relámpago dirigido con click
   if (active === 26) return [280, 200, 90][standForm];
   if (active === 18) return tuskAct === 4 ? (tuskForm === 0 ? 230 : 80) : [0, 220, 280, 240, 250][tuskAct];
   if (active === 27) return isNightWave(wave) ? 180 : 320;
@@ -2108,7 +2110,7 @@ function doAttack() {
     case 0: whipForm === 1 ? whipLassoAttack(a) : whipAttack(a); break;
     case 1: threadsAttack(a); break;
     case 2: breakerAttack(a); break;
-    case 3: /* lluvia: continuo, en updateRain */ break;
+    case 3: rainLightning(); break;   // lluvia pasiva en updateRain; click = relámpago dirigido
     case 4: arrowAttack(a); break;
     case 5: bastionAttack(a); break;
     case 6: flurryAttack(a); break;
@@ -2333,35 +2335,50 @@ function processBreakerCombo() {
   }
 }
 
-// 4. Tormenta Torrencial (continua mientras click + tormenta global con O)
+// 4. Tormenta Torrencial — la lluvia que cae ENCIMA TUYO se vuelve un arma:
+//   · lluvia pasiva que daña a los enemigos a tu alrededor (te posicionas)
+//   · RELÁMPAGO dirigido con click en el cursor (parte interactiva)
+//   · medidor DILUVIO que carga la TORMENTA FINAL (O) con juego activo
 let rainCounter = 0;
+let nrGauge = 0;                 // Diluvio 0..100 (carga la Tormenta Final)
+let rainLightningCD = 0;
+const RAIN_RADIUS = 155;
 function updateRain() {
-  // Lluvia normal sobre el cursor
-  if (active === 3 && mouse.down) {
+  if (rainLightningCD > 0) rainLightningCD--;
+
+  // Lluvia pasiva: la nube te sigue y las gotas caen a tu alrededor dañando enemigos
+  if (active === 3) {
     rainCounter++;
-    if (rainCounter % 2 === 0) {
-      const rx = mouse.x + rand(-90, 90);
-      const ry = mouse.y - 280;
+    // gotas que caen dentro del radio (dañan al impactar por el splash del proyectil)
+    for (let k = 0; k < 3; k++) {
+      const off = rand(-RAIN_RADIUS, RAIN_RADIUS);
+      const rx = player.x + off;
+      const startY = player.y - RAIN_RADIUS - rand(30, 130);
+      const ty = player.y + rand(-RAIN_RADIUS * 0.55, RAIN_RADIUS * 0.7);
       projectiles.push({
-        x: rx, y: ry, vx: rand(-0.5, 0.5), vy: 11,
-        r: 4, dmg: 32, life: 80, type: 'rain', color: '#69c', targetY: mouse.y + 70
+        x: rx, y: startY, vx: rand(-0.4, 0.4), vy: 13,
+        r: 3, dmg: 9, life: 90, type: 'rain', color: '#69c', targetY: ty
       });
     }
-    // splash damage at impact zone
-    if (rainCounter % 6 === 0) {
+    // daño confiable + carga del Diluvio mientras haya enemigos bajo tu lluvia
+    if (rainCounter % 12 === 0) {
       for (let j = 0; j < enemies.length; j++) {
         const e = enemies[j];
-        const dx = e.x - mouse.x, dy = e.y - mouse.y;
-        if (dx * dx + dy * dy < 80 * 80) damageEnemy(e, 12, '#69c');
+        if (e.ally) continue;
+        if (distSq(player, e) < RAIN_RADIUS * RAIN_RADIUS) {
+          damageEnemy(e, 5, '#69c');        // la lluvia moja y daña
+          e.wet = 40;                       // mojado: bonus de relámpago
+          nrGauge = Math.min(100, nrGauge + 2.5);
+        }
       }
     }
-    // relámpagos esporádicos en la nube
-    if (frame % 22 === 0 && Math.random() < 0.6) {
+    // relámpago ambiental dentro de la nube
+    if (frame % 30 === 0 && Math.random() < 0.5) {
       effects.push({
         type: 'spark',
-        x1: mouse.x + rand(-60, 60), y1: mouse.y - 230,
-        x2: mouse.x + rand(-30, 30), y2: mouse.y - 170,
-        life: 8, max: 8, color: '#fff'
+        x1: player.x + rand(-45, 45), y1: player.y - RAIN_RADIUS - 20,
+        x2: player.x + rand(-30, 30), y2: player.y - RAIN_RADIUS + 30,
+        life: 8, max: 8, color: '#bcf'
       });
     }
   }
@@ -2402,6 +2419,36 @@ function updateRain() {
       }
     }
   }
+}
+
+// RELÁMPAGO dirigido (click): cae un rayo de tu nube al cursor. Área + parálisis;
+// los enemigos MOJADOS por la lluvia reciben daño extra (recompensa posicionarte).
+function rainLightning() {
+  if (rainLightningCD > 0) return;
+  rainLightningCD = 16;
+  const tx = mouse.x, ty = mouse.y;
+  const R = 76;
+  // rayo visual desde el techo de la nube hasta el cursor (zigzag)
+  effects.push({ type: 'spark', x1: tx + rand(-14, 14), y1: 20, x2: tx, y2: ty, life: 14, max: 14, color: '#dff' });
+  effects.push({ type: 'spark', x1: tx + rand(-8, 8), y1: 20, x2: tx, y2: ty, life: 10, max: 10, color: '#fff' });
+  effects.push({ type: 'shockwave', x: tx, y: ty, life: 20, max: 20, r: 0, color: '#bdf' });
+  shake = Math.max(shake, 6);
+  for (let s = 0; s < 8; s++) {
+    particles.push({ x: tx, y: ty, vx: rand(-3, 3), vy: rand(-4, 1), life: 22, max: 22, color: rand(0, 1) > 0.5 ? '#dff' : '#9cf', r: 2 });
+  }
+  let any = false;
+  for (let j = 0; j < enemies.length; j++) {
+    const e = enemies[j];
+    if (e.ally) continue;
+    const dx = e.x - tx, dy = e.y - ty;
+    if (dx * dx + dy * dy < (R + e.r) * (R + e.r)) {
+      const wet = (e.wet || 0) > 0;
+      damageEnemy(e, wet ? 70 : 42, '#dff');   // bonus si está mojado
+      e.paralyzed = Math.max(e.paralyzed || 0, 45);
+      any = true;
+    }
+  }
+  if (any) nrGauge = Math.min(100, nrGauge + 10);
 }
 
 // 19. Copias Dimensionales — 3 copias dimensionales en paralelo (atraviesan enemigos)
@@ -3975,6 +4022,7 @@ function updateEnemies() {
   enemies.forEach(e => {
     if (timeStopTimer > 0) return;
     if (e.geOvercharge > 0) e.geOvercharge--;
+    if (e.wet > 0) e.wet--;
     if (e.tied > 0) e.tied--;
     if (e.frozen > 0) { e.frozen--; return; }
     // rocas pegadas: más tiempo = más daño
@@ -6247,31 +6295,33 @@ function draw() {
 
   // Tormenta Torrencial — nube tormenta sobre el cursor
   if (active === 3) {
-    const cx = mouse.x, cy = mouse.y - 220;
-    // zona de impacto en el suelo
-    ctx.strokeStyle = 'rgba(105, 160, 200, 0.55)';
-    ctx.setLineDash([6, 6]);
-    ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 80, 0, Math.PI * 2); ctx.stroke();
+    // zona de lluvia alrededor del jugador (donde las gotas dañan)
+    ctx.strokeStyle = 'rgba(105, 160, 200, 0.35)';
+    ctx.setLineDash([5, 7]);
+    ctx.beginPath(); ctx.arc(player.x, player.y, RAIN_RADIUS, 0, Math.PI * 2); ctx.stroke();
     ctx.setLineDash([]);
-    // sombra/cuerpo de nube — múltiples círculos
+    // nube ENCIMA del jugador
+    const cx = player.x, cy = player.y - RAIN_RADIUS - 10;
     const cloudPulse = Math.sin(frame * 0.08);
-    const cloudAlpha = mouse.down ? 0.85 : 0.55;
-    ctx.fillStyle = `rgba(40, 50, 70, ${cloudAlpha})`;
-    ctx.beginPath();
-    ctx.ellipse(cx - 70, cy + 8 + cloudPulse, 38, 22, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(cx + 60, cy + 4 + cloudPulse * 0.8, 42, 24, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(cx, cy - 12 + cloudPulse * 0.6, 60, 32, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(cx + 25, cy + 16, 36, 20, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(cx - 30, cy + 14, 38, 22, 0, 0, Math.PI * 2); ctx.fill();
-    // borde más claro
-    ctx.strokeStyle = `rgba(120, 140, 170, ${cloudAlpha * 0.9})`;
+    ctx.fillStyle = 'rgba(40, 50, 70, 0.7)';
+    ctx.beginPath(); ctx.ellipse(cx - 55, cy + 8 + cloudPulse, 34, 20, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx + 50, cy + 4 + cloudPulse * 0.8, 38, 22, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx, cy - 10 + cloudPulse * 0.6, 54, 30, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx + 22, cy + 15, 32, 18, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx - 26, cy + 13, 34, 20, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(120, 140, 170, 0.65)';
     ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(cx, cy - 6, 84, 34, 0, 0, Math.PI * 2); ctx.stroke();
+    // retícula del cursor: dónde caerá el relámpago
+    const ready = rainLightningCD <= 0;
+    ctx.strokeStyle = ready ? 'rgba(200, 235, 255, 0.9)' : 'rgba(140, 170, 200, 0.5)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 20, 0, Math.PI * 2); ctx.stroke();
     ctx.beginPath();
-    ctx.ellipse(cx, cy - 8, 95, 38, 0, 0, Math.PI * 2);
+    ctx.moveTo(mouse.x - 26, mouse.y); ctx.lineTo(mouse.x - 10, mouse.y);
+    ctx.moveTo(mouse.x + 10, mouse.y); ctx.lineTo(mouse.x + 26, mouse.y);
+    ctx.moveTo(mouse.x, mouse.y - 26); ctx.lineTo(mouse.x, mouse.y - 10);
+    ctx.moveTo(mouse.x, mouse.y + 10); ctx.lineTo(mouse.x, mouse.y + 26);
     ctx.stroke();
   }
   // Tormenta global — nube ENORME sobre toda la pantalla
@@ -10355,12 +10405,12 @@ function drawUI() {
     if (nrPhase > 0 || stormTimer > 0) {
       ctx.fillStyle = '#9ac';
       ctx.fillText(`⛈ TORMENTA FINAL`, 280, 33);
-    } else if (nrCD > 0) {
-      ctx.fillStyle = '#888';
-      ctx.fillText(`O Tormenta: ${(nrCD / 60).toFixed(1)}s`, 280, 33);
+    } else if (nrGauge >= 100) {
+      ctx.fillStyle = '#bdf';
+      ctx.fillText(`⛈ Diluvio LLENO — O: TORMENTA FINAL`, 280, 33);
     } else {
       ctx.fillStyle = '#9ac';
-      ctx.fillText(`O Tormenta: LISTO`, 280, 33);
+      ctx.fillText(`Click: relámpago · Diluvio ${Math.floor(nrGauge)}%`, 280, 33);
     }
   }
   if (active === 1) {
@@ -11021,7 +11071,7 @@ function restart() {
   skPhase = 0; skTimer = 0; skCD = 0;
   rhcpPhase = 0; rhcpTimer = 0; rhcpCD = 0; rhcpCharges = 0;
   sfPhase = 0; sfTimer = 0; sfCD = 0;
-  nrPhase = 0; nrTimer = 0; nrCD = 0; stormTimer = 0;
+  nrPhase = 0; nrTimer = 0; nrCD = 0; stormTimer = 0; nrGauge = 0; rainLightningCD = 0; rainCounter = 0;
   mmPhase = 0; mmTimer = 0; mmCD = 0;
   nkcPhase = 0; nkcTimer = 0; nkcCD = 0;
   ltPhase = 0; ltTimer = 0; ltCD = 0; ltActiveTimer = 0; trainX = 0;
