@@ -325,7 +325,7 @@ const player = {
 
 const ABILITIES = [
   { id: 'whip',     name: '1. Látigo Eléctrico Morado', cost: 0,
-    desc: 'Arco eléctrico que encadena daño entre enemigos.', color: '#c4f' },
+    desc: 'Latigazo eléctrico que restalla en línea y encadena daño entre enemigos. Con 50 kills desbloqueas una 2ª forma: pulsa C para cambiar los clicks a un LÁTIGO-CUERDA eléctrico (como Oh! Lonesome Me pero morado): te jala hasta el punto dañando en el camino, y a quien sobreviva lo deja PARALIZADO 5s.', color: '#c4f' },
   { id: 'threads',  name: '2. Hilo Liberado',              cost: 25,
     desc: 'Puños teal + 3 hilos en abanico que se desentrañan al volar. Y: RUPTURA DE HILOS — cutscene + descarga de 16 hilos en 360° que paralizan a los enemigos 1.5s (CD 15s).', color: '#2cb' },
   { id: 'breaker',  name: '3. Puños Rompedores',        cost: 120,
@@ -389,14 +389,13 @@ const ABILITIES = [
 ];
 
 // Orden de la TIENDA (y de la cadena de compra), desacoplado del indice de juego.
-// Coloca 'Oh! Lonesome Me' (29) un puesto ANTES de 'Pelota de Acero' (indice 14)
-// y 'Balas Vivientes' (30) un puesto ANTES de 'Pernos Letales' (indice 9).
+// 'Balas Vivientes' (30) y 'Oh! Lonesome Me' (29) van justo DETRAS de
+// 'Furia Electrica' (indice 10), es decir antes de 'Don del Milagro' (indice 11).
 const SHOP_ORDER = (() => {
   const o = [];
   for (let i = 0; i < ABILITIES.length; i++) {
     if (i === 29 || i === 30) continue;   // se colocan manualmente
-    if (i === 9)  o.push(30);             // Balas Vivientes antes de Pernos Letales
-    if (i === 14) o.push(29);             // Oh! Lonesome Me antes de Pelota de Acero
+    if (i === 11) { o.push(30); o.push(29); }  // Balas Vivientes y Oh! Lonesome Me tras Furia Electrica
     o.push(i);
   }
   return o;
@@ -423,6 +422,11 @@ let raidAnnounceText = '';
 let raidAnnounceColor = '#fd6';
 // power-up activos del jugador
 let puDmgTimer = 0, puRateTimer = 0, puInvulnTimer = 0, puMagnetTimer = 0;
+// Látigo Eléctrico Morado (slot 0): 0 = latigazo en cadena, 1 = látigo-cuerda eléctrico
+let whipForm = 0;
+let whipKills = 0;                       // kills con el látigo (desbloquea la forma 1 a las 50)
+const whipFormUnlocked = new Set([0]);
+let whipUnlockFlash = 0;
 const pibPuddles = []; // Mancha Negra: charcos negros (de noche con contorno arcoíris)
 const pibGiants = [];  // clones gigantes arcoíris (ult de oscuridad)
 let pibForm = 0;       // 0 = balas, 1 = puños de pintura
@@ -465,10 +469,11 @@ let rewindFrame = 0;
 let dashTimer = 0;
 let dashAngle = 0;
 let dashHits = new Set();
-// Oh! Lonesome Me (cuerda-dash)
+// Oh! Lonesome Me (cuerda-dash) — compartido con el látigo eléctrico (forma 1)
 let lassoTimer = 0, lassoMax = 0;
 let lassoFromX = 0, lassoFromY = 0, lassoTX = 0, lassoTY = 0;
 let lassoHits = new Set();
+let lassoMode = 0;   // 0 = cuerda (Oh! Lonesome Me, amarra), 1 = látigo eléctrico (paraliza)
 let apexPhase = 0;
 let apexTimer = 0;
 let apexCD = 0;
@@ -1473,6 +1478,12 @@ function updatePlayer() {
     shockwave(player.x, player.y, MJ_FORM_COLORS[mjForm], 20);
     flashFx(MJ_FORM_COLORS[mjForm], 12);
   }
+  if (active === 0 && whipFormUnlocked.has(1) && keyPressed['c']) {
+    // Látigo Eléctrico — cambiar clicks: latigazo ↔ látigo-cuerda eléctrico
+    whipForm = whipForm === 0 ? 1 : 0;
+    shockwave(player.x, player.y, '#b5f', 18);
+    flashFx('#b5f', 12);
+  }
   if (active === 14 && keyPressed['f'] && lesson3CD <= 0) {
     const ang = aimAngle();
     projectiles.push({
@@ -1913,6 +1924,7 @@ function updatePlayer() {
   if (mihUltCD > 0) mihUltCD--;
   if (wsUnlockFlash > 0) wsUnlockFlash--;
   if (cmUnlockFlash > 0) cmUnlockFlash--;
+  if (whipUnlockFlash > 0) whipUnlockFlash--;
   if (mihSpeedBoost > 0) mihSpeedBoost--;
 
   // Disco del Alma — ONCE DISCOS
@@ -2080,6 +2092,7 @@ function updatePlayer() {
 }
 
 function getAttackCD() {
+  if (active === 0) return whipForm === 1 ? 400 : 340;   // forma 1 (látigo-cuerda) más lenta
   if (active === 26) return [280, 200, 90][standForm];
   if (active === 18) return tuskAct === 4 ? (tuskForm === 0 ? 230 : 80) : [0, 220, 280, 240, 250][tuskAct];
   if (active === 27) return isNightWave(wave) ? 180 : 320;
@@ -2092,7 +2105,7 @@ function getAttackCD() {
 function doAttack() {
   const a = aimAngle();
   switch (active) {
-    case 0: whipAttack(a); break;
+    case 0: whipForm === 1 ? whipLassoAttack(a) : whipAttack(a); break;
     case 1: threadsAttack(a); break;
     case 2: breakerAttack(a); break;
     case 3: /* lluvia: continuo, en updateRain */ break;
@@ -2193,32 +2206,34 @@ function damageEnemy(e, dmg, color) {
 
 // 1. Látigo Eléctrico
 function whipAttack(angle) {
-  const range = 150;
-  const arc = Math.PI / 1.6;
+  const range = 210;           // el látigo golpea a lo largo de una línea, no en abanico
+  const lashW = 44;            // ancho del latigazo (perpendicular a la línea)
   const baseDmg = 60;
-  const inFront = [];
+  const ca = Math.cos(angle), sa = Math.sin(angle);
+  // enemigos a lo largo del latigazo (proyección sobre la línea del cursor)
+  const inLine = [];
   for (let j = 0; j < enemies.length; j++) {
     const e = enemies[j];
-    const rr = range + e.r;
-    if (distSq(player, e) <= rr * rr) {
-      let da = angleBetween(player, e) - angle;
-      while (da > Math.PI) da -= 2 * Math.PI;
-      while (da < -Math.PI) da += 2 * Math.PI;
-      if (Math.abs(da) <= arc / 2) inFront.push(e);
-    }
+    if (e.ally) continue;
+    const dx = e.x - player.x, dy = e.y - player.y;
+    const along = dx * ca + dy * sa;
+    if (along < 0 || along > range + e.r) continue;
+    const perp = Math.abs(-dx * sa + dy * ca);
+    if (perp <= lashW + e.r) inLine.push(e);
   }
   const chained = new Set();
-  for (let f = 0; f < inFront.length; f++) {
-    const first = inFront[f];
+  for (let f = 0; f < inLine.length; f++) {
+    const first = inLine[f];
     if (chained.has(first)) continue;
     damageEnemy(first, baseDmg, '#d8f');
+    first.vx += ca * 4; first.vy += sa * 4;   // el chasquido empuja hacia afuera
     chained.add(first);
     let from = first;
     for (let c = 0; c < 3; c++) {
       let next = null, bestSq = 110 * 110;
       for (let j = 0; j < enemies.length; j++) {
         const other = enemies[j];
-        if (chained.has(other)) continue;
+        if (chained.has(other) || other.ally) continue;
         const dSq = distSq(from, other);
         if (dSq < bestSq) { bestSq = dSq; next = other; }
       }
@@ -2229,7 +2244,14 @@ function whipAttack(angle) {
       from = next;
     }
   }
-  effects.push({ type: 'whip', x: player.x, y: player.y, angle, range, life: 12, max: 12 });
+  // latigazo: línea que restalla con curva y chispas
+  effects.push({ type: 'whiplash', x: player.x, y: player.y, angle, range, life: 12, max: 12, curl: rand(-1, 1) });
+}
+
+// Forma 1 (50 kills): látigo-cuerda ELÉCTRICO — como Oh! Lonesome Me pero morado y
+// eléctrico; a quien sobreviva al tirón lo deja PARALIZADO (en vez de amarrado).
+function whipLassoAttack(angle) {
+  lassoAttack(angle, 1);
 }
 
 // melee punch
@@ -2546,8 +2568,10 @@ function raiseZombie(e) {
 
 // Oh! Lonesome Me: lanza una cuerda; te jala (dash) hasta donde cae,
 // dana en el camino y deja AMARRADO 5s a quien sobreviva.
-function lassoAttack(angle) {
+function lassoAttack(angle, mode = 0) {
   if (lassoTimer > 0) return;
+  lassoMode = mode;
+  const col = mode === 1 ? '#b5f' : '#cb6';
   const range = 380;
   const ca = Math.cos(angle), sa = Math.sin(angle);
   let tx = player.x + ca * range, ty = player.y + sa * range;
@@ -2571,11 +2595,13 @@ function lassoAttack(angle) {
   lassoHits = new Set();
   player.iframe = Math.max(player.iframe, lassoMax + 6);
   shake = Math.max(shake, 8);
-  shockwave(player.x, player.y, '#cb6', 14);
+  shockwave(player.x, player.y, col, 14);
 }
 
 function processLasso() {
   if (lassoTimer <= 0) return;
+  const elec = lassoMode === 1;
+  const col = elec ? '#b5f' : '#cb6';
   const t = 1 - lassoTimer / lassoMax;
   const ease = 1 - (1 - t) * (1 - t); // easeOut
   player.x = lassoFromX + (lassoTX - lassoFromX) * ease;
@@ -2586,16 +2612,20 @@ function processLasso() {
     const rr = player.r + e.r + 30;
     if (distSq(player, e) < rr * rr) {
       lassoHits.add(e.id);
-      damageEnemy(e, 240, '#cb6');
+      damageEnemy(e, 240, col);
       e.vx += rand(-3, 3); e.vy += rand(-3, 3);
-      effects.push({ type: 'punch', x: e.x, y: e.y, life: 7, max: 7, color: '#cb6', r: 34 });
+      effects.push({ type: 'punch', x: e.x, y: e.y, life: 7, max: 7, color: col, r: 34 });
       if (e.hp > 0) {
-        e.frozen = Math.max(e.frozen || 0, 300); // amarrado 5s
-        e.tied = 300;
+        if (elec) {
+          e.paralyzed = Math.max(e.paralyzed || 0, 300); // látigo eléctrico: PARALIZADO 5s
+        } else {
+          e.frozen = Math.max(e.frozen || 0, 300);        // cuerda: amarrado 5s
+          e.tied = 300;
+        }
       }
     }
   }
-  burst(player.x, player.y, 3, '#cb6', { jitter: 6, spread: 1.5 });
+  burst(player.x, player.y, 3, col, { jitter: 6, spread: 1.5 });
   player.x = Math.max(player.r, Math.min(W - player.r, player.x));
   player.y = Math.max(player.r, Math.min(H - player.r, player.y));
   lassoTimer--;
@@ -4720,6 +4750,16 @@ function updateEnemies() {
             tuskA4Flash = 300;
             effects.push({ type: 'flash', life: 40, max: 40, color: '#fd6' });
           }
+        }
+      }
+      // Progresión Látigo Eléctrico Morado → forma cuerda eléctrica (slot 0)
+      if (active === 0 && owned.has(0) && !whipFormUnlocked.has(1)) {
+        whipKills++;
+        if (whipKills >= 50) {
+          whipFormUnlocked.add(1);
+          whipUnlockFlash = 240;
+          effects.push({ type: 'flash', life: 36, max: 36, color: '#b5f' });
+          effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 30, max: 30, r: 0, color: '#b5f' });
         }
       }
       // Progresión Vida Dorada → Réquiem Dorado (slot 16)
@@ -7240,6 +7280,27 @@ function draw() {
       ctx.fillText('🪢', e.x, e.y - e.r - 12);
       ctx.textAlign = 'left';
     }
+    // paralizado (látigo eléctrico): arcos eléctricos morados alrededor
+    if (e.paralyzed > 0 && !e.ally) {
+      ctx.strokeStyle = `rgba(181, 90, 255, ${0.5 + 0.5 * Math.sin(frame * 0.5)})`;
+      ctx.lineWidth = 1.6;
+      for (let s = 0; s < 3; s++) {
+        const a0 = frame * 0.2 + s * 2.1;
+        ctx.beginPath();
+        ctx.moveTo(e.x + Math.cos(a0) * (e.r + 2), e.y + Math.sin(a0) * (e.r + 2));
+        for (let k = 1; k <= 4; k++) {
+          const aa = a0 + k * 0.5;
+          const rr = e.r + 4 + rand(-3, 3);
+          ctx.lineTo(e.x + Math.cos(aa) * rr, e.y + Math.sin(aa) * rr);
+        }
+        ctx.stroke();
+      }
+      ctx.fillStyle = '#e9f';
+      ctx.font = 'bold 12px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('⚡', e.x, e.y - e.r - 12);
+      ctx.textAlign = 'left';
+    }
     // espinas de dinosaurio (aliado dino o infectado)
     if ((e.dino && e.ally) || (e.infected > 0 && !e.ally)) {
       ctx.fillStyle = e.dino ? '#cf6' : '#8e3';
@@ -7513,18 +7574,40 @@ function draw() {
   }
   // cuerda de Oh! Lonesome Me durante el tiron
   if (lassoTimer > 0) {
-    ctx.strokeStyle = '#cb6';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(player.x, player.y);
-    ctx.lineTo(lassoTX, lassoTY);
-    ctx.stroke();
-    ctx.strokeStyle = '#fda';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(player.x, player.y); ctx.lineTo(lassoTX, lassoTY); ctx.stroke();
-    // lazo en la punta
-    ctx.strokeStyle = '#cb6'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(lassoTX, lassoTY, 12, 0, Math.PI * 2); ctx.stroke();
+    const elec = lassoMode === 1;
+    if (elec) {
+      // látigo eléctrico: cuerda morada que serpentea con chispas
+      ctx.strokeStyle = '#b5f';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(player.x, player.y);
+      const segs = 10;
+      for (let i = 1; i < segs; i++) {
+        const t = i / segs;
+        const jx = player.x + (lassoTX - player.x) * t + rand(-7, 7);
+        const jy = player.y + (lassoTY - player.y) * t + rand(-7, 7);
+        ctx.lineTo(jx, jy);
+      }
+      ctx.lineTo(lassoTX, lassoTY);
+      ctx.stroke();
+      ctx.strokeStyle = '#e9f'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(player.x, player.y); ctx.lineTo(lassoTX, lassoTY); ctx.stroke();
+      ctx.strokeStyle = '#b5f'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(lassoTX, lassoTY, 12, 0, Math.PI * 2); ctx.stroke();
+    } else {
+      ctx.strokeStyle = '#cb6';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(player.x, player.y);
+      ctx.lineTo(lassoTX, lassoTY);
+      ctx.stroke();
+      ctx.strokeStyle = '#fda';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(player.x, player.y); ctx.lineTo(lassoTX, lassoTY); ctx.stroke();
+      // lazo en la punta
+      ctx.strokeStyle = '#cb6'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(lassoTX, lassoTY, 12, 0, Math.PI * 2); ctx.stroke();
+    }
   }
   const blink = player.iframe > 0 && player.iframe % 8 < 4;
   ctx.fillStyle = blink ? '#fff' : '#9cf';
@@ -7632,18 +7715,43 @@ function draw() {
 
   // effects (foreground)
   effects.forEach(f => {
-    if (f.type === 'whip') {
-      ctx.strokeStyle = `rgba(180, 80, 255, ${f.life / f.max})`;
-      ctx.lineWidth = 6;
+    if (f.type === 'whiplash') {
+      // latigazo: línea que restalla desde el jugador, curvada, se afina y da un chasquido
+      const a = f.life / f.max;               // 1 → 0
+      const prog = 1 - a;                      // el latigazo se extiende al inicio
+      const ca = Math.cos(f.angle), sa = Math.sin(f.angle);
+      const px = -sa, py = ca;                 // perpendicular (para la curva/curl)
+      const segs = 14;
+      // el látigo restalla: la curva se invierte y se aplana según avanza la animación
+      const curlAmp = (f.curl || 0) * 46 * (1 - prog) + Math.sin(prog * Math.PI) * 10;
+      const pts = [];
+      for (let i = 0; i <= segs; i++) {
+        const t = i / segs;
+        const along = f.range * t;
+        // seno a lo largo del látigo → forma de S que chasquea; se afina hacia la punta
+        const bend = Math.sin(t * Math.PI) * curlAmp * (1 - t * 0.35);
+        pts.push({ x: f.x + ca * along + px * bend, y: f.y + sa * along + py * bend });
+      }
+      // cuerpo del látigo, afinándose de grueso (mango) a fino (punta)
+      ctx.lineCap = 'round';
+      for (let i = 0; i < segs; i++) {
+        const t = i / segs;
+        ctx.strokeStyle = `rgba(150, 70, 240, ${a * (1 - t * 0.5)})`;
+        ctx.lineWidth = 7 * (1 - t) + 1;
+        ctx.beginPath(); ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[i + 1].x, pts[i + 1].y); ctx.stroke();
+      }
+      // filamento eléctrico brillante encima
+      ctx.strokeStyle = `rgba(235, 190, 255, ${a})`;
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.arc(f.x, f.y, f.range, f.angle - Math.PI / 3.2, f.angle + Math.PI / 3.2);
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i <= segs; i++) ctx.lineTo(pts[i].x + rand(-2, 2), pts[i].y + rand(-2, 2));
       ctx.stroke();
-      // electric inner
-      ctx.strokeStyle = `rgba(230, 180, 255, ${f.life / f.max})`;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(f.x, f.y, f.range - 4, f.angle - Math.PI / 3.2, f.angle + Math.PI / 3.2);
-      ctx.stroke();
+      ctx.lineCap = 'butt';
+      // chasquido en la punta
+      const tip = pts[segs];
+      ctx.fillStyle = `rgba(240, 210, 255, ${a})`;
+      ctx.beginPath(); ctx.arc(tip.x, tip.y, 4 * a + 1.5, 0, Math.PI * 2); ctx.fill();
     } else if (f.type === 'spark') {
       const a = f.life / f.max;
       const baseColor = f.color || 'rgba(220, 180, 255, 1)';
@@ -10575,6 +10683,15 @@ function drawUI() {
       ctx.fillText(`Escudo: quédate quieto (${(shieldCharge / 60).toFixed(1)}s)`, 280, 33);
     }
   }
+  if (active === 0) {
+    if (!whipFormUnlocked.has(1)) {
+      ctx.fillStyle = whipKills >= 50 ? '#b5f' : '#fff';
+      ctx.fillText(`☠ Kills Látigo: ${Math.min(whipKills, 50)}/50 → látigo-cuerda eléctrico`, 280, 33);
+    } else {
+      ctx.fillStyle = '#c9f';
+      ctx.fillText(`Látigo: ${whipForm === 0 ? 'Latigazo' : 'Cuerda eléctrica (paraliza)'}  ·  C para cambiar`, 280, 33);
+    }
+  }
   if (active === 26) {
     // indicador de stand activa + ult según forma
     if (standForm === 0) {
@@ -10694,6 +10811,21 @@ function drawUI() {
     ctx.font = 'bold 16px monospace';
     ctx.fillStyle = `rgba(255, 240, 200, ${a})`;
     ctx.fillText('El tiempo te pertenece. Pulsa L para cambiar.', W / 2, 158);
+    ctx.restore();
+    ctx.textAlign = 'left';
+  }
+  if (whipUnlockFlash > 0) {
+    const a = Math.min(1, whipUnlockFlash / 60);
+    ctx.save();
+    ctx.font = 'bold 36px monospace';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(181, 90, 255, 1)';
+    ctx.shadowBlur = 22;
+    ctx.fillStyle = `rgba(210, 170, 255, ${a})`;
+    ctx.fillText('¡LÁTIGO-CUERDA ELÉCTRICO DESBLOQUEADO!', W / 2, 130);
+    ctx.font = 'bold 16px monospace';
+    ctx.fillStyle = `rgba(235, 220, 255, ${a})`;
+    ctx.fillText('Pulsa C para cambiar los clicks del látigo', W / 2, 158);
     ctx.restore();
     ctx.textAlign = 'left';
   }
@@ -10914,6 +11046,8 @@ function restart() {
   tuskNailStormCD = 0; tuskNailStormPhase = 0; tuskNailStormTimer = 0;
   tuskWormholeCD = 0; tuskWormholePhase = 0; tuskWormholeTimer = 0;
   tuskWormholeTargets = [];
+  whipForm = 0; whipKills = 0; whipUnlockFlash = 0; whipFormUnlocked.clear(); whipFormUnlocked.add(0);
+  lassoMode = 0;
   wsKills = 0; cmKills = 0; wsUnlockFlash = 0; cmUnlockFlash = 0;
   wsUltCD = 0; wsUltPhase = 0; wsUltTimer = 0;
   cmUltCD = 0; cmUltPhase = 0; cmUltTimer = 0;
@@ -13226,7 +13360,7 @@ function updateRaceNight() {
 
   // ---- combate por un trozo ----
   if (nightCombat) {
-    if (mouse.down) nightAttack();
+    if (mouse.down) nightPrimaryAttack();
     if (mouse.rdown) nightSexPistols();
     updateNightCombat();
     return;
@@ -13238,14 +13372,15 @@ function updateRaceNight() {
   if (!room) return;
 
   if (room.kind === 'camp') {
-    if (!raceRoomRested) {
-      raceRoomRested = true;
+    // descanso ilimitado: puedes regenerarte en el campamento cuantas veces quieras
+    raceRoomRested = true;
+    if (racePlayer.hp >= racePlayer.maxHp) {
+      raceRoomMsg = 'Ya estás a vida completa.';
+      raceRoomMsgTimer = 150;
+    } else {
       racePlayer.hp = racePlayer.maxHp;
       raceRoomMsg = '🛌 Descansaste junto a la hoguera — vida restaurada al máximo.';
       raceRoomMsgTimer = 240;
-    } else {
-      raceRoomMsg = 'Ya descansaste esta noche.';
-      raceRoomMsgTimer = 180;
     }
   } else if (room.kind === 'search') {
     if (room.searched || room.cleared) {
@@ -13325,97 +13460,270 @@ function startNightCombat(room) {
   raceFlashTimer = 14; raceFlashColor = '#f44';
 }
 
-function nightAttack() {
+// ── Poder equipado contra los guardias (SBR) ──────────────────────────
+// Mapea el tipo de ataque de cada stand a un comportamiento en el combate
+// nocturno: 'shoot' (proyectiles), 'ricochet' (Balas Vivientes), 'melee'
+// (arco frontal), 'chain' (salta entre enemigos), 'aoe' (zona).
+const NIGHT_STAND_BEHAVIOR = {
+  single:       { mode: 'shoot', n: 1, cd: 16 },
+  spread:       { mode: 'shoot', n: 3, spread: 0.22, cd: 20 },
+  burst:        { mode: 'shoot', n: 4, spread: 0.05, speed: 13, cd: 18 },
+  pistols:      { mode: 'ricochet', n: SEX_PISTOLS_PER_SHOT, cd: 12 },
+  knives:       { mode: 'shoot', n: 5, spread: 0.13, speed: 14, cd: 24 },
+  threadspread: { mode: 'shoot', n: 5, spread: 0.18, slow: 90, cd: 24 },
+  standarrow:   { mode: 'shoot', n: 1, pierce: true, bleed: 120, speed: 15, life: 120, cd: 26 },
+  pierce:       { mode: 'shoot', n: 1, pierce: true, speed: 15, life: 110, cd: 22 },
+  darkspike:    { mode: 'shoot', n: 1, pierce: true, speed: 14, cd: 20 },
+  ironbolt:     { mode: 'shoot', n: 3, spread: 0.15, homing: 0.3, cd: 24 },
+  miracleshot:  { mode: 'shoot', n: 1, homing: 0.5, speed: 13, cd: 20 },
+  dualbomb:     { mode: 'shoot', n: 2, spread: 0.3, cd: 26 },
+  bubblepop:    { mode: 'shoot', n: 3, spread: 0.2, cd: 22 },
+  fire:         { mode: 'shoot', n: 1, bleed: 80, cd: 20 },
+  firetrail:    { mode: 'shoot', n: 1, bleed: 90, cd: 22 },
+  spiral:       { mode: 'shoot', n: 1, homing: 0.55, pierce: true, r: 9, speed: 10, life: 130, cd: 30 },
+  wormhole:     { mode: 'shoot', n: 1, homing: 0.4, pierce: true, cd: 24 },
+
+  melee:        { mode: 'melee', reach: 70, radius: 70, cd: 22 },
+  flurry:       { mode: 'melee', reach: 80, radius: 75, mult: 1.4, cd: 20 },
+  ora:          { mode: 'melee', reach: 80, radius: 90, mult: 4, cd: 30 },
+  scratches:    { mode: 'melee', reach: 60, radius: 60, bleed: 90, cd: 14 },
+  rewindheal:   { mode: 'melee', reach: 70, radius: 70, heal: 6, cd: 22 },
+  lifesteal:    { mode: 'melee', reach: 70, radius: 70, heal: 8, cd: 22 },
+  kingcrimson:  { mode: 'melee', reach: 80, radius: 85, mult: 3, cd: 28 },
+
+  whipchain:    { mode: 'chain', k: 3, range: 200, cd: 22 },
+  chain:        { mode: 'chain', k: 3, range: 200, cd: 24 },
+  emeraldchain: { mode: 'chain', k: 5, range: 220, cd: 26 },
+
+  lightning:    { mode: 'aoe', radius: 180, cd: 26 },
+  heatring:     { mode: 'aoe', radius: 150, cd: 24 },
+  smoke:        { mode: 'aoe', radius: 150, slow: 80, cd: 24 },
+  shieldburst:  { mode: 'aoe', radius: 150, cd: 26 },
+  clone:        { mode: 'aoe', radius: 130, cd: 26 },
+  madeinheaven: { mode: 'aoe', radius: 220, cd: 30 },
+  calamity:     { mode: 'aoe', radius: 130, atCursor: true, cd: 28 },
+  rainstrike:   { mode: 'aoe', radius: 100, atCursor: true, cd: 26 },
+  storm:        { mode: 'aoe', radius: 110, atCursor: true, cd: 26 },
+};
+
+// Daño base del poder equipado (con bonus de forma despierta).
+function nightStandDmg() {
+  const s = racePlayer.stand;
+  let d = s ? s.dmg : 18;
+  if (racePlayer.standAwakened) d = Math.round(d * 1.35);
+  return d;
+}
+
+// Aplica daño a un guardia con feedback (empuje, chispas, ralentización, sangrado).
+function damageNightEnemy(e, dmg, color, ang, opts) {
+  opts = opts || {};
+  e.hp -= dmg;
+  const k = opts.knock != null ? opts.knock : 4;
+  if (ang != null) { e.vx += Math.cos(ang) * k; e.vy += Math.sin(ang) * k; }
+  if (opts.slow) e.slow = Math.max(e.slow || 0, opts.slow);
+  if (opts.bleed) e.bleed = Math.max(e.bleed || 0, opts.bleed);
+  nightFx.push({ x: e.x, y: e.y, life: 10, max: 10, color: color || '#fff' });
+}
+
+// Ataque primario del combate: usa el poder equipado; si no hay stand, golpe básico.
+function nightPrimaryAttack() {
+  if (racePlayer.stand) nightStandAttack();
+  else nightBasicMelee();
+}
+
+function nightStandAttack() {
   if (raceMapPlayer.attackCD > 0) return;
-  raceMapPlayer.attackCD = 14;
-  raceMapPlayer.swing = 8;
+  const stand = racePlayer.stand;
+  const beh = NIGHT_STAND_BEHAVIOR[stand.attack] || { mode: 'melee', reach: 60, radius: 60, cd: 22 };
+  const awake = racePlayer.standAwakened;
+  raceMapPlayer.attackCD = Math.max(8, Math.round((beh.cd || 22) * (awake ? 0.7 : 1)));
+  raceMapPlayer.swing = beh.mode === 'melee' ? 8 : 4;
   const ang = raceMapPlayer.facing;
-  const reach = 52, hitR = 46;
-  const tx = raceMapPlayer.x + Math.cos(ang) * reach;
-  const ty = raceMapPlayer.y + Math.sin(ang) * reach;
-  let dmg = racePlayer.stand ? Math.max(16, racePlayer.stand.dmg + 6) : 18;
-  if (racePlayer.standAwakened) dmg = Math.round(dmg * 1.35);
-  for (const e of nightEnemies) {
-    if (Math.hypot(e.x - tx, e.y - ty) < hitR + e.r) {
-      e.hp -= dmg;
-      e.vx += Math.cos(ang) * 5;
-      e.vy += Math.sin(ang) * 5;
-      nightFx.push({ x: e.x, y: e.y, life: 8, max: 8, color: '#fff' });
-    }
+  const col = stand.color || '#fd6';
+  let dmg = nightStandDmg();
+  if (beh.mult) dmg = Math.round(dmg * beh.mult);
+  switch (beh.mode) {
+    case 'shoot':    nightShoot(ang, dmg, col, beh); break;
+    case 'ricochet': nightRicochet(ang, col, beh); break;
+    case 'chain':    nightChain(dmg, col, beh); break;
+    case 'aoe':      nightAoe(dmg, col, beh); break;
+    default:         nightMelee(ang, dmg, col, beh); break;
   }
 }
 
-// Balas Vivientes en el combate SBR: 6 balas numeradas (sin el Nº4) con ricochet.
-function nightSexPistols() {
-  if (raceMapPlayer.bulletCD > 0) return;
-  raceMapPlayer.bulletCD = 13;
-  const ang = raceMapPlayer.facing;
-  const mx = raceMapPlayer.x + Math.cos(ang) * 16;
-  const my = raceMapPlayer.y + Math.sin(ang) * 16;
-  // fogonazo
-  for (let s = 0; s < 4; s++) {
-    nightFx.push({ x: mx, y: my, life: 8, max: 8, color: rand(0, 1) > 0.5 ? '#fd0' : '#fff' });
+// Golpe básico cuando aún no tienes stand (primera pelea).
+function nightBasicMelee() {
+  if (raceMapPlayer.attackCD > 0) return;
+  raceMapPlayer.attackCD = 14;
+  nightMelee(raceMapPlayer.facing, 18, '#fec', { reach: 52, radius: 46 });
+}
+
+function nightShoot(ang, dmg, col, beh) {
+  const n = beh.n || 1, spread = beh.spread || 0.14;
+  const mx = raceMapPlayer.x + Math.cos(ang) * 16, my = raceMapPlayer.y + Math.sin(ang) * 16;
+  let target = null;
+  if (beh.homing) {
+    let bestSq = 1e18;
+    for (const e of nightEnemies) { const dSq = (e.x - mx) ** 2 + (e.y - my) ** 2; if (dSq < bestSq) { bestSq = dSq; target = e; } }
+  }
+  for (let i = 0; i < n; i++) {
+    const a = ang + (i - (n - 1) / 2) * spread + rand(-0.04, 0.04);
+    const sp = beh.speed || 11;
+    nightBullets.push({
+      x: mx, y: my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+      r: beh.r || 6, life: beh.life || 100, dmg, color: col,
+      pierce: !!beh.pierce, homing: beh.homing || 0, target,
+      slow: beh.slow || 0, bleed: beh.bleed || 0,
+      hits: new Set(), trail: [],
+    });
   }
   raceShake = Math.max(raceShake, 2);
-  for (let i = 0; i < SEX_PISTOLS_PER_SHOT; i++) {
-    const a = ang + (i - (SEX_PISTOLS_PER_SHOT - 1) / 2) * 0.16 + rand(-0.05, 0.05);
+}
+
+function nightRicochet(ang, col, beh) {
+  const mx = raceMapPlayer.x + Math.cos(ang) * 16, my = raceMapPlayer.y + Math.sin(ang) * 16;
+  const base = Math.max(10, Math.round(nightStandDmg() * 0.6));
+  const n = beh.n || SEX_PISTOLS_PER_SHOT;
+  for (let i = 0; i < n; i++) {
+    const a = ang + (i - (n - 1) / 2) * 0.16 + rand(-0.05, 0.05);
     const num = SEX_PISTOLS_NUMS[sexPistolsShotIdx % SEX_PISTOLS_NUMS.length];
     sexPistolsShotIdx++;
     nightBullets.push({
       x: mx, y: my, vx: Math.cos(a) * 10, vy: Math.sin(a) * 10,
-      r: 6, life: 120, num,
-      target: null, hits: new Set(), bounces: 0, trail: [],
+      r: 6, life: 120, num, color: col,
+      ricochet: true, base, target: null, hits: new Set(), bounces: 0, trail: [],
     });
   }
+  raceShake = Math.max(raceShake, 2);
+}
+
+function nightMelee(ang, dmg, col, beh) {
+  const reach = beh.reach || 60, radius = beh.radius || 55;
+  const tx = raceMapPlayer.x + Math.cos(ang) * reach, ty = raceMapPlayer.y + Math.sin(ang) * reach;
+  let hits = 0;
+  for (const e of nightEnemies) {
+    if (Math.hypot(e.x - tx, e.y - ty) < radius + e.r) {
+      damageNightEnemy(e, dmg, col, ang, { knock: 5, slow: beh.slow || 40, bleed: beh.bleed || 0 });
+      hits++;
+    }
+  }
+  if (beh.heal && hits) racePlayer.hp = Math.min(racePlayer.maxHp, racePlayer.hp + beh.heal * hits);
+  for (let k = 0; k < 6; k++) {
+    const aa = ang + (k - 2.5) * 0.12;
+    nightFx.push({ x: raceMapPlayer.x + Math.cos(aa) * reach * 0.8, y: raceMapPlayer.y + Math.sin(aa) * reach * 0.8, life: 9, max: 9, color: col });
+  }
+  raceShake = Math.max(raceShake, 2);
+}
+
+function nightChain(dmg, col, beh) {
+  const k = beh.k || 3, range = beh.range || 220;
+  let px = raceMapPlayer.x, py = raceMapPlayer.y;
+  const hit = new Set();
+  for (let n = 0; n < k; n++) {
+    let best = null, bestD = Infinity;
+    for (const e of nightEnemies) {
+      if (hit.has(e) || e.hp <= 0) continue;
+      const d = Math.hypot(e.x - px, e.y - py);
+      if (d < bestD && d < range) { bestD = d; best = e; }
+    }
+    if (!best) break;
+    hit.add(best);
+    damageNightEnemy(best, dmg, col, null, { slow: 45 });
+    for (let s = 0; s <= 8; s++) {
+      const t = s / 8;
+      nightFx.push({ x: px + (best.x - px) * t, y: py + (best.y - py) * t, life: 12, max: 12, color: col });
+    }
+    px = best.x; py = best.y;
+  }
+  raceFlashTimer = Math.max(raceFlashTimer, 10); raceFlashColor = col;
+}
+
+function nightAoe(dmg, col, beh) {
+  const radius = beh.radius || 150;
+  const cx = beh.atCursor ? mouse.x : raceMapPlayer.x;
+  const cy = beh.atCursor ? mouse.y : raceMapPlayer.y;
+  for (const e of nightEnemies) {
+    if (Math.hypot(e.x - cx, e.y - cy) < radius + e.r) {
+      const a = Math.atan2(e.y - cy, e.x - cx);
+      damageNightEnemy(e, dmg, col, a, { knock: 3, slow: beh.slow || 45, bleed: beh.bleed || 0 });
+    }
+  }
+  for (let k = 0; k < 20; k++) {
+    const a = (k / 20) * Math.PI * 2;
+    nightFx.push({ x: cx + Math.cos(a) * radius * 0.5, y: cy + Math.sin(a) * radius * 0.5, life: 16, max: 16, color: col });
+  }
+  raceFlashTimer = Math.max(raceFlashTimer, 12); raceFlashColor = col;
+  raceShake = Math.max(raceShake, 3);
+  if (beh.heal) racePlayer.hp = Math.min(racePlayer.maxHp, racePlayer.hp + beh.heal);
+}
+
+// Balas Vivientes en el combate SBR: extra siempre disponible con clic derecho.
+function nightSexPistols() {
+  if (raceMapPlayer.bulletCD > 0) return;
+  raceMapPlayer.bulletCD = 13;
+  const ang = raceMapPlayer.facing;
+  const mx = raceMapPlayer.x + Math.cos(ang) * 16, my = raceMapPlayer.y + Math.sin(ang) * 16;
+  for (let s = 0; s < 4; s++) {
+    nightFx.push({ x: mx, y: my, life: 8, max: 8, color: rand(0, 1) > 0.5 ? '#fd0' : '#fff' });
+  }
+  nightRicochet(ang, '#fd0', { n: SEX_PISTOLS_PER_SHOT });
 }
 
 function updateNightBullets() {
-  const base = racePlayer.stand ? Math.max(10, Math.round(racePlayer.stand.dmg * 0.5)) : 12;
   for (let i = nightBullets.length - 1; i >= 0; i--) {
     const b = nightBullets[i];
     b.life--;
-    // (re)elegir objetivo: enemigo vivo más cercano que aún no golpeó
-    let need = !b.target || b.target.hp <= 0 || nightEnemies.indexOf(b.target) === -1 || b.hits.has(b.target);
-    if (need) {
-      let nearest = null, bestSq = 1e18;
-      for (const e of nightEnemies) {
-        if (b.hits.has(e)) continue;
-        const dSq = (e.x - b.x) ** 2 + (e.y - b.y) ** 2;
-        if (dSq < bestSq) { bestSq = dSq; nearest = e; }
-      }
-      // si ya rebotó en todos, resetea memoria para seguir golpeando (jefes / pocos guardias)
-      if (!nearest && nightEnemies.length) {
-        b.hits.clear();
+    // teledirección (ricochet o homing): buscar/seguir objetivo
+    if (b.ricochet || b.homing) {
+      const need = !b.target || b.target.hp <= 0 || nightEnemies.indexOf(b.target) === -1 || b.hits.has(b.target);
+      if (need) {
+        let nearest = null, bestSq = 1e18;
         for (const e of nightEnemies) {
+          if (b.hits.has(e)) continue;
           const dSq = (e.x - b.x) ** 2 + (e.y - b.y) ** 2;
           if (dSq < bestSq) { bestSq = dSq; nearest = e; }
         }
+        // ricochet: si ya golpeó a todos, resetea memoria para seguir rebotando
+        if (!nearest && b.ricochet && nightEnemies.length) {
+          b.hits.clear();
+          for (const e of nightEnemies) {
+            const dSq = (e.x - b.x) ** 2 + (e.y - b.y) ** 2;
+            if (dSq < bestSq) { bestSq = dSq; nearest = e; }
+          }
+        }
+        b.target = nearest;
       }
-      b.target = nearest;
-    }
-    // dirigirse al objetivo
-    if (b.target) {
-      const a = Math.atan2(b.target.y - b.y, b.target.x - b.x);
-      const sp = Math.hypot(b.vx, b.vy) || 10;
-      b.vx += (Math.cos(a) * sp - b.vx) * 0.22;
-      b.vy += (Math.sin(a) * sp - b.vy) * 0.22;
+      if (b.target) {
+        const a = Math.atan2(b.target.y - b.y, b.target.x - b.x);
+        const sp = Math.hypot(b.vx, b.vy) || 10;
+        const steer = b.ricochet ? 0.22 : b.homing;
+        b.vx += (Math.cos(a) * sp - b.vx) * steer;
+        b.vy += (Math.sin(a) * sp - b.vy) * steer;
+      }
     }
     b.trail.push({ x: b.x, y: b.y });
     if (b.trail.length > 6) b.trail.shift();
     b.x += b.vx; b.y += b.vy;
-    // colisión + rebote
-    if (b.target && Math.hypot(b.x - b.target.x, b.y - b.target.y) < b.r + b.target.r) {
-      const dmg = base + b.bounces * 5;
-      b.target.hp -= dmg;
-      const a = Math.atan2(b.vy, b.vx);
-      b.target.vx += Math.cos(a) * 3;
-      b.target.vy += Math.sin(a) * 3;
-      nightFx.push({ x: b.target.x, y: b.target.y, life: 10, max: 10, color: '#fd0' });
-      b.hits.add(b.target);
-      b.bounces++;
-      b.target = null;
+    // colisión
+    let dead = false;
+    if (b.ricochet) {
+      if (b.target && Math.hypot(b.x - b.target.x, b.y - b.target.y) < b.r + b.target.r) {
+        const a = Math.atan2(b.vy, b.vx);
+        damageNightEnemy(b.target, b.base + b.bounces * 5, b.color, a, { knock: 3 });
+        b.hits.add(b.target); b.bounces++; b.target = null;
+      }
+    } else {
+      for (const e of nightEnemies) {
+        if (b.hits.has(e)) continue;
+        if (Math.hypot(b.x - e.x, b.y - e.y) < b.r + e.r) {
+          const a = Math.atan2(b.vy, b.vx);
+          damageNightEnemy(e, b.dmg, b.color, a, { knock: 3, slow: b.slow, bleed: b.bleed });
+          b.hits.add(e);
+          if (!b.pierce) { dead = true; break; }
+        }
+      }
     }
-    if (b.life <= 0 || b.x < 40 || b.x > W - 40 || b.y < 100 || b.y > H - 20) {
+    if (dead || b.life <= 0 || b.x < 40 || b.x > W - 40 || b.y < 100 || b.y > H - 20) {
       nightBullets.splice(i, 1);
     }
   }
@@ -13437,6 +13745,13 @@ function updateNightCombat() {
       nightEnemies.splice(i, 1);
       continue;
     }
+    // sangrado (DoT) y ralentización aplicados por los poderes
+    if (e.bleed > 0) {
+      e.bleed--;
+      if (e.bleed % 20 === 0) { e.hp -= 2; nightFx.push({ x: e.x, y: e.y, life: 8, max: 8, color: '#c22' }); }
+    }
+    if (e.slow > 0) e.slow--;
+    const slowMul = e.slow > 0 ? 0.45 : 1;
     const d = Math.hypot(e.x - raceMapPlayer.x, e.y - raceMapPlayer.y);
     const a = Math.atan2(raceMapPlayer.y - e.y, raceMapPlayer.x - e.x);
     if (e.ranged) {
@@ -13444,8 +13759,8 @@ function updateNightCombat() {
       let move = 0;
       if (d < 150) move = -0.5;         // demasiado cerca: retrocede
       else if (d > 260) move = 0.4;     // lejos: se acerca
-      e.vx = e.vx * 0.86 + Math.cos(a) * e.speed * move;
-      e.vy = e.vy * 0.86 + Math.sin(a) * e.speed * move;
+      e.vx = e.vx * 0.86 + Math.cos(a) * e.speed * slowMul * move;
+      e.vy = e.vy * 0.86 + Math.sin(a) * e.speed * slowMul * move;
       if (e.shootCD > 0) e.shootCD--;
       if (e.shootCD <= 0 && d < 340) {
         nightProjectiles.push({
@@ -13458,8 +13773,8 @@ function updateNightCombat() {
       // melee: persigue (el runner serpentea)
       let ma = a;
       if (e.type === 'runner') { e.wob += 0.25; ma += Math.sin(e.wob) * 0.6; }
-      e.vx = e.vx * 0.86 + Math.cos(ma) * e.speed * 0.4;
-      e.vy = e.vy * 0.86 + Math.sin(ma) * e.speed * 0.4;
+      e.vx = e.vx * 0.86 + Math.cos(ma) * e.speed * slowMul * 0.4;
+      e.vy = e.vy * 0.86 + Math.sin(ma) * e.speed * slowMul * 0.4;
     }
     e.x += e.vx; e.y += e.vy;
     e.x = Math.max(64, Math.min(W - 64, e.x));
@@ -14177,22 +14492,25 @@ function drawRaceNight() {
     ctx.strokeStyle = pr.color; ctx.lineWidth = 2; ctx.stroke();
   }
 
-  // Balas Vivientes del jugador (numeradas + estela)
+  // proyectiles del poder del jugador (con estela; numerados si son Balas Vivientes)
   for (const b of nightBullets) {
+    const bc = b.color || '#fd0';
     for (let t = 0; t < b.trail.length; t++) {
       ctx.globalAlpha = (t / b.trail.length) * 0.4;
-      ctx.fillStyle = '#fd0';
+      ctx.fillStyle = bc;
       ctx.beginPath(); ctx.arc(b.trail[t].x, b.trail[t].y, b.r * 0.6, 0, Math.PI * 2); ctx.fill();
     }
     ctx.globalAlpha = 1;
-    ctx.fillStyle = '#fd0';
+    ctx.fillStyle = bc;
     ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#a70'; ctx.lineWidth = 1.5; ctx.stroke();
-    ctx.fillStyle = '#320';
-    ctx.font = 'bold 8px monospace';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(b.num, b.x, b.y + 0.5);
-    ctx.textBaseline = 'alphabetic';
+    ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5; ctx.stroke();
+    if (b.num != null) {
+      ctx.fillStyle = '#320';
+      ctx.font = 'bold 8px monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(b.num, b.x, b.y + 0.5);
+      ctx.textBaseline = 'alphabetic';
+    }
   }
   ctx.globalAlpha = 1;
 
@@ -14228,7 +14546,7 @@ function drawRaceNight() {
     ctx.fillStyle = '#f66';
     ctx.font = 'bold 13px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(`⚔ DERROTA A LOS GUARDIAS — quedan ${nightEnemies.length}   ·   🖱 izq: golpe · der: Balas Vivientes`, W / 2, 107);
+    ctx.fillText(`⚔ DERROTA A LOS GUARDIAS — quedan ${nightEnemies.length}   ·   🖱 izq: ${racePlayer.stand ? racePlayer.stand.name : 'golpe'} · der: Balas Vivientes`, W / 2, 107);
   }
 
   // sala bajo el jugador → prompt de interacción
