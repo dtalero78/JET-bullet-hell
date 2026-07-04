@@ -329,7 +329,7 @@ const ABILITIES = [
   { id: 'threads',  name: '2. Hilo Liberado',              cost: 25,
     desc: 'Puños teal + 3 hilos en abanico que se desentrañan al volar. Y: RUPTURA DE HILOS — cutscene + descarga de 16 hilos en 360° que paralizan a los enemigos 1.5s (CD 15s).', color: '#2cb' },
   { id: 'breaker',  name: '3. Puños Rompedores',        cost: 120,
-    desc: 'Ráfaga de 4 puños rosados rápidos en línea.', color: '#f8c' },
+    desc: 'Ráfaga de puños limpios estilo Crazy Diamond. A cada enemigo que MATAS lo conviertes en una PIEDRA-cristal que bloquea el paso: nadie la atraviesa. Los enemigos deben romperla a golpes para pasar, y tú puedes destruirla volviéndole a pegar. Úsala para tapar rutas y encerrar.', color: '#f8c' },
   { id: 'rain',     name: '4. Tormenta Torrencial',           cost: 250,
     desc: 'Una nube te sigue ENCIMA y su lluvia se vuelve arma: daña sola a los enemigos a tu alrededor (posiciónate para mojarlos). CLICK: RELÁMPAGO dirigido al cursor (área + parálisis; +daño a los mojados). Mojar y golpear carga el medidor DILUVIO; al llenarlo, pulsa O para desatar la TORMENTA FINAL que cubre la pantalla 5s.', color: '#69c' },
   { id: 'arrow',    name: '5. Flechas Perforantes',     cost: 300,
@@ -422,6 +422,9 @@ let raidAnnounceText = '';
 let raidAnnounceColor = '#fd6';
 // power-up activos del jugador
 let puDmgTimer = 0, puRateTimer = 0, puInvulnTimer = 0, puMagnetTimer = 0;
+// Puños Rompedores (slot 2): a quien matas se vuelve PIEDRA-obstáculo que bloquea
+// el paso; enemigos y jugador deben romperla a golpes.
+const stones = [];
 // Látigo Eléctrico Morado (slot 0): 0 = latigazo en cadena, 1 = látigo-cuerda eléctrico
 let whipForm = 0;
 let whipKills = 0;                       // kills con el látigo (desbloquea la forma 1 a las 50)
@@ -2305,7 +2308,10 @@ function standOutBurst() {
   effects.push({ type: 'flash', life: 14, max: 14, color: '#5fe' });
 }
 
-// 3. Puños Rompedores — ráfaga rosa de 4 puños rápidos
+// 3. Puños Rompedores — Crazy Diamond: ráfaga de puños limpios. A quien matas se
+// vuelve PIEDRA que bloquea el paso; tú y los enemigos deben romperla a golpes.
+const CD_PINK = '#f49ac2';   // rosa Crazy Diamond
+const CD_CYAN = '#9fe';      // brillo cian
 let breakerCombo = 0;
 let breakerTimer = 0;
 let breakerAngle = 0;
@@ -2319,19 +2325,155 @@ function processBreakerCombo() {
   if (breakerCombo <= 0) return;
   breakerTimer--;
   if (breakerTimer <= 0) {
-    const a = breakerAngle + rand(-0.08, 0.08);
-    punchAttack(a, 48, 95, 8, '#f6b', 60);
+    const a = breakerAngle + rand(-0.06, 0.06);
+    punchAttack(a, 48, 95, 8, CD_PINK, 60);
     const tx = player.x + Math.cos(a) * 48;
     const ty = player.y + Math.sin(a) * 48;
-    for (let p = 0; p < 7; p++) {
-      particles.push({
-        x: tx + rand(-10,10), y: ty + rand(-10,10),
-        vx: rand(-2.5,2.5), vy: rand(-2.5,2.5),
-        life: 22, max: 22, color: rand(0,1) > 0.5 ? '#f6b' : '#fbd', r: 3
-      });
-    }
+    // efecto limpio: destello de impacto + estela corta hacia adelante
+    effects.push({ type: 'cdpunch', x: tx, y: ty, angle: a, life: 9, max: 9 });
+    // el jugador también rompe piedras al golpear
+    damageStonesAt(tx, ty, 46, 34);
     breakerCombo--;
     breakerTimer = 4;
+  }
+}
+
+// ── PIEDRAS de Puños Rompedores ──────────────────────────────────────
+// Crea una piedra-obstáculo donde murió el enemigo. Bloquea el paso y hay
+// que romperla a golpes (tú o los enemigos).
+function spawnStone(x, y, r) {
+  const rad = Math.max(16, Math.min(30, r + 4));
+  // facetas para un cristal limpio (vértices fijos → no titila)
+  const verts = 7;
+  const shape = [];
+  for (let i = 0; i < verts; i++) {
+    const ang = (i / verts) * Math.PI * 2;
+    shape.push({ ang, m: 0.78 + (i % 2 ? 0.22 : 0.0) + rand(-0.06, 0.06) });
+  }
+  stones.push({
+    x, y, r: rad, hp: 60, maxHp: 60,
+    life: 60 * 16, max: 60 * 16,          // se erosiona sola tras ~16s
+    shape, spin: rand(0, Math.PI),
+  });
+  effects.push({ type: 'cdshard', x, y, life: 16, max: 16 });
+}
+
+// Daña las piedras dentro de un radio (golpes del jugador). Al llegar a 0, estalla.
+function damageStonesAt(x, y, radius, dmg) {
+  for (let i = stones.length - 1; i >= 0; i--) {
+    const s = stones[i];
+    const rr = radius + s.r;
+    const dx = s.x - x, dy = s.y - y;
+    if (dx * dx + dy * dy <= rr * rr) {
+      s.hp -= dmg;
+      s.hitFlash = 6;
+      if (s.hp <= 0) shatterStone(i);
+    }
+  }
+}
+
+function shatterStone(i) {
+  const s = stones[i];
+  for (let p = 0; p < 12; p++) {
+    particles.push({
+      x: s.x, y: s.y,
+      vx: rand(-4, 4), vy: rand(-4, 4),
+      life: 26, max: 26, color: p % 2 ? CD_PINK : CD_CYAN, r: 3
+    });
+  }
+  effects.push({ type: 'shockwave', x: s.x, y: s.y, life: 16, max: 16, r: 0, color: CD_PINK });
+  stones.splice(i, 1);
+}
+
+// Empuja a una entidad (jugador/enemigo) fuera de cualquier piedra que solape.
+function pushOutOfStones(ent) {
+  for (const s of stones) {
+    const minD = ent.r + s.r;
+    const dx = ent.x - s.x, dy = ent.y - s.y;
+    const dSq = dx * dx + dy * dy;
+    if (dSq < minD * minD && dSq > 0.01) {
+      const d = Math.sqrt(dSq);
+      const push = (minD - d);
+      ent.x += (dx / d) * push;
+      ent.y += (dy / d) * push;
+    }
+  }
+}
+
+function updateStones() {
+  if (stones.length === 0) return;
+  for (let i = stones.length - 1; i >= 0; i--) {
+    const s = stones[i];
+    if (s.hitFlash > 0) s.hitFlash--;
+    s.life--;
+    if (s.life <= 0) { shatterStone(i); continue; }
+    // los enemigos que tocan la piedra la golpean (la rompen para pasar) y quedan frenados
+    for (let j = 0; j < enemies.length; j++) {
+      const e = enemies[j];
+      if (e.ally) continue;
+      const rr = e.r + s.r;
+      const dx = e.x - s.x, dy = e.y - s.y;
+      const dSq = dx * dx + dy * dy;
+      if (dSq < rr * rr && dSq > 0.01) {
+        s.hp -= 0.5;                       // golpe constante del enemigo
+        s.hitFlash = Math.max(s.hitFlash, 3);
+        if (frame % 10 === 0) {
+          effects.push({ type: 'cdpunch', x: s.x + rand(-6, 6), y: s.y + rand(-6, 6), angle: Math.atan2(-dy, -dx), life: 6, max: 6 });
+        }
+        const d = Math.sqrt(dSq);           // empújalo fuera: no puede pasar
+        const push = (rr - d);
+        e.x += (dx / d) * push; e.y += (dy / d) * push;
+        if (s.hp <= 0) { shatterStone(i); break; }
+      }
+    }
+  }
+  // el jugador tampoco puede atravesar ninguna piedra
+  pushOutOfStones(player);
+  player.x = Math.max(player.r, Math.min(W - player.r, player.x));
+  player.y = Math.max(player.r, Math.min(H - player.r, player.y));
+}
+
+function drawStones() {
+  for (const s of stones) {
+    const hurt = s.hp / s.maxHp;           // 1 → 0
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.rotate(s.spin);
+    // cuerpo del cristal (rosa Crazy Diamond) con grietas al dañarse
+    ctx.beginPath();
+    for (let i = 0; i < s.shape.length; i++) {
+      const v = s.shape[i];
+      const rr = s.r * v.m;
+      const x = Math.cos(v.ang) * rr, y = Math.sin(v.ang) * rr;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = s.hitFlash > 0 ? '#fff' : `rgba(226, 150, 190, ${0.55 + hurt * 0.4})`;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = CD_PINK;
+    ctx.stroke();
+    // faceta interior (brillo limpio)
+    ctx.beginPath();
+    for (let i = 0; i < s.shape.length; i++) {
+      const v = s.shape[i];
+      const rr = s.r * v.m * 0.5;
+      const x = Math.cos(v.ang) * rr, y = Math.sin(v.ang) * rr;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = `rgba(180, 255, 240, ${0.25 * hurt + 0.1})`;
+    ctx.fill();
+    // grietas cuando está muy dañada
+    if (hurt < 0.55) {
+      ctx.strokeStyle = 'rgba(60, 20, 40, 0.6)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-s.r * 0.5, -s.r * 0.2); ctx.lineTo(s.r * 0.1, s.r * 0.1); ctx.lineTo(s.r * 0.5, -s.r * 0.3);
+      ctx.moveTo(0, s.r * 0.5); ctx.lineTo(-s.r * 0.15, 0);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 }
 
@@ -4870,6 +5012,10 @@ function updateEnemies() {
       }
       // Luna de sangre: monedas extra
       if (bloodMoon) player.coins += Math.floor(e.coins);
+      // Puños Rompedores: el enemigo muerto se vuelve PIEDRA-obstáculo
+      if (active === 2 && owned.has(2) && !e.bossKind && !e.ally && stones.length < 40) {
+        spawnStone(e.x, e.y, e.r);
+      }
       e.dead = true;
       enemies.splice(i, 1);
     }
@@ -7123,6 +7269,9 @@ function draw() {
     }
   });
 
+  // piedras de Puños Rompedores (obstáculos) — bajo los enemigos
+  drawStones();
+
   // boss telegraphs: laser sight (Tirador), echo clone (Espejo), warlord dash arrow
   for (let ei = 0; ei < enemies.length; ei++) {
     const e = enemies[ei];
@@ -7830,6 +7979,28 @@ function draw() {
       ctx.strokeStyle = 'rgba(255,255,255,0.8)';
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(f.x, f.y, rIn, 0, Math.PI * 2); ctx.stroke();
+    } else if (f.type === 'cdpunch') {
+      // impacto limpio de Crazy Diamond: destello + 4 esquirlas nítidas hacia afuera
+      const a = f.life / f.max;
+      const R = 16 * (1 - a) + 6;
+      ctx.globalAlpha = a;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(f.x, f.y, 4 * a + 1.5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = CD_PINK; ctx.lineWidth = 2.5;
+      for (let k = 0; k < 4; k++) {
+        const aa = (f.angle || 0) + k * Math.PI / 2 + Math.PI / 4;
+        ctx.beginPath();
+        ctx.moveTo(f.x + Math.cos(aa) * R * 0.4, f.y + Math.sin(aa) * R * 0.4);
+        ctx.lineTo(f.x + Math.cos(aa) * R, f.y + Math.sin(aa) * R);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    } else if (f.type === 'cdshard') {
+      // aparición de la piedra: anillo cristalino que se contrae
+      const a = f.life / f.max;
+      ctx.strokeStyle = `rgba(244, 154, 194, ${a})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(f.x, f.y, 8 + a * 22, 0, Math.PI * 2); ctx.stroke();
     } else if (f.type === 'shockwave') {
       const alpha = f.life / f.max;
       if (f.color) {
@@ -11035,6 +11206,7 @@ function restart() {
   effects.length = 0;
   vortexFields.length = 0;
   fires.length = 0;
+  stones.length = 0;
   pibPuddles.length = 0;
   pibGiants.length = 0;
   pibForm = 0; pibGiantCD = 0; pibGiantPhase = 0;
@@ -11130,6 +11302,7 @@ function loop() {
     if (timeStopTimer === 0) {
       updateEnemies();
     }
+    updateStones();
     updateProjectiles();
     updateVortexFields();
     updateBossHazards();
