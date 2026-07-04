@@ -2357,7 +2357,7 @@ function updateRain() {
       const ty = player.y + rand(-RAIN_RADIUS * 0.55, RAIN_RADIUS * 0.7);
       projectiles.push({
         x: rx, y: startY, vx: rand(-0.4, 0.4), vy: 13,
-        r: 3, dmg: 9, life: 90, type: 'rain', color: '#69c', targetY: ty
+        r: 3, dmg: 4, life: 90, type: 'rain', color: '#69c', targetY: ty
       });
     }
     // daño confiable + carga del Diluvio mientras haya enemigos bajo tu lluvia
@@ -2366,7 +2366,7 @@ function updateRain() {
         const e = enemies[j];
         if (e.ally) continue;
         if (distSq(player, e) < RAIN_RADIUS * RAIN_RADIUS) {
-          damageEnemy(e, 5, '#69c');        // la lluvia moja y daña
+          damageEnemy(e, 2, '#69c');        // la lluvia moja y daña (chip suave)
           e.wet = 40;                       // mojado: bonus de relámpago
           nrGauge = Math.min(100, nrGauge + 2.5);
         }
