@@ -327,7 +327,7 @@ const ABILITIES = [
   { id: 'whip',     name: '1. Látigo Eléctrico Morado', cost: 0,
     desc: 'Latigazo eléctrico que restalla en línea y encadena daño entre enemigos. Con 50 kills desbloqueas una 2ª forma: pulsa C para cambiar los clicks a un LÁTIGO-CUERDA eléctrico (como Oh! Lonesome Me pero morado): te jala hasta el punto dañando en el camino, y a quien sobreviva lo deja PARALIZADO 5s.', color: '#c4f' },
   { id: 'threads',  name: '2. Hilo Liberado',              cost: 25,
-    desc: 'Puños teal + 3 hilos en abanico que se desentrañan al volar. Y: RUPTURA DE HILOS — cutscene + descarga de 16 hilos en 360° que paralizan a los enemigos 1.5s (CD 15s).', color: '#2cb' },
+    desc: 'Stone Free: te desenredas en HILO. Click: puño corto + un tendón que ATRAVIESA hasta 5 enemigos y los ENREDA (inmoviliza ~1.8s + daño continuo), tejiendo una telaraña entre los atrapados. Y: RUPTURA DE HILOS — cutscene + 16 hilos en 360° que enredan a todo alrededor 2.5s (CD 15s).', color: '#2cb' },
   { id: 'breaker',  name: '3. Puños Rompedores',        cost: 120,
     desc: 'Ráfaga de puños limpios estilo Crazy Diamond. A cada enemigo que MATAS lo conviertes en una PIEDRA-cristal que bloquea el paso: nadie la atraviesa. Los enemigos deben romperla a golpes para pasar, y tú puedes destruirla volviéndole a pegar. Úsala para tapar rutas y encerrar.', color: '#f8c' },
   { id: 'rain',     name: '4. Tormenta Torrencial',           cost: 250,
@@ -2279,17 +2279,25 @@ function punchAttack(angle, range, dmg, knock, color, hitR) {
 }
 
 // 2. Hilo Liberado — puños teal + 3 hilos que se desentrañan
+// 2. Hilo Liberado — Stone Free: se desenreda en HILO. El click da un puño corto
+// y lanza un tendón que ATRAVIESA y ENREDA a los enemigos (inmoviliza + DoT),
+// tejiendo una telaraña entre los atrapados.
+const SF_TEAL = '#2cd1c0';
+function snareEnemy(e, frames) {
+  if (e.ally) return;
+  e.paralyzed = Math.max(e.paralyzed || 0, frames);   // reusa el bind (inmoviliza)
+  e.snared = Math.max(e.snared || 0, frames);         // hilo: DoT + visual de telaraña
+}
 function threadsAttack(angle) {
-  punchAttack(angle, 36, 80, 7, '#2cb');
-  for (let i = -1; i <= 1; i++) {
-    const a = angle + i * 0.14;
-    projectiles.push({
-      x: player.x + Math.cos(a) * 18, y: player.y + Math.sin(a) * 18,
-      vx: Math.cos(a) * 10, vy: Math.sin(a) * 10,
-      r: 4, dmg: 60, life: 80, type: 'thread', color: '#2cb',
-      angle: a, trail: []
-    });
-  }
+  // ORA corto de hilo
+  punchAttack(angle, 34, 52, 6, SF_TEAL, 30);
+  // tendón de hilo hacia el cursor: atraviesa varios y los enreda
+  projectiles.push({
+    x: player.x + Math.cos(angle) * 18, y: player.y + Math.sin(angle) * 18,
+    vx: Math.cos(angle) * 13, vy: Math.sin(angle) * 13,
+    r: 5, dmg: 42, life: 46, type: 'sfstring', color: SF_TEAL,
+    angle, hits: new Set(), trail: []
+  });
 }
 
 function standOutBurst() {
@@ -2431,6 +2439,49 @@ function updateStones() {
   pushOutOfStones(player);
   player.x = Math.max(player.r, Math.min(W - player.r, player.x));
   player.y = Math.max(player.r, Math.min(H - player.r, player.y));
+}
+
+// Telaraña de Stone Free: envuelve a los enredados y conecta a los cercanos con hilo.
+function drawStoneFreeWeb() {
+  const snared = [];
+  for (let i = 0; i < enemies.length; i++) {
+    const e = enemies[i];
+    if (!e.ally && e.snared > 0) snared.push(e);
+  }
+  if (snared.length === 0) return;
+  ctx.save();
+  ctx.lineCap = 'round';
+  // hilos entre enredados cercanos (telaraña)
+  ctx.strokeStyle = 'rgba(45, 209, 192, 0.5)';
+  ctx.lineWidth = 1.4;
+  for (let i = 0; i < snared.length; i++) {
+    for (let j = i + 1; j < snared.length; j++) {
+      const a = snared[i], b = snared[j];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      if (dx * dx + dy * dy > 170 * 170) continue;
+      const mx = (a.x + b.x) / 2 + Math.sin(frame * 0.2 + i) * 3;
+      const my = (a.y + b.y) / 2 + Math.cos(frame * 0.2 + j) * 3;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.quadraticCurveTo(mx, my, b.x, b.y);
+      ctx.stroke();
+    }
+  }
+  // envoltura de hilo alrededor de cada enredado
+  for (const e of snared) {
+    ctx.strokeStyle = 'rgba(120, 240, 225, 0.75)';
+    ctx.lineWidth = 1.3;
+    const R = e.r + 4;
+    for (let k = -2; k <= 2; k++) {
+      const yy = e.y + k * (e.r * 0.4);
+      const w = Math.sqrt(Math.max(0, R * R - (k * e.r * 0.4) ** 2));
+      ctx.beginPath();
+      ctx.moveTo(e.x - w, yy);
+      ctx.quadraticCurveTo(e.x, yy + Math.sin(frame * 0.3 + k) * 2, e.x + w, yy);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
 }
 
 function drawStones() {
@@ -4165,6 +4216,7 @@ function updateEnemies() {
     if (timeStopTimer > 0) return;
     if (e.geOvercharge > 0) e.geOvercharge--;
     if (e.wet > 0) e.wet--;
+    if (e.snared > 0) { e.snared--; if (frame % 15 === 0) damageEnemy(e, 3, SF_TEAL); }
     if (e.tied > 0) e.tied--;
     if (e.frozen > 0) { e.frozen--; return; }
     // rocas pegadas: más tiempo = más daño
@@ -5597,7 +5649,7 @@ function updateProjectiles() {
         }
       }
     } else if (p.type === 'standOutThread') {
-      // hilo de Hilo Liberado — atraviesa enemigos y los paraliza
+      // hilo de Hilo Liberado — atraviesa enemigos y los ENREDA (telaraña)
       for (let j = 0; j < enemies.length; j++) {
         const e = enemies[j];
         if (e.ally) continue;
@@ -5605,9 +5657,25 @@ function updateProjectiles() {
         const rr = e.r + p.r;
         if (distSq(e, p) < rr * rr) {
           damageEnemy(e, p.dmg, '#5fe');
-          e.paralyzed = Math.max(e.paralyzed || 0, 90); // 1.5s bind
-          effects.push({ type: 'debuff', x: e.x, y: e.y - 24, value: '🪢', life: 28, max: 28 });
+          snareEnemy(e, 150); // 2.5s enredado
+          effects.push({ type: 'debuff', x: e.x, y: e.y - 24, value: '🕸', life: 28, max: 28 });
           p.hits.add(e.id);
+        }
+      }
+    } else if (p.type === 'sfstring') {
+      // tendón de Stone Free: atraviesa hasta 5 enemigos y los ENREDA
+      if (p.pierce === undefined) p.pierce = 5;
+      for (let j = 0; j < enemies.length; j++) {
+        const e = enemies[j];
+        if (e.ally || p.hits.has(e.id)) continue;
+        const rr = e.r + p.r;
+        if (distSq(e, p) < rr * rr) {
+          damageEnemy(e, p.dmg, SF_TEAL);
+          snareEnemy(e, 110); // ~1.8s enredado
+          effects.push({ type: 'debuff', x: e.x, y: e.y - 24, value: '🕸', life: 26, max: 26 });
+          p.hits.add(e.id);
+          p.pierce--;
+          if (p.pierce <= 0) { consumed = true; break; }
         }
       }
     } else if (p.type === 'heatstrike') {
@@ -6702,9 +6770,9 @@ function draw() {
       ctx.fill();
       ctx.restore();
     }
-    if (p.type === 'thread' || p.type === 'standOutThread') {
+    if (p.type === 'thread' || p.type === 'standOutThread' || p.type === 'sfstring') {
       // Hilo de Hilo Liberado — múltiples cuerdas paralelas oscilando
-      const baseColor = p.type === 'standOutThread' ? '#5fe' : '#2cb';
+      const baseColor = p.type === 'standOutThread' ? '#5fe' : (p.type === 'sfstring' ? SF_TEAL : '#2cb');
       const lightColor = p.type === 'standOutThread' ? '#fff' : '#cef';
       if (p.trail && p.trail.length > 1) {
         // 3 cuerdas paralelas con offset perpendicular
@@ -7271,6 +7339,8 @@ function draw() {
 
   // piedras de Puños Rompedores (obstáculos) — bajo los enemigos
   drawStones();
+  // telaraña de Stone Free — bajo los enemigos
+  drawStoneFreeWeb();
 
   // boss telegraphs: laser sight (Tirador), echo clone (Espejo), warlord dash arrow
   for (let ei = 0; ei < enemies.length; ei++) {
@@ -7480,7 +7550,8 @@ function draw() {
       ctx.textAlign = 'left';
     }
     // paralizado (látigo eléctrico): arcos eléctricos morados alrededor
-    if (e.paralyzed > 0 && !e.ally) {
+    // (si está ENREDADO por Stone Free, manda el visual de hilo, no el eléctrico)
+    if (e.paralyzed > 0 && !e.ally && !(e.snared > 0)) {
       ctx.strokeStyle = `rgba(181, 90, 255, ${0.5 + 0.5 * Math.sin(frame * 0.5)})`;
       ctx.lineWidth = 1.6;
       for (let s = 0; s < 3; s++) {
