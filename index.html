@@ -15363,9 +15363,9 @@ async function openOnlinePanel() {
   const msg = document.getElementById('ol-home-msg');
   const joinBtn = document.getElementById('ol-join-btn');
   if (hasLan) {
-    msg.textContent = 'Corre la carrera contra alguien en tu misma red WiFi. Uno crea la partida; el otro la ve en la lista y se une.';
-    joinBtn.textContent = '🔍 Ver partidas en la WiFi';
-    olSetStatus('Servidor WiFi detectado ✔');
+    msg.textContent = 'Juega contra alguien en cualquier red. Uno crea la partida y comparte el código de 6 dígitos; el otro escribe ese código para unirse.';
+    joinBtn.textContent = '🔑 Unirse con código';
+    olSetStatus('Servidor conectado ✔');
     netLanInit();
   } else {
     msg.textContent = 'No hay servidor WiFi (abriste la versión web). Puedes jugar por internet con un código: uno crea y comparte el código de 6 dígitos. Para el modo "misma WiFi" hay que correr el servidor local (server.js).';
@@ -15416,7 +15416,7 @@ function onLanEvent(ev) {
 
 function applyLanRoom(room) {
   net.lanRoom = room.roomId;
-  net.code = room.name;
+  net.code = room.code || room.name;
   const me = room.players.find(p => p.id === net.lanId);
   const rival = room.players.find(p => p.id !== net.lanId);
   if (me && me.host !== undefined) net.role = me.host ? 'host' : 'guest';
@@ -15439,9 +15439,9 @@ async function netLanCreate() {
   olSetStatus('Creando partida…');
   const r = await lanApi('/api/create', { clientId: net.lanId, name: 'Anfitrión', weapon: net.myWeapon });
   if (r && r.roomId) {
-    net.lanRoom = r.roomId; net.code = r.name; net.role = 'host';
+    net.lanRoom = r.roomId; net.code = r.code || r.name; net.role = 'host';
     olShow('ol-lobby'); renderLobby();
-    olSetStatus('Sala "' + r.name + '" creada. Esperando rival…');
+    olSetStatus('Sala creada. Comparte el código ' + (r.code || r.name) + ' con tu rival.');
   } else { olSetStatus('No se pudo crear la sala.'); }
 }
 
@@ -15468,6 +15468,18 @@ async function netLanRefreshList() {
     if (!rm.full) div.addEventListener('click', () => netLanJoin(rm.id, rm.name));
     box.appendChild(div);
   });
+}
+async function netLanJoinByCode(code) {
+  if (!/^\d{6}$/.test(code)) { olSetStatus('El código debe tener 6 dígitos.'); return; }
+  netLanInit();
+  olSetStatus('Uniéndote a la sala ' + code + '…');
+  const r = await lanApi('/api/join', { clientId: net.lanId, code, name: 'Rival', weapon: net.myWeapon });
+  if (r && r.roomId) {
+    net.lanRoom = r.roomId; net.code = r.code || code; net.role = 'guest';
+    olShow('ol-lobby'); renderLobby();
+  } else {
+    olSetStatus(r && r.error ? r.error : 'No se pudo unir. Verifica el código.');
+  }
 }
 async function netLanJoin(roomId, name) {
   olSetStatus('Uniéndote a "' + name + '"…');
@@ -15641,7 +15653,7 @@ function renderLobby() {
   const codeEl = document.getElementById('ol-code');
   if (codeEl) codeEl.textContent = net.code || '——————';
   const box = document.getElementById('ol-codebox');
-  if (box) box.firstChild.textContent = net.transport === 'lan' ? 'Sala' : (net.role === 'host' ? 'Código de tu sala' : 'Sala');
+  if (box) box.firstChild.textContent = net.role === 'host' ? 'Código de tu sala' : 'Sala';
   // montura seleccionada
   document.querySelectorAll('#ol-weapons .ol-wp').forEach(b => {
     b.classList.toggle('sel', b.dataset.wp === net.myWeapon);
@@ -15782,15 +15794,14 @@ document.getElementById('ol-create').addEventListener('click', () => {
   if (net.transport === 'lan') netLanCreate(); else netCreateGame();
 });
 document.getElementById('ol-join-btn').addEventListener('click', () => {
-  if (net.transport === 'lan') { netLanShowList(); }
-  else { olShow('ol-join'); olSetStatus(''); }
+  olShow('ol-join'); olSetStatus('');
 });
 document.getElementById('ol-list-refresh').addEventListener('click', () => netLanRefreshList());
 document.getElementById('ol-list-back').addEventListener('click', () => { olShow('ol-home'); olSetStatus(''); });
 document.getElementById('ol-join-back').addEventListener('click', () => { olShow('ol-home'); olSetStatus(''); });
 document.getElementById('ol-connect').addEventListener('click', () => {
   const code = (document.getElementById('ol-code-input').value || '').trim();
-  netJoinGame(code);
+  if (net.transport === 'lan') netLanJoinByCode(code); else netJoinGame(code);
 });
 document.getElementById('ol-code-input').addEventListener('input', e => {
   e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);

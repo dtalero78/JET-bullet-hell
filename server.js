@@ -35,6 +35,18 @@ function uniqueRoomName() {
   return name;
 }
 function uid() { return Math.random().toString(36).slice(2, 10); }
+function uniqueCode() {
+  const taken = new Set([...lobbies.values()].map(r => r.code));
+  let code, tries = 0;
+  do { code = String(Math.floor(100000 + Math.random() * 900000)); }
+  while (taken.has(code) && tries++ < 200);
+  return code;
+}
+function findByCode(code) {
+  if (!code) return null;
+  for (const room of lobbies.values()) if (room.code === code) return room;
+  return null;
+}
 
 function sendJSON(res, code, obj) {
   res.writeHead(code, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
@@ -49,7 +61,7 @@ function roomState(room) {
   for (const [cid, c] of room.clients) {
     players.push({ id: cid, name: c.name, ready: c.ready, weapon: c.weapon, host: cid === room.hostId });
   }
-  return { type: 'room', roomId: room.id, name: room.name, players, started: room.started };
+  return { type: 'room', roomId: room.id, name: room.name, code: room.code, players, started: room.started };
 }
 function broadcastRoom(room) {
   const st = roomState(room);
@@ -125,22 +137,23 @@ const server = http.createServer(async (req, res) => {
     const b = await readBody(req);
     if (!b.clientId) return sendJSON(res, 400, { error: 'sin clientId' });
     disconnect(b.clientId); // por si estaba en otra sala
-    const room = { id: uid(), name: uniqueRoomName(), hostId: b.clientId, started: false, clients: new Map() };
+    const room = { id: uid(), name: uniqueRoomName(), code: uniqueCode(), hostId: b.clientId, started: false, clients: new Map() };
     room.clients.set(b.clientId, { ready: false, weapon: b.weapon || 'fists', name: b.name || 'Anfitrión', host: true });
     lobbies.set(room.id, room);
     broadcastRoom(room);
-    return sendJSON(res, 200, { roomId: room.id, name: room.name });
+    return sendJSON(res, 200, { roomId: room.id, name: room.name, code: room.code });
   }
 
   if (p === '/api/join' && req.method === 'POST') {
     const b = await readBody(req);
-    const room = lobbies.get(b.roomId);
-    if (!room) return sendJSON(res, 404, { error: 'La sala ya no existe.' });
+    const room = lobbies.get(b.roomId) || findByCode(b.code);
+    if (!room) return sendJSON(res, 404, { error: 'No existe una sala con ese código.' });
     if (room.started) return sendJSON(res, 409, { error: 'La partida ya empezó.' });
     if (room.clients.size >= 2 && !room.clients.has(b.clientId)) return sendJSON(res, 409, { error: 'La sala está llena.' });
+    disconnect(b.clientId); // por si estaba en otra sala
     room.clients.set(b.clientId, { ready: false, weapon: b.weapon || 'fists', name: b.name || 'Rival', host: false });
     broadcastRoom(room);
-    return sendJSON(res, 200, { roomId: room.id, name: room.name });
+    return sendJSON(res, 200, { roomId: room.id, name: room.name, code: room.code });
   }
 
   if (p === '/api/ready' && req.method === 'POST') {
