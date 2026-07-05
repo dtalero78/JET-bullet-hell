@@ -94,6 +94,8 @@
   #ol-status { margin-top: 12px; color: #8df; font-size: 13px; min-height: 18px; }
   #ol-weapons { margin: 10px 0; }
   #ol-weapons span { display: block; color: #cca; margin-bottom: 4px; font-size: 12px; }
+  #ol-tutrow { display: inline-flex; align-items: center; gap: 7px; margin: 6px 0 2px 0; color: #cde; font-size: 13px; cursor: pointer; }
+  #ol-tutrow input { width: 16px; height: 16px; cursor: pointer; }
   #ol-list-box { margin: 10px 0; max-height: 260px; overflow-y: auto; }
   .ol-room {
     display: flex; justify-content: space-between; align-items: center;
@@ -154,6 +156,7 @@
       <button class="ol-wp" data-wp="gun">🔫 Pistola</button>
       <button class="ol-wp" data-wp="steelballs">⚙ Pelotas</button>
     </div>
+    <label id="ol-tutrow"><input type="checkbox" id="ol-tut"> 📘 Hacer el tutorial antes de la carrera</label>
     <div id="ol-players"></div>
     <button id="ol-ready">✔ LISTO</button>
     <div><button id="ol-leave" class="ghost">Salir</button></div>
@@ -11514,8 +11517,14 @@ document.getElementById('sb-darkness').addEventListener('click', () => {
 // ============================================================
 let raceMode = false;
 let racePaused = false;
-let racePhase = 'weapon-select'; // weapon-select, pre-stage, racing, post-stage, night, finale, defeat
+let racePhase = 'weapon-select'; // weapon-select, tutorial-ask, tutorial, tut-wait, pre-stage, racing, post-stage, night, finale, defeat
 let raceStage = 1;
+// --- Tutorial de Steel Ball Run (opcional, antes de la carrera) ---
+const raceTut = {
+  step: 0, timer: 0, attacks: 0,
+  movedL: false, movedR: false, accel: false, dashed: false,
+  finishDist: 0, dummy: null,
+};
 const RACE_STAGES = 9;
 let raceWeapon = null;            // 'fists' | 'gun' | 'steelballs'
 const raceCollectedParts = [];    // partes del Santo Cadáver halladas
@@ -11878,6 +11887,15 @@ function updateRace() {
     case 'weapon-select':
       updateRaceWeaponSelect();
       break;
+    case 'tutorial-ask':
+      updateRaceTutorialAsk();
+      break;
+    case 'tutorial':
+      updateRaceTutorial();
+      break;
+    case 'tut-wait':
+      netCheckTutBarrier();
+      break;
     case 'pre-stage':
       if (racePhaseTimer > 150 || keyPressed[' ']) {
         racePhase = 'racing';
@@ -11919,11 +11937,243 @@ function updateRaceWeaponSelect() {
     const x = startX + i * (boxW + gap);
     if (mouse.x >= x && mouse.x <= x + boxW && mouse.y >= cy && mouse.y <= cy + boxH) {
       raceWeapon = choices[i];
-      racePhase = 'pre-stage';
+      racePhase = 'tutorial-ask';
       racePhaseTimer = 0;
-      setupRaceStage();
       return;
     }
+  }
+}
+
+// ---------- TUTORIAL (opcional, antes de la carrera) ----------
+// Geometría de los dos botones Sí/No (compartida por update y draw).
+const TUT_ASK_BW = 300, TUT_ASK_BH = 96, TUT_ASK_GAP = 44;
+function tutAskYesRect() { return { x: W / 2 - TUT_ASK_BW - TUT_ASK_GAP / 2, y: H / 2 + 20, w: TUT_ASK_BW, h: TUT_ASK_BH }; }
+function tutAskNoRect()  { return { x: W / 2 + TUT_ASK_GAP / 2,             y: H / 2 + 20, w: TUT_ASK_BW, h: TUT_ASK_BH }; }
+function ptInRect(px, py, r) { return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h; }
+
+function updateRaceTutorialAsk() {
+  if (!mouse.clicked) return;
+  if (ptInRect(mouse.x, mouse.y, tutAskYesRect())) {
+    startRaceTutorial();
+  } else if (ptInRect(mouse.x, mouse.y, tutAskNoRect())) {
+    setupRaceStage();
+    racePhase = 'pre-stage';
+    racePhaseTimer = 0;
+  }
+}
+
+// Textos de cada paso del tutorial.
+const RACE_TUT_STEPS = [
+  '', // paso 0 no se usa
+  'MUÉVETE  —  A / D cambian de carril · W acelera · S frena',
+  'ESQUIVA  —  pulsa ESPACIO mientras te mueves para hacer un dash',
+  'ATACA  —  apunta con el ratón y haz CLIC sobre el saco de práctica',
+  'META  —  ¡corre hacia la línea de meta para terminar!',
+];
+
+function startRaceTutorial() {
+  raceProjectiles.length = 0;
+  raceParticles.length = 0;
+  raceArrows.length = 0;
+  raceObstacles.length = 0;
+  raceNPCs.length = 0;
+  raceStage = 1;
+  raceStageDist = 999999;
+  racePlayer.progress = 0;
+  racePlayer.x = W / 2;
+  racePlayer.y = H - 200;
+  racePlayer.vx = 0; racePlayer.vy = 0;
+  racePlayer.hp = 100; racePlayer.maxHp = 100;
+  racePlayer.stamina = 100; racePlayer.maxStamina = 100;
+  racePlayer.exhausted = false;
+  racePlayer.iframe = 0; racePlayer.attackCD = 0;
+  racePlayer.sideDashTimer = 0; racePlayer.sideDashCD = 0;
+  racePlayer.sideDashVX = 0; racePlayer.sideDashVY = 0;
+  racePlayer.stand = null;          // el tutorial usa el arma base elegida
+  racePlayer.facingAngle = -Math.PI / 2;
+  raceShake = 0; raceDustCD = 0;
+  raceTut.step = 1;
+  raceTut.timer = 0;
+  raceTut.attacks = 0;
+  raceTut.movedL = raceTut.movedR = raceTut.accel = raceTut.dashed = false;
+  raceTut.dummy = null;
+  raceTut.finishDist = 0;
+  racePhase = 'tutorial';
+  racePhaseTimer = 0;
+}
+
+function tutNextStep() {
+  raceTut.step++;
+  raceTut.timer = 0;
+  if (raceTut.step === 4) {
+    raceTut.finishDist = racePlayer.progress + 1600;
+    raceStageDist = raceTut.finishDist; // drawRaceTrack dibuja la meta a cuadros aquí
+  }
+}
+
+function updateRaceTutorial() {
+  raceTut.timer++;
+  const left  = keys['a'] || keys['arrowleft'];
+  const right = keys['d'] || keys['arrowright'];
+  const up    = keys['w'] || keys['arrowup'];
+  const down  = keys['s'] || keys['arrowdown'];
+  if (left)  raceTut.movedL = true;
+  if (right) raceTut.movedR = true;
+  if (up)    raceTut.accel = true;
+
+  // ---- movimiento lateral (idéntico a la carrera, sin penalizaciones) ----
+  racePlayer.vx *= 0.78;
+  if (left)  racePlayer.vx -= 1.1;
+  if (right) racePlayer.vx += 1.1;
+  racePlayer.vy *= 0.84;
+  if (up)   racePlayer.vy -= 0.6;
+  if (down) racePlayer.vy += 0.7;
+  racePlayer.x += racePlayer.vx;
+  racePlayer.y += racePlayer.vy;
+  racePlayer.x = Math.max(RACE_LANE_LEFT, Math.min(RACE_LANE_RIGHT, racePlayer.x));
+  racePlayer.y = Math.max(140, Math.min(H - 90, racePlayer.y));
+
+  // ---- DASH (SPACE) ----
+  if (racePlayer.sideDashCD > 0) racePlayer.sideDashCD--;
+  if (keyPressed[' '] && racePlayer.sideDashTimer <= 0 && racePlayer.sideDashCD <= 0 && racePlayer.stamina >= 20) {
+    let dx = 0, dy = 0;
+    if (left)  dx -= 1;
+    if (right) dx += 1;
+    if (up)    dy -= 1;
+    if (down)  dy += 1;
+    if (dx !== 0 || dy !== 0) {
+      const mag = Math.hypot(dx, dy);
+      racePlayer.sideDashVX = dx / mag;
+      racePlayer.sideDashVY = dy / mag;
+      racePlayer.sideDashTimer = 14;
+      racePlayer.stamina = Math.max(0, racePlayer.stamina - 20);
+      racePlayer.sideDashCD = 180;
+      racePlayer.iframe = Math.max(racePlayer.iframe, 22);
+      raceFlashTimer = 14; raceFlashColor = '#6cf';
+      raceTut.dashed = true;
+      for (let k = 0; k < 18; k++) {
+        raceParticles.push({
+          x: racePlayer.x + rand(-10, 10), y: racePlayer.y + rand(-8, 8),
+          vx: -racePlayer.sideDashVX * rand(2, 6), vy: -racePlayer.sideDashVY * rand(2, 6),
+          life: 26, color: '#6cf', size: 4
+        });
+      }
+    }
+  }
+  if (racePlayer.sideDashTimer > 0) {
+    racePlayer.sideDashTimer--;
+    racePlayer.x += racePlayer.sideDashVX * 26;
+    racePlayer.y += racePlayer.sideDashVY * 26;
+    racePlayer.x = Math.max(RACE_LANE_LEFT, Math.min(RACE_LANE_RIGHT, racePlayer.x));
+    racePlayer.y = Math.max(140, Math.min(H - 90, racePlayer.y));
+  }
+
+  // ---- resistencia (simple) ----
+  if (up) racePlayer.stamina -= 0.3;
+  else if (down) racePlayer.stamina += 0.5;
+  else racePlayer.stamina += 0.15;
+  racePlayer.stamina = Math.max(0, Math.min(racePlayer.maxStamina, racePlayer.stamina));
+
+  // ---- avance (congelado en el paso de ataque para tener el saco a tiro) ----
+  let fwd = 2.2;
+  if (up) fwd += 2.2;
+  if (down) fwd -= 1.8;
+  if (raceTut.step !== 3) racePlayer.progress += Math.max(0, fwd);
+
+  if (racePlayer.attackCD > 0) racePlayer.attackCD--;
+  if (racePlayer.iframe > 0) racePlayer.iframe--;
+
+  // polvo bajo los cascos
+  if (raceDustCD > 0) raceDustCD--;
+  if (fwd > 3 && raceDustCD <= 0) {
+    raceDustCD = 4;
+    raceParticles.push({
+      x: racePlayer.x + rand(-14, 14), y: racePlayer.y + 22,
+      vx: rand(-1.2, 1.2), vy: rand(0.5, 2), life: 20,
+      color: Math.random() < 0.5 ? '#c9a26b' : '#b8905a', size: rand(3, 6)
+    });
+  }
+
+  // apuntado siempre disponible
+  racePlayer.facingAngle = Math.atan2(mouse.y - racePlayer.y, mouse.x - racePlayer.x);
+
+  // ---- paso de ataque: saco de práctica ----
+  if (raceTut.step === 3) {
+    if (!raceTut.dummy) {
+      raceTut.dummy = {
+        name: 'SACO DE PRÁCTICA', ability: 'none', color: '#9a7',
+        aggro: 0, lane: 1, x: W / 2, progress: 0, speed: 0, baseSpeed: 0,
+        hp: 500, maxHp: 500, stamina: 100, maxStamina: 100, exhausted: false,
+        stunned: 0, slowTimer: 0, hitFlash: 0, bleed: 0,
+        laneChangeCD: 999999, arrowBoost: 0, attackCD: 999999,
+      };
+      raceNPCs.length = 0;
+      raceNPCs.push(raceTut.dummy);
+    }
+    // el saco se mantiene justo delante, a tiro
+    raceTut.dummy.progress = racePlayer.progress + 60;
+    raceTut.dummy.x = W / 2;
+    raceTut.dummy.hp = raceTut.dummy.maxHp; // indestructible: no se muere en el tutorial
+    if (raceTut.dummy.hitFlash > 0) raceTut.dummy.hitFlash--;
+    if (mouse.down && racePlayer.attackCD <= 0) {
+      const hadBall = !!racePlayer.steelBallActive;
+      const cdBefore = racePlayer.attackCD;
+      doRaceAttack();
+      // contar sólo ataques que de verdad salieron
+      if (raceWeapon === 'steelballs') {
+        if (!hadBall && racePlayer.steelBallActive) raceTut.attacks++;
+      } else if (cdBefore <= 0 && racePlayer.attackCD > 0) {
+        raceTut.attacks++;
+      }
+    }
+  }
+
+  updateRaceProjectiles();
+  updateRaceParticles();
+
+  // ---- progresión de pasos ----
+  switch (raceTut.step) {
+    case 1:
+      if (raceTut.movedL && raceTut.movedR && raceTut.accel && raceTut.timer > 45) tutNextStep();
+      break;
+    case 2:
+      if (raceTut.dashed) tutNextStep();
+      break;
+    case 3:
+      if (raceTut.attacks >= 3) { raceNPCs.length = 0; raceTut.dummy = null; tutNextStep(); }
+      break;
+    case 4:
+      if (racePlayer.progress >= raceTut.finishDist) tutFinishTutorial();
+      break;
+  }
+}
+
+function tutFinishTutorial() {
+  raceNPCs.length = 0;
+  raceProjectiles.length = 0;
+  raceParticles.length = 0;
+  if (net.active) {
+    net.myTutorialDone = true;
+    netSend({ t: 'tutdone' });
+    racePhase = 'tut-wait';
+    racePhaseTimer = 0;
+    netCheckTutBarrier();
+  } else {
+    raceStage = 1;
+    setupRaceStage();
+    racePhase = 'pre-stage';
+    racePhaseTimer = 0;
+  }
+}
+
+// Arranca la carrera online sólo cuando ambos terminaron (o no eligieron) el tutorial.
+function netCheckTutBarrier() {
+  if (!net.active) return;
+  if (net.myTutorialDone && net.rivalTutorialDone) {
+    raceStage = 1;
+    setupRaceStage();
+    racePhase = 'racing';
+    racePhaseTimer = 0;
   }
 }
 
@@ -14152,6 +14402,12 @@ function drawRace() {
     drawRaceNight();
   } else if (racePhase === 'weapon-select') {
     drawRaceWeaponSelect();
+  } else if (racePhase === 'tutorial-ask') {
+    drawRaceTutorialAsk();
+  } else if (racePhase === 'tutorial') {
+    drawRaceTutorial();
+  } else if (racePhase === 'tut-wait') {
+    drawRaceTutWait();
   } else if (racePhase === 'finale') {
     drawRaceFinale();
   } else if (racePhase === 'defeat') {
@@ -15026,6 +15282,121 @@ function drawRaceWeaponSelect() {
   ctx.fillText('ESC para volver al menú', W / 2, H - 30);
 }
 
+function drawRaceTutorialAsk() {
+  const grd = ctx.createLinearGradient(0, 0, 0, H);
+  grd.addColorStop(0, '#0a1e2a');
+  grd.addColorStop(1, '#02060a');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#6cf';
+  ctx.font = 'bold 46px monospace';
+  ctx.fillText('¿QUIERES UN TUTORIAL?', W / 2, 150);
+  ctx.fillStyle = '#fff';
+  ctx.font = '17px monospace';
+  ctx.fillText('Aprende a moverte, esquivar y atacar antes de largar.', W / 2, 190);
+  ctx.fillText('Es rápido y opcional — puedes saltarlo si ya sabes jugar.', W / 2, 214);
+
+  const yes = tutAskYesRect(), no = tutAskNoRect();
+  const drawBtn = (r, color, title, sub, hovered) => {
+    ctx.fillStyle = hovered ? '#12303c' : '#0c1c26';
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.strokeStyle = hovered ? color : '#456';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(r.x, r.y, r.w, r.h);
+    ctx.fillStyle = color;
+    ctx.font = 'bold 24px monospace';
+    ctx.fillText(title, r.x + r.w / 2, r.y + 42);
+    ctx.fillStyle = '#cde';
+    ctx.font = '13px monospace';
+    ctx.fillText(sub, r.x + r.w / 2, r.y + 72);
+  };
+  drawBtn(yes, '#6f6', '📘 SÍ, TUTORIAL', 'Practicar los controles', ptInRect(mouse.x, mouse.y, yes));
+  drawBtn(no,  '#fc6', '▶ NO, A CORRER',  'Ir directo a la carrera', ptInRect(mouse.x, mouse.y, no));
+
+  if (net.active) {
+    ctx.fillStyle = '#8ac';
+    ctx.font = '13px monospace';
+    ctx.fillText('En línea: si eliges tutorial, tu rival te esperará (y tú a él si lo eligió).', W / 2, no.y + no.h + 40);
+  }
+
+  ctx.fillStyle = '#666';
+  ctx.font = '12px monospace';
+  ctx.fillText('ESC para volver al menú', W / 2, H - 30);
+}
+
+function drawRaceTutorial() {
+  ctx.save();
+  if (raceShake > 0) ctx.translate(rand(-raceShake, raceShake), rand(-raceShake, raceShake));
+  drawRaceTrack(); // dibuja pista, saco, proyectiles, partículas, meta y al jugador
+  ctx.restore();
+
+  // ---- banner del paso ----
+  const totalSteps = RACE_TUT_STEPS.length - 1;
+  ctx.textAlign = 'center';
+  // panel superior
+  ctx.fillStyle = 'rgba(0,0,0,0.62)';
+  ctx.fillRect(W / 2 - 460, 96, 920, 76);
+  ctx.strokeStyle = '#6cf';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(W / 2 - 460, 96, 920, 76);
+  ctx.fillStyle = '#6cf';
+  ctx.font = 'bold 14px monospace';
+  ctx.fillText(`TUTORIAL  ·  PASO ${raceTut.step} / ${totalSteps}`, W / 2, 120);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 20px monospace';
+  ctx.fillText(RACE_TUT_STEPS[raceTut.step] || '', W / 2, 150);
+
+  // pista de progreso del paso actual
+  let hint = '';
+  if (raceTut.step === 1) {
+    const got = [raceTut.movedL ? 'A ✓' : 'A', raceTut.movedR ? 'D ✓' : 'D', raceTut.accel ? 'W ✓' : 'W'].join('   ');
+    hint = got;
+  } else if (raceTut.step === 2) {
+    hint = racePlayer.sideDashCD > 0 ? 'dash en recarga…' : 'muévete + ESPACIO';
+  } else if (raceTut.step === 3) {
+    hint = `golpes: ${raceTut.attacks} / 3`;
+  } else if (raceTut.step === 4) {
+    const remain = Math.max(0, Math.ceil((raceTut.finishDist - racePlayer.progress) / 60));
+    hint = `a la meta: ${remain} m`;
+  }
+  if (hint) {
+    ctx.fillStyle = '#ffd76c';
+    ctx.font = 'bold 15px monospace';
+    ctx.fillText(hint, W / 2, H - 40);
+  }
+  ctx.fillStyle = '#667';
+  ctx.font = '12px monospace';
+  ctx.fillText('ESC para salir del tutorial y volver al menú', W / 2, H - 18);
+}
+
+function drawRaceTutWait() {
+  const grd = ctx.createLinearGradient(0, 0, 0, H);
+  grd.addColorStop(0, '#0a1e2a');
+  grd.addColorStop(1, '#02060a');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#6cf';
+  ctx.font = 'bold 40px monospace';
+  ctx.fillText('ESPERANDO AL RIVAL', W / 2, H / 2 - 40);
+  ctx.fillStyle = '#fff';
+  ctx.font = '18px monospace';
+  const msg = net.myTutorialDone
+    ? 'Tu rival aún está en su tutorial. La carrera arranca cuando ambos estén listos.'
+    : 'Terminando…';
+  ctx.fillText(msg, W / 2, H / 2 + 4);
+  // puntos animados
+  const dots = '.'.repeat(1 + (Math.floor(frame / 20) % 3));
+  ctx.fillStyle = '#8ac';
+  ctx.font = 'bold 28px monospace';
+  ctx.fillText(dots, W / 2, H / 2 + 50);
+  ctx.fillStyle = '#8fce8f';
+  ctx.font = '14px monospace';
+  ctx.fillText(`Tú: ${net.myTutorialDone ? 'listo ✓' : 'en tutorial…'}   ·   Rival: ${net.rivalTutorialDone ? 'listo ✓' : 'en tutorial…'}`, W / 2, H / 2 + 90);
+}
+
 function drawRaceFinale() {
   const grd = ctx.createLinearGradient(0, 0, 0, H);
   grd.addColorStop(0, '#3a1e0a');
@@ -15287,6 +15658,10 @@ const net = {
   rivalPresent: false,
   myWeapon: 'fists',
   rivalWeapon: 'fists',
+  myTutorial: false,        // ¿elegí hacer el tutorial antes de la carrera?
+  rivalTutorial: false,     // ¿el rival eligió tutorial?
+  myTutorialDone: true,     // ¿ya terminé (o no elegí) el tutorial? (barrera de arranque)
+  rivalTutorialDone: true,  // ¿el rival ya terminó (o no eligió)?
   sendCD: 0,
   rival: null,        // {p,x,hp,wp,sc,stg,ph,fin}
   rivalTimeout: 0,
@@ -15409,6 +15784,7 @@ function onLanEvent(ev) {
     onNetData(ev.data);          // mensajes de juego (sync 's')
   } else if (ev.type === 'peerleft') {
     net.rivalPresent = false; net.rivalReady = false; net.rival = null;
+    if (net.active) { net.rivalTutorialDone = true; netCheckTutBarrier(); } // no te quedes esperando
     olSetStatus('El rival salió de la sala.');
     renderLobby();
   }
@@ -15560,13 +15936,14 @@ function netSetupConn(conn) {
     olClearConnectTimer();
     net.connected = true;
     net.rivalPresent = true;
-    conn.send({ t: 'hello', name: net.myName, weapon: net.myWeapon, ready: net.myReady });
+    conn.send({ t: 'hello', name: net.myName, weapon: net.myWeapon, ready: net.myReady, tut: net.myTutorial });
     olSetStatus('¡Conectado! Elige montura y pon LISTO.');
     renderLobby();
   });
   conn.on('data', d => onNetData(d));
   conn.on('close', () => {
     net.connected = false; net.rivalPresent = false; net.rivalReady = false; net.rival = null;
+    if (net.active) { net.rivalTutorialDone = true; netCheckTutBarrier(); }
     olSetStatus('El rival se desconectó.');
     renderLobby();
   });
@@ -15596,13 +15973,21 @@ function onNetData(d) {
     net.rivalName = d.name || 'Rival';
     net.rivalWeapon = d.weapon || 'fists';
     net.rivalReady = !!d.ready;
+    if (d.tut !== undefined) net.rivalTutorial = !!d.tut;
     renderLobby();
   } else if (d.t === 'ready') {
     net.rivalReady = !!d.ready;
     if (d.name) net.rivalName = d.name;
     if (d.weapon) net.rivalWeapon = d.weapon;
+    if (d.tut !== undefined) net.rivalTutorial = !!d.tut;
     renderLobby();
     netMaybeStart();
+  } else if (d.t === 'tutopt') {
+    net.rivalTutorial = !!d.tut;
+    renderLobby();
+  } else if (d.t === 'tutdone') {
+    net.rivalTutorialDone = true;
+    netCheckTutBarrier();
   } else if (d.t === 'start') {
     beginOnlineRace();
   } else if (d.t === 's') {
@@ -15610,6 +15995,7 @@ function onNetData(d) {
     net.rivalTimeout = 150;
   } else if (d.t === 'leave') {
     net.connected = false; net.rivalPresent = false; net.rivalReady = false; net.rival = null;
+    if (net.active) { net.rivalTutorialDone = true; netCheckTutBarrier(); }
     olSetStatus('El rival salió.');
     renderLobby();
   }
@@ -15633,9 +16019,16 @@ function toggleReady() {
   }
   if (!net.connected) { olSetStatus('Aún no hay rival conectado.'); return; }
   net.myReady = !net.myReady;
-  netSend({ t: 'ready', ready: net.myReady, name: net.myName, weapon: net.myWeapon });
+  netSend({ t: 'ready', ready: net.myReady, name: net.myName, weapon: net.myWeapon, tut: net.myTutorial });
   renderLobby();
   netMaybeStart();
+}
+
+function setMyTutorial(on) {
+  net.myTutorial = !!on;
+  // avisa al rival mi elección (sirve para LAN y para P2P)
+  netSend({ t: 'tutopt', tut: net.myTutorial });
+  renderLobby();
 }
 
 function setMyWeapon(wp) {
@@ -15664,12 +16057,17 @@ function renderLobby() {
     rb.textContent = net.myReady ? '✖ Cancelar listo' : '✔ LISTO';
     rb.classList.toggle('on', net.myReady);
   }
+  // checkbox de tutorial (refleja el estado)
+  const tb = document.getElementById('ol-tut');
+  if (tb) tb.checked = net.myTutorial;
   // lista de jugadores
   const pl = document.getElementById('ol-players');
   if (pl) {
-    const me = `<div class="pl ${net.myReady ? 'rdy' : ''}">🧍 Tú (${net.myWeapon}) — ${net.myReady ? 'LISTO ✔' : 'esperando…'}</div>`;
+    const meTut = net.myTutorial ? ' · 📘 tutorial' : '';
+    const rvTut = net.rivalTutorial ? ' · 📘 tutorial' : '';
+    const me = `<div class="pl ${net.myReady ? 'rdy' : ''}">🧍 Tú (${net.myWeapon})${meTut} — ${net.myReady ? 'LISTO ✔' : 'esperando…'}</div>`;
     const rivalLine = net.rivalPresent
-      ? `<div class="pl ${net.rivalReady ? 'rdy' : ''}">🧑 Rival (${net.rivalWeapon}) — ${net.rivalReady ? 'LISTO ✔' : 'esperando…'}</div>`
+      ? `<div class="pl ${net.rivalReady ? 'rdy' : ''}">🧑 Rival (${net.rivalWeapon})${rvTut} — ${net.rivalReady ? 'LISTO ✔' : 'esperando…'}</div>`
       : `<div class="pl">⌛ Esperando rival…</div>`;
     pl.innerHTML = me + rivalLine;
   }
@@ -15685,9 +16083,19 @@ function beginOnlineRace() {
   startRaceMode();          // pone raceMode=true, racePhase='weapon-select'
   raceWeapon = net.myWeapon;
   raceStage = 1;
-  setupRaceStage();
-  racePhase = 'racing';     // saltamos selección de arma y pre-stage
-  racePhaseTimer = 0;
+  // Barrera de tutorial: cada quien corre su tutorial (si lo eligió) y la
+  // carrera sólo empieza cuando AMBOS avisan 'tutdone'. Siempre esperamos el
+  // aviso del rival (no dependemos de conocer su elección de antemano).
+  net.myTutorialDone = !net.myTutorial;
+  net.rivalTutorialDone = false;
+  if (net.myTutorial) {
+    startRaceTutorial();    // racePhase='tutorial'; al terminar avisa y espera
+  } else {
+    netSend({ t: 'tutdone' });   // no hago tutorial: aviso de inmediato
+    racePhase = 'tut-wait';
+    racePhaseTimer = 0;
+    netCheckTutBarrier();   // si el rival tampoco, arranca ya
+  }
 }
 
 function netTeardownPeer() {
@@ -15732,6 +16140,7 @@ function netRaceTick() {
 
 function drawNetRival() {
   if (!net.active || !net.rival) return;
+  if (racePhase !== 'racing') return; // durante tutorial/espera no proyectamos al rival
   const r = net.rival;
   if (r.stg !== raceStage) return; // en otra etapa: sólo en el HUD
   const sy = raceScreenY(r.p);
@@ -15806,6 +16215,7 @@ document.getElementById('ol-connect').addEventListener('click', () => {
 document.getElementById('ol-code-input').addEventListener('input', e => {
   e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
 });
+document.getElementById('ol-tut').addEventListener('change', e => setMyTutorial(e.target.checked));
 document.getElementById('ol-ready').addEventListener('click', toggleReady);
 document.getElementById('ol-leave').addEventListener('click', () => {
   netLeave(); olShow('ol-home'); olSetStatus('Saliste de la sala.');
