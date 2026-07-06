@@ -388,7 +388,7 @@ const ABILITIES = [
   { id: 'lonesome', name: 'Oh! Lonesome Me (Cuerda)', cost: 300,
     desc: 'Lanza una cuerda hacia el cursor: se engancha donde cae y te jala hasta ahi como un dash, danando a los enemigos en el camino. Quien sobreviva al tiron queda AMARRADO 5s sin poder moverse.', color: '#cb6' },
   { id: 'pistols', name: 'Balas Vivientes', cost: 470,
-    desc: 'Sex Pistols (Mista). Pistola de disparo rapidisimo: cada bala real la monta uno de los 6 Pistols numerados Nº1, 2, 3, 5, 6 y 7 (sin el 4, que Mista odia). Los Pistols la PATEAN para BANQUEARLA en las paredes del mapa y curvarla hacia los enemigos, sumando fuerza en cada patada y en cada rebote. Los 6 Pistols flotan a tu alrededor.', color: '#fd0' },
+    desc: 'Sex Pistols (Mista). Los 6 Pistols numerados Nº1, 2, 3, 5, 6 y 7 (sin el 4, que Mista odia) flotan a tu alrededor. CLICK dispara: si la bala pasa por un Pistol, este la PATEA hacia el enemigo mas cercano (banco canon) y rebota entre enemigos con daño creciente. V: recolocar los 6 Pistols. X: cambiar a BALAS DIRECTAS (sin Pistols, van solas al enemigo).', color: '#fd0' },
 ];
 
 // Orden de la TIENDA (y de la cadena de compra), desacoplado del indice de juego.
@@ -1507,6 +1507,16 @@ function updatePlayer() {
     // Puños Rompedores — RESTAURACIÓN (Crazy Diamond)
     crazyRestore();
     restoreCD = 60 * 12;
+  }
+  if (active === 30 && keyPressed['x']) {
+    // Balas Vivientes — cambiar entre Pistols (patean) y balas directas
+    pistolMode = pistolMode === 0 ? 1 : 0;
+    shockwave(player.x, player.y, '#fd0', 16);
+    flashFx('#fd0', 12);
+  }
+  if (active === 30 && keyPressed['v']) {
+    // Balas Vivientes — recolocar los 6 Pistols
+    repositionPistols();
   }
   if (active === 14 && keyPressed['f'] && lesson3CD <= 0) {
     const ang = aimAngle();
@@ -3822,13 +3832,27 @@ function detonateAllEnemies() {
   effects.push({ type: 'heal', life: 40, max: 40 });
 }
 
-// Balas Vivientes (Sex Pistols) — Mista dispara balas REALES y los 6 Pistols numerados
-// (Nº1, 2, 3, 5, 6 y 7 — sin el 4, que Mista odia) las PATEAN para que reboten en las
-// paredes y se curven hacia los enemigos, sumando fuerza en cada patada. Fiel a la serie:
-// no persiguen mágicamente, banquean disparos como Mista contra las esquinas.
+// Balas Vivientes (Sex Pistols) — Mista dispara y los 6 Pistols numerados (Nº1,2,3,5,6,7,
+// sin el 4) están estacionados alrededor. Si la bala pasa por un Pistol, este la PATEA
+// hacia el enemigo más cercano (banco canon). B: cambiar a balas directas. V: recolocar.
 const SEX_PISTOLS_NUMS = [1, 2, 3, 5, 6, 7];
-const SEX_PISTOLS_PER_SHOT = 2;   // cuántas balas por disparo (rotan entre los 6 números)
+const SEX_PISTOLS_PER_SHOT = 2;   // (modo Noche) balas por disparo
 let sexPistolsShotIdx = 0;
+let pistolMode = 0;              // 0 = Pistols (patean), 1 = balas directas
+let pistolStations = [];         // {num, ang, rad} — posición relativa al jugador
+function initPistolStations() {
+  pistolStations = SEX_PISTOLS_NUMS.map((num, i) => ({
+    num, ang: (i / SEX_PISTOLS_NUMS.length) * Math.PI * 2, rad: 52 + (i % 2) * 16,
+  }));
+}
+function repositionPistols() {
+  if (!pistolStations.length) initPistolStations();
+  for (const s of pistolStations) { s.ang = rand(0, Math.PI * 2); s.rad = rand(42, 82); }
+  effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 12, max: 12, r: 0, color: '#fd0' });
+}
+function pistolStationX(s) { return player.x + Math.cos(s.ang) * s.rad; }
+function pistolStationY(s) { return player.y + Math.sin(s.ang) * s.rad; }
+
 function sexPistolsAttack(angle) {
   // fogonazo del cañón
   const mx = player.x + Math.cos(angle) * 22, my = player.y + Math.sin(angle) * 22;
@@ -3841,61 +3865,41 @@ function sexPistolsAttack(angle) {
     });
   }
   shake = Math.max(shake, 3);
-  // 2 balas por disparo, cada una montada por un Pistol numerado, en abanico corto
-  for (let i = 0; i < SEX_PISTOLS_PER_SHOT; i++) {
-    const a = angle + (i - (SEX_PISTOLS_PER_SHOT - 1) / 2) * 0.16 + rand(-0.05, 0.05);
-    const num = SEX_PISTOLS_NUMS[sexPistolsShotIdx % SEX_PISTOLS_NUMS.length];
-    sexPistolsShotIdx++;
-    projectiles.push({
-      x: mx, y: my,
-      vx: Math.cos(a) * 13, vy: Math.sin(a) * 13,
-      r: 7, dmg: 26, life: 150, type: 'pistol', color: '#fd0',
-      num, hits: new Set(), target: null, wallBounces: 0, bankCD: 0,
-      trail: [],
-    });
-  }
+  const num = SEX_PISTOLS_NUMS[sexPistolsShotIdx % SEX_PISTOLS_NUMS.length];
+  sexPistolsShotIdx++;
+  projectiles.push({
+    x: mx, y: my,
+    vx: Math.cos(angle) * 13, vy: Math.sin(angle) * 13,
+    r: 6, dmg: 26, life: 130, type: 'pistol', color: '#fd0',
+    num, hits: new Set(), target: null, hitCD: 0,
+    bank: pistolMode === 0, kicked: new Set(),
+    trail: [],
+  });
 }
 
-// Un Pistol: pequeño ser verde oliva con gorra numerada montando la bala amarilla.
-function drawPistolBeing(x, y, num, s, ang) {
-  ctx.save();
-  ctx.translate(x, y);
-  if (ang != null) ctx.rotate(ang);
-  // bala amarilla (núcleo)
-  const g = ctx.createRadialGradient(-2 * s, -2 * s, 1, 0, 0, 8 * s);
+// bala amarilla numerada (un Pistol)
+function drawPistolBeing(x, y, num, r) {
+  const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, 1, x, y, r + 2);
   g.addColorStop(0, '#ffe'); g.addColorStop(0.6, '#fd0'); g.addColorStop(1, '#c90');
   ctx.fillStyle = g;
-  ctx.beginPath(); ctx.arc(0, 0, 7 * s, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   ctx.strokeStyle = '#630'; ctx.lineWidth = 1.5; ctx.stroke();
-  // cuerpecito verde oliva del Pistol montando encima
-  ctx.fillStyle = '#7a7a34';
-  ctx.beginPath(); ctx.arc(0, -3.5 * s, 4.2 * s, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = '#3d3d18'; ctx.lineWidth = 1; ctx.stroke();
-  // gorra roja con el número
-  ctx.fillStyle = '#c0392b';
-  ctx.beginPath(); ctx.arc(0, -5 * s, 4.2 * s, Math.PI, Math.PI * 2); ctx.fill();
-  // ojitos
-  ctx.fillStyle = '#fff';
-  ctx.beginPath(); ctx.arc(-1.6 * s, -3.3 * s, 1.1 * s, 0, Math.PI * 2);
-  ctx.arc(1.6 * s, -3.3 * s, 1.1 * s, 0, Math.PI * 2); ctx.fill();
-  ctx.restore();
-  // número (sin rotar, siempre legible)
-  ctx.fillStyle = '#fff';
-  ctx.font = `bold ${Math.round(8 * s)}px monospace`;
+  ctx.fillStyle = '#402000';
+  ctx.font = `bold ${Math.round(r * 1.3)}px monospace`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(String(num), x, y - 5 * s);
+  ctx.fillText(String(num), x, y + 0.5);
   ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
 }
 
-// Los 6 Pistols flotan alrededor de Mista cuando el poder está activo.
+// los 6 Pistols estacionados alrededor de Mista (solo en modo Pistols)
 function drawSexPistols() {
-  if (active !== 30) return;
-  for (let i = 0; i < SEX_PISTOLS_NUMS.length; i++) {
-    const ang = frame * 0.03 + (i / SEX_PISTOLS_NUMS.length) * Math.PI * 2;
-    const rad = player.r + 20 + Math.sin(frame * 0.1 + i) * 3;
-    const x = player.x + Math.cos(ang) * rad;
-    const y = player.y + Math.sin(ang) * rad;
-    drawPistolBeing(x, y, SEX_PISTOLS_NUMS[i], 0.72, null);
+  if (active !== 30 || pistolMode !== 0 || !pistolStations.length) return;
+  for (const s of pistolStations) {
+    const x = pistolStationX(s), y = pistolStationY(s);
+    ctx.strokeStyle = 'rgba(255, 210, 0, 0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(x, y, 13, 0, Math.PI * 2); ctx.stroke();
+    drawPistolBeing(x, y, s.num, 8);
   }
 }
 
@@ -6016,55 +6020,62 @@ function updateProjectiles() {
         }
       }
     } else if (p.type === 'pistol') {
-      // Balas Vivientes: los Pistols PATEAN la bala para banquearla en las paredes
-      // (rebote canon) y curvarla suavemente hacia el enemigo; suma fuerza en cada golpe.
+      // Balas Vivientes: en modo Pistols, al pasar por un Pistol este PATEA la bala hacia
+      // el enemigo más cercano. En ambos modos la bala rebota de enemigo en enemigo.
       if (p.hitCD > 0) p.hitCD--;
-      if (p.bankCD > 0) p.bankCD--;
-      // rebote en los bordes del mapa: un Pistol la patea de vuelta
-      let banked = false;
-      if (p.x < p.r) { p.x = p.r; p.vx = Math.abs(p.vx); banked = true; }
-      else if (p.x > W - p.r) { p.x = W - p.r; p.vx = -Math.abs(p.vx); banked = true; }
-      if (p.y < p.r) { p.y = p.r; p.vy = Math.abs(p.vy); banked = true; }
-      else if (p.y > H - p.r) { p.y = H - p.r; p.vy = -Math.abs(p.vy); banked = true; }
-      if (banked) {
-        p.wallBounces++;
-        p.dmg = Math.min(p.dmg * 1.08, 130);   // la patada del Pistol suma fuerza
-        p.bankCD = 12;                          // vuela recto un momento tras patear la pared
-        effects.push({ type: 'shockwave', x: p.x, y: p.y, life: 8, max: 8, r: 0, color: '#fd0' });
-        for (let s = 0; s < 3; s++) {
-          particles.push({ x: p.x, y: p.y, vx: rand(-2, 2), vy: rand(-2, 2), life: 10, max: 10, color: '#fd0', r: 2 });
+      if (p.bank && pistolStations.length) {
+        for (const st of pistolStations) {
+          if (p.kicked.has(st.num)) continue;
+          const sx = pistolStationX(st), sy = pistolStationY(st);
+          const dx = p.x - sx, dy = p.y - sy;
+          if (dx * dx + dy * dy < 15 * 15) {
+            let nearest = null, bestSq = 1e18;
+            for (let j = 0; j < enemies.length; j++) {
+              const e = enemies[j];
+              if (e.ally) continue;
+              const d = (e.x - sx) ** 2 + (e.y - sy) ** 2;
+              if (d < bestSq) { bestSq = d; nearest = e; }
+            }
+            if (nearest) {
+              const ang = Math.atan2(nearest.y - p.y, nearest.x - p.x);
+              const sp = Math.hypot(p.vx, p.vy) || 13;
+              p.vx = Math.cos(ang) * sp; p.vy = Math.sin(ang) * sp;
+              p.dmg = Math.min(p.dmg * 1.15, 130);   // la patada suma fuerza
+            }
+            p.kicked.add(st.num);
+            effects.push({ type: 'shockwave', x: sx, y: sy, life: 8, max: 8, r: 0, color: '#fd0' });
+          }
         }
-      }
-      let needNew = !p.target || p.target.dead || p.target.ally || p.target.hp <= 0 || p.hits.has(p.target.id);
-      if (needNew) {
-        let nearest = null, bestSq = 1e18;
-        for (let j = 0; j < enemies.length; j++) {
-          const e = enemies[j];
-          if (e.ally || p.hits.has(e.id)) continue;
-          const dSq = distSq(e, p);
-          if (dSq < bestSq) { bestSq = dSq; nearest = e; }
-        }
-        // si ya rebotó en todos, resetea memoria para seguir golpeando (sostén en jefes / pocos enemigos)
-        if (!nearest) {
+      } else if (!p.bank) {
+        // balas directas: teledirección suave al enemigo más cercano
+        let needNew = !p.target || p.target.dead || p.target.ally || p.target.hp <= 0 || p.hits.has(p.target.id);
+        if (needNew) {
+          let nearest = null, bestSq = 1e18;
           for (let j = 0; j < enemies.length; j++) {
             const e = enemies[j];
-            if (e.ally) continue;
+            if (e.ally || p.hits.has(e.id)) continue;
             const dSq = distSq(e, p);
             if (dSq < bestSq) { bestSq = dSq; nearest = e; }
           }
-          if (nearest) p.hits.clear();
+          if (!nearest) {
+            for (let j = 0; j < enemies.length; j++) {
+              const e = enemies[j];
+              if (e.ally) continue;
+              const dSq = distSq(e, p);
+              if (dSq < bestSq) { bestSq = dSq; nearest = e; }
+            }
+            if (nearest) p.hits.clear();
+          }
+          p.target = nearest;
         }
-        p.target = nearest;
+        if (p.target) {
+          const ang = angleBetween(p, p.target);
+          const sp = 13;
+          p.vx = p.vx * 0.8 + Math.cos(ang) * sp * 0.4;
+          p.vy = p.vy * 0.8 + Math.sin(ang) * sp * 0.4;
+        }
       }
-      // guía suave de los Pistols (suprimida justo tras banquear, para que la pared se vea)
-      if (p.target && p.bankCD <= 0) {
-        const ang = angleBetween(p, p.target);
-        const sp = 13;
-        p.vx = p.vx * 0.86 + Math.cos(ang) * sp * 0.26;
-        p.vy = p.vy * 0.86 + Math.sin(ang) * sp * 0.26;
-        const m = Math.hypot(p.vx, p.vy) || 1;   // mantén la velocidad (no frenar)
-        p.vx = p.vx / m * sp; p.vy = p.vy / m * sp;
-      }
+      // impacto + rebote de enemigo en enemigo con daño creciente (ambos modos)
       if (p.hitCD <= 0) {
         for (let j = 0; j < enemies.length; j++) {
           const e = enemies[j];
@@ -6073,9 +6084,22 @@ function updateProjectiles() {
           if (distSq(e, p) < rr * rr) {
             damageEnemy(e, p.dmg, '#fd0');
             p.hits.add(e.id);
-            p.dmg = Math.min(p.dmg * 1.18, 130);  // el rebote acumula fuerza (cap)
-            p.hitCD = 6;                           // no golpear al mismo objetivo cada frame
-            p.target = null;                       // rebota: busca el siguiente
+            p.dmg = Math.min(p.dmg * 1.18, 130);
+            p.hitCD = 6;
+            // rebota hacia el siguiente enemigo
+            let nx = null, bestSq = 1e18;
+            for (let k = 0; k < enemies.length; k++) {
+              const o = enemies[k];
+              if (o.ally || p.hits.has(o.id)) continue;
+              const d = distSq(o, p);
+              if (d < bestSq) { bestSq = d; nx = o; }
+            }
+            if (nx) {
+              const ang = Math.atan2(nx.y - p.y, nx.x - p.x);
+              const sp = Math.hypot(p.vx, p.vy) || 13;
+              p.vx = Math.cos(ang) * sp; p.vy = Math.sin(ang) * sp;
+              p.target = nx;
+            }
             effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 10, max: 10, r: 0, color: '#fd0' });
             for (let s = 0; s < 4; s++) {
               particles.push({ x: e.x, y: e.y, vx: rand(-3, 3), vy: rand(-3, 3), life: 14, max: 14, color: rand(0, 1) > 0.5 ? '#fd0' : '#fff', r: 2 });
@@ -6905,8 +6929,8 @@ function draw() {
       ctx.restore();
     }
     if (p.type === 'pistol') {
-      // un Pistol numerado montando su bala amarilla
-      drawPistolBeing(p.x, p.y, p.num, 1, null);
+      // bala amarilla numerada
+      drawPistolBeing(p.x, p.y, p.num, p.r);
     }
     if (p.type === 'nutbolt') {
       // perno hexagonal con highlight
@@ -10880,6 +10904,14 @@ function drawUI() {
       ctx.fillText(`C Restauración: LISTO`, 280, 33);
     }
   }
+  if (active === 30) {
+    ctx.fillStyle = '#fd0';
+    if (pistolMode === 0) {
+      ctx.fillText(`Pistols: dispara hacia ellos · V recolocar · X balas directas`, 280, 33);
+    } else {
+      ctx.fillText(`Balas directas · X volver a Pistols`, 280, 33);
+    }
+  }
   if (active === 10) {
     // muestra cargas y CD aunque no haya cutscene
     if (rhcpPhase > 0) {
@@ -11559,7 +11591,7 @@ function restart() {
   sfPhase = 0; sfTimer = 0; sfCD = 0;
   threadKills = 0; threadAwakened = false; threadUnlockFlash = 0; threadCombo = 0; threadTimer = 0;
   crazyKills = 0; crazyAwakened = false; crazyUnlockFlash = 0; restoreCD = 0;
-  sexPistolsShotIdx = 0;
+  sexPistolsShotIdx = 0; pistolMode = 0; initPistolStations();
   nrPhase = 0; nrTimer = 0; nrCD = 0; stormTimer = 0; nrGauge = 0; rainLightningCD = 0; rainCounter = 0;
   mmPhase = 0; mmTimer = 0; mmCD = 0;
   nkcPhase = 0; nkcTimer = 0; nkcCD = 0;
