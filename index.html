@@ -388,7 +388,7 @@ const ABILITIES = [
   { id: 'lonesome', name: 'Oh! Lonesome Me (Cuerda)', cost: 300,
     desc: 'Lanza una cuerda hacia el cursor: se engancha donde cae y te jala hasta ahi como un dash, danando a los enemigos en el camino. Quien sobreviva al tiron queda AMARRADO 5s sin poder moverse.', color: '#cb6' },
   { id: 'pistols', name: 'Balas Vivientes', cost: 470,
-    desc: 'Pistola de disparo rapido. Cada disparo suelta 6 balas amarillas vivientes numeradas Nº1, 2, 3, 5, 6 y 7 (sin el 4). Cada una hace RICOCHET: busca al enemigo mas cercano, lo golpea y rebota al siguiente, con daño que crece en cada rebote. Se espamean muchisimo.', color: '#fd0' },
+    desc: 'Sex Pistols (Mista). Pistola de disparo rapidisimo: cada bala real la monta uno de los 6 Pistols numerados Nº1, 2, 3, 5, 6 y 7 (sin el 4, que Mista odia). Los Pistols la PATEAN para BANQUEARLA en las paredes del mapa y curvarla hacia los enemigos, sumando fuerza en cada patada y en cada rebote. Los 6 Pistols flotan a tu alrededor.', color: '#fd0' },
 ];
 
 // Orden de la TIENDA (y de la cadena de compra), desacoplado del indice de juego.
@@ -3822,8 +3822,10 @@ function detonateAllEnemies() {
   effects.push({ type: 'heal', life: 40, max: 40 });
 }
 
-// Balas Vivientes — 6 balas numeradas (sin el Nº4). Cada disparo suelta las 6
-// balas amarillas numeradas que hacen ricochet de enemigo en enemigo.
+// Balas Vivientes (Sex Pistols) — Mista dispara balas REALES y los 6 Pistols numerados
+// (Nº1, 2, 3, 5, 6 y 7 — sin el 4, que Mista odia) las PATEAN para que reboten en las
+// paredes y se curven hacia los enemigos, sumando fuerza en cada patada. Fiel a la serie:
+// no persiguen mágicamente, banquean disparos como Mista contra las esquinas.
 const SEX_PISTOLS_NUMS = [1, 2, 3, 5, 6, 7];
 const SEX_PISTOLS_PER_SHOT = 2;   // cuántas balas por disparo (rotan entre los 6 números)
 let sexPistolsShotIdx = 0;
@@ -3839,18 +3841,61 @@ function sexPistolsAttack(angle) {
     });
   }
   shake = Math.max(shake, 3);
-  // 2 Pistols por disparo, rotando entre los 6 números y en abanico corto
+  // 2 balas por disparo, cada una montada por un Pistol numerado, en abanico corto
   for (let i = 0; i < SEX_PISTOLS_PER_SHOT; i++) {
     const a = angle + (i - (SEX_PISTOLS_PER_SHOT - 1) / 2) * 0.16 + rand(-0.05, 0.05);
     const num = SEX_PISTOLS_NUMS[sexPistolsShotIdx % SEX_PISTOLS_NUMS.length];
     sexPistolsShotIdx++;
     projectiles.push({
       x: mx, y: my,
-      vx: Math.cos(a) * 12, vy: Math.sin(a) * 12,
-      r: 7, dmg: 26, life: 110, type: 'pistol', color: '#fd0',
-      num, hits: new Set(), target: null,
+      vx: Math.cos(a) * 13, vy: Math.sin(a) * 13,
+      r: 7, dmg: 26, life: 150, type: 'pistol', color: '#fd0',
+      num, hits: new Set(), target: null, wallBounces: 0, bankCD: 0,
       trail: [],
     });
+  }
+}
+
+// Un Pistol: pequeño ser verde oliva con gorra numerada montando la bala amarilla.
+function drawPistolBeing(x, y, num, s, ang) {
+  ctx.save();
+  ctx.translate(x, y);
+  if (ang != null) ctx.rotate(ang);
+  // bala amarilla (núcleo)
+  const g = ctx.createRadialGradient(-2 * s, -2 * s, 1, 0, 0, 8 * s);
+  g.addColorStop(0, '#ffe'); g.addColorStop(0.6, '#fd0'); g.addColorStop(1, '#c90');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(0, 0, 7 * s, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#630'; ctx.lineWidth = 1.5; ctx.stroke();
+  // cuerpecito verde oliva del Pistol montando encima
+  ctx.fillStyle = '#7a7a34';
+  ctx.beginPath(); ctx.arc(0, -3.5 * s, 4.2 * s, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#3d3d18'; ctx.lineWidth = 1; ctx.stroke();
+  // gorra roja con el número
+  ctx.fillStyle = '#c0392b';
+  ctx.beginPath(); ctx.arc(0, -5 * s, 4.2 * s, Math.PI, Math.PI * 2); ctx.fill();
+  // ojitos
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(-1.6 * s, -3.3 * s, 1.1 * s, 0, Math.PI * 2);
+  ctx.arc(1.6 * s, -3.3 * s, 1.1 * s, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  // número (sin rotar, siempre legible)
+  ctx.fillStyle = '#fff';
+  ctx.font = `bold ${Math.round(8 * s)}px monospace`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(String(num), x, y - 5 * s);
+  ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+}
+
+// Los 6 Pistols flotan alrededor de Mista cuando el poder está activo.
+function drawSexPistols() {
+  if (active !== 30) return;
+  for (let i = 0; i < SEX_PISTOLS_NUMS.length; i++) {
+    const ang = frame * 0.03 + (i / SEX_PISTOLS_NUMS.length) * Math.PI * 2;
+    const rad = player.r + 20 + Math.sin(frame * 0.1 + i) * 3;
+    const x = player.x + Math.cos(ang) * rad;
+    const y = player.y + Math.sin(ang) * rad;
+    drawPistolBeing(x, y, SEX_PISTOLS_NUMS[i], 0.72, null);
   }
 }
 
@@ -5971,8 +6016,25 @@ function updateProjectiles() {
         }
       }
     } else if (p.type === 'pistol') {
-      // Balas Vivientes: RICOCHET teledirigido de enemigo en enemigo, con daño creciente.
+      // Balas Vivientes: los Pistols PATEAN la bala para banquearla en las paredes
+      // (rebote canon) y curvarla suavemente hacia el enemigo; suma fuerza en cada golpe.
       if (p.hitCD > 0) p.hitCD--;
+      if (p.bankCD > 0) p.bankCD--;
+      // rebote en los bordes del mapa: un Pistol la patea de vuelta
+      let banked = false;
+      if (p.x < p.r) { p.x = p.r; p.vx = Math.abs(p.vx); banked = true; }
+      else if (p.x > W - p.r) { p.x = W - p.r; p.vx = -Math.abs(p.vx); banked = true; }
+      if (p.y < p.r) { p.y = p.r; p.vy = Math.abs(p.vy); banked = true; }
+      else if (p.y > H - p.r) { p.y = H - p.r; p.vy = -Math.abs(p.vy); banked = true; }
+      if (banked) {
+        p.wallBounces++;
+        p.dmg = Math.min(p.dmg * 1.08, 130);   // la patada del Pistol suma fuerza
+        p.bankCD = 12;                          // vuela recto un momento tras patear la pared
+        effects.push({ type: 'shockwave', x: p.x, y: p.y, life: 8, max: 8, r: 0, color: '#fd0' });
+        for (let s = 0; s < 3; s++) {
+          particles.push({ x: p.x, y: p.y, vx: rand(-2, 2), vy: rand(-2, 2), life: 10, max: 10, color: '#fd0', r: 2 });
+        }
+      }
       let needNew = !p.target || p.target.dead || p.target.ally || p.target.hp <= 0 || p.hits.has(p.target.id);
       if (needNew) {
         let nearest = null, bestSq = 1e18;
@@ -5994,11 +6056,14 @@ function updateProjectiles() {
         }
         p.target = nearest;
       }
-      if (p.target) {
+      // guía suave de los Pistols (suprimida justo tras banquear, para que la pared se vea)
+      if (p.target && p.bankCD <= 0) {
         const ang = angleBetween(p, p.target);
         const sp = 13;
-        p.vx = p.vx * 0.8 + Math.cos(ang) * sp * 0.4;
-        p.vy = p.vy * 0.8 + Math.sin(ang) * sp * 0.4;
+        p.vx = p.vx * 0.86 + Math.cos(ang) * sp * 0.26;
+        p.vy = p.vy * 0.86 + Math.sin(ang) * sp * 0.26;
+        const m = Math.hypot(p.vx, p.vy) || 1;   // mantén la velocidad (no frenar)
+        p.vx = p.vx / m * sp; p.vy = p.vy / m * sp;
       }
       if (p.hitCD <= 0) {
         for (let j = 0; j < enemies.length; j++) {
@@ -6840,20 +6905,8 @@ function draw() {
       ctx.restore();
     }
     if (p.type === 'pistol') {
-      // bolita amarilla numerada (una de las Balas Vivientes)
-      const g = ctx.createRadialGradient(p.x - 2, p.y - 2, 1, p.x, p.y, p.r + 2);
-      g.addColorStop(0, '#ffe');
-      g.addColorStop(0.6, '#fd0');
-      g.addColorStop(1, '#c90');
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#630'; ctx.lineWidth = 1.5; ctx.stroke();
-      // número
-      ctx.fillStyle = '#402000';
-      ctx.font = 'bold 9px monospace';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(String(p.num), p.x, p.y + 0.5);
-      ctx.textBaseline = 'alphabetic';
+      // un Pistol numerado montando su bala amarilla
+      drawPistolBeing(p.x, p.y, p.num, 1, null);
     }
     if (p.type === 'nutbolt') {
       // perno hexagonal con highlight
@@ -7979,6 +8032,8 @@ function draw() {
     ctx.beginPath(); ctx.arc(player.x, player.y, 220, 0, Math.PI * 2); ctx.stroke();
     ctx.setLineDash([]);
   }
+  // los 6 Pistols flotando alrededor de Mista (Balas Vivientes)
+  drawSexPistols();
   // cuerda de Oh! Lonesome Me durante el tiron
   if (lassoTimer > 0) {
     const elec = lassoMode === 1;
@@ -11504,6 +11559,7 @@ function restart() {
   sfPhase = 0; sfTimer = 0; sfCD = 0;
   threadKills = 0; threadAwakened = false; threadUnlockFlash = 0; threadCombo = 0; threadTimer = 0;
   crazyKills = 0; crazyAwakened = false; crazyUnlockFlash = 0; restoreCD = 0;
+  sexPistolsShotIdx = 0;
   nrPhase = 0; nrTimer = 0; nrCD = 0; stormTimer = 0; nrGauge = 0; rainLightningCD = 0; rainCounter = 0;
   mmPhase = 0; mmTimer = 0; mmCD = 0;
   nkcPhase = 0; nkcTimer = 0; nkcCD = 0;
