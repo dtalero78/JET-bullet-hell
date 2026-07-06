@@ -330,9 +330,9 @@ const ABILITIES = [
   { id: 'whip',     name: '1. Látigo Eléctrico Morado', cost: 0,
     desc: 'Latigazo eléctrico que restalla en línea y encadena daño entre enemigos. Con 50 kills desbloqueas una 2ª forma: pulsa C para cambiar los clicks a un LÁTIGO-CUERDA eléctrico (como Oh! Lonesome Me pero morado): te jala hasta el punto dañando en el camino, y a quien sobreviva lo deja PARALIZADO 5s.', color: '#c4f' },
   { id: 'threads',  name: '2. Hilo Liberado',              cost: 25,
-    desc: 'Stone Free: te desenredas en HILO. Click: puño corto + un tendón que ATRAVIESA hasta 5 enemigos y los ENREDA (inmoviliza ~1.8s + daño continuo), tejiendo una telaraña entre los atrapados. Y: RUPTURA DE HILOS — cutscene + 16 hilos en 360° que enredan a todo alrededor 2.5s (CD 15s).', color: '#2cb' },
+    desc: 'Stone Free (Jolyne). Click: RÁFAGA de puños "ORAORAORA" a corta distancia + un tendón de hilo que ATRAVIESA y ENREDA (inmoviliza + daño continuo), tejiendo telaraña entre los atrapados. DESPERTAR a los 40 kills: los hilos atraviesan más, la telaraña CAZA balas enemigas (las corta) y la Ruptura crece. Y: RUPTURA DE HILOS — cutscene + hilos en 360° que enredan alrededor (CD 15s).', color: '#2cb' },
   { id: 'breaker',  name: '3. Puños Rompedores',        cost: 120,
-    desc: 'Ráfaga de puños limpios estilo Crazy Diamond. A cada enemigo que MATAS lo conviertes en una PIEDRA-cristal que bloquea el paso: nadie la atraviesa. Los enemigos deben romperla a golpes para pasar, y tú puedes destruirla volviéndole a pegar. Úsala para tapar rutas y encerrar.', color: '#f8c' },
+    desc: 'Crazy Diamond (Josuke). Click: barrage "DORARARARA" de puños limpios. A cada enemigo que MATAS lo fusionas en una ROCA que bloquea el paso (como la Roca de Angelo). DESPERTAR a los 40 kills: RESTAURACIÓN — pulsa C para restaurar el campo: devuelve las balas enemigas cercanas como esquirlas y cura a los aliados al máximo (Josuke no puede curarse a sí mismo). CD 12s.', color: '#f8c' },
   { id: 'rain',     name: '4. Tormenta Torrencial',           cost: 250,
     desc: 'Una nube te sigue ENCIMA y su lluvia se vuelve arma: daña sola a los enemigos a tu alrededor (posiciónate para mojarlos). CLICK: RELÁMPAGO dirigido al cursor (área + parálisis; +daño a los mojados). Mojar y golpear carga el medidor DILUVIO; al llenarlo, pulsa O para desatar la TORMENTA FINAL que cubre la pantalla 5s.', color: '#69c' },
   { id: 'arrow',    name: '5. Flechas Perforantes',     cost: 300,
@@ -596,6 +596,16 @@ let rhcpCD = 0;
 let sfPhase = 0;
 let sfTimer = 0;
 let sfCD = 0;
+// Hilo Liberado (Stone Free): forma base primero, DESPERTAR ganado con kills (canon).
+let threadKills = 0;
+let threadAwakened = false;
+let threadUnlockFlash = 0;
+let threadCombo = 0, threadTimer = 0, threadAngle = 0;   // ráfaga ORAORAORA
+// Puños Rompedores (Crazy Diamond): DESPERTAR = RESTAURACIÓN (curar aliados + devolver balas).
+let crazyKills = 0;
+let crazyAwakened = false;
+let crazyUnlockFlash = 0;
+let restoreCD = 0;
 
 let nrPhase = 0;
 let nrTimer = 0;
@@ -1069,6 +1079,8 @@ function updatePlayer() {
   if (player.slowed > 0) player.slowed--;
   processFlurry();
   processBreakerCombo();
+  processThreadCombo();
+  updateSfWeb();
   processOraBarrage();
   processMjPunch();
   processMjDash();
@@ -1491,6 +1503,11 @@ function updatePlayer() {
     shockwave(player.x, player.y, '#b5f', 18);
     flashFx('#b5f', 12);
   }
+  if (active === 2 && crazyAwakened && keyPressed['c'] && restoreCD <= 0) {
+    // Puños Rompedores — RESTAURACIÓN (Crazy Diamond)
+    crazyRestore();
+    restoreCD = 60 * 12;
+  }
   if (active === 14 && keyPressed['f'] && lesson3CD <= 0) {
     const ang = aimAngle();
     projectiles.push({
@@ -1513,6 +1530,7 @@ function updatePlayer() {
   if (skCD > 0) skCD--;
   if (rhcpCD > 0) rhcpCD--;
   if (sfCD > 0) sfCD--;
+  if (restoreCD > 0) restoreCD--;
   if (nrCD > 0) nrCD--;
   if (mmCD > 0) mmCD--;
   if (nkcCD > 0) nkcCD--;
@@ -1932,6 +1950,8 @@ function updatePlayer() {
   if (wsUnlockFlash > 0) wsUnlockFlash--;
   if (cmUnlockFlash > 0) cmUnlockFlash--;
   if (whipUnlockFlash > 0) whipUnlockFlash--;
+  if (threadUnlockFlash > 0) threadUnlockFlash--;
+  if (crazyUnlockFlash > 0) crazyUnlockFlash--;
   if (mihSpeedBoost > 0) mihSpeedBoost--;
 
   // Disco del Alma — ONCE DISCOS
@@ -2291,28 +2311,65 @@ function snareEnemy(e, frames) {
   e.paralyzed = Math.max(e.paralyzed || 0, frames);   // reusa el bind (inmoviliza)
   e.snared = Math.max(e.snared || 0, frames);         // hilo: DoT + visual de telaraña
 }
+// Click: lanza el tendón de hilo (atraviesa + enreda) y arranca la ráfaga ORAORAORA.
 function threadsAttack(angle) {
-  // ORA corto de hilo
-  punchAttack(angle, 34, 52, 6, SF_TEAL, 30);
-  // tendón de hilo hacia el cursor: atraviesa varios y los enreda
+  if (threadCombo > 0) return;
+  threadCombo = threadAwakened ? 6 : 4;   // más puños al despertar
+  threadTimer = 0;
+  threadAngle = angle;
+  fireSfString(angle);
+}
+function fireSfString(angle) {
   projectiles.push({
     x: player.x + Math.cos(angle) * 18, y: player.y + Math.sin(angle) * 18,
     vx: Math.cos(angle) * 13, vy: Math.sin(angle) * 13,
     r: 5, dmg: 42, life: 46, type: 'sfstring', color: SF_TEAL,
-    angle, hits: new Set(), trail: []
+    angle, hits: new Set(), pierce: threadAwakened ? 8 : 5, trail: []
   });
+}
+// Ráfaga de puños teal: golpes rápidos en abanico corto con gritos "ORA".
+function processThreadCombo() {
+  if (threadCombo <= 0) return;
+  threadTimer--;
+  if (threadTimer <= 0) {
+    const a = threadAngle + rand(-0.16, 0.16);
+    punchAttack(a, 32, 34, 5, SF_TEAL, 26);
+    const tx = player.x + Math.cos(a) * 32, ty = player.y + Math.sin(a) * 32;
+    effects.push({ type: 'ora', x: tx, y: ty - 6, life: 12, max: 12, color: SF_TEAL });
+    threadCombo--;
+    threadTimer = 3;
+  }
+}
+// Telaraña cazadora (al DESPERTAR): corta las balas enemigas cercanas a los enredados.
+function updateSfWeb() {
+  if (active !== 1 || !threadAwakened) return;
+  for (let i = 0; i < enemies.length; i++) {
+    const e = enemies[i];
+    if (e.ally || e.snared <= 0) continue;
+    for (let k = projectiles.length - 1; k >= 0; k--) {
+      const p = projectiles[k];
+      if (p.type !== 'enemy') continue;
+      const dx = p.x - e.x, dy = p.y - e.y;
+      if (dx * dx + dy * dy < 62 * 62) {
+        effects.push({ type: 'spark', x1: e.x, y1: e.y, x2: p.x, y2: p.y, life: 8, max: 8 });
+        projectiles.splice(k, 1);
+      }
+    }
+  }
 }
 
 function standOutBurst() {
-  // 16 hilos en 360° que atraviesan y paralizan
-  for (let i = 0; i < 16; i++) {
-    const a = (i / 16) * Math.PI * 2;
+  // hilos en 360° que atraviesan y enredan; al DESPERTAR salen más y aguantan más
+  const n = threadAwakened ? 24 : 16;
+  const snare = threadAwakened ? 210 : 150;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
     projectiles.push({
       x: player.x + Math.cos(a) * 16, y: player.y + Math.sin(a) * 16,
       vx: Math.cos(a) * 14, vy: Math.sin(a) * 14,
       r: 5, dmg: 110, life: 110,
       type: 'standOutThread', color: '#5fe',
-      angle: a, hits: new Set(), trail: []
+      angle: a, hits: new Set(), snare, trail: []
     });
   }
   effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 28, max: 28, r: 0, color: '#5fe' });
@@ -2328,7 +2385,7 @@ let breakerTimer = 0;
 let breakerAngle = 0;
 function breakerAttack(angle) {
   if (breakerCombo > 0) return;
-  breakerCombo = 4;
+  breakerCombo = 6;            // DORARARARA: ráfaga de puños
   breakerTimer = 0;
   breakerAngle = angle;
 }
@@ -2336,16 +2393,59 @@ function processBreakerCombo() {
   if (breakerCombo <= 0) return;
   breakerTimer--;
   if (breakerTimer <= 0) {
-    const a = breakerAngle + rand(-0.06, 0.06);
-    punchAttack(a, 48, 95, 8, CD_PINK, 60);
+    const a = breakerAngle + rand(-0.08, 0.08);
+    punchAttack(a, 48, 70, 8, CD_PINK, 58);
     const tx = player.x + Math.cos(a) * 48;
     const ty = player.y + Math.sin(a) * 48;
-    // efecto limpio: destello de impacto + estela corta hacia adelante
+    // efecto limpio: destello de impacto + grito DORA
     effects.push({ type: 'cdpunch', x: tx, y: ty, angle: a, life: 9, max: 9 });
+    if (breakerCombo % 2 === 0) effects.push({ type: 'ora', x: tx, y: ty - 8, life: 12, max: 12, color: CD_PINK, word: 'DORA' });
     // el jugador también rompe piedras al golpear
     damageStonesAt(tx, ty, 46, 34);
     breakerCombo--;
-    breakerTimer = 4;
+    breakerTimer = 3;
+  }
+}
+
+// RESTAURACIÓN (Crazy Diamond, tras DESPERTAR): pulso que devuelve las balas enemigas
+// cercanas como esquirlas restauradas y cura a los aliados al máximo. Josuke NO puede
+// curarse a sí mismo (fiel al canon), así que al jugador no lo cura.
+function crazyRestore() {
+  const R = 260;
+  shake = Math.max(shake, 12);
+  effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 26, max: 26, r: 0, color: CD_CYAN });
+  effects.push({ type: 'flash', life: 14, max: 14, color: CD_PINK });
+  effects.push({ type: 'ora', x: player.x, y: player.y - 40, life: 40, max: 40, big: true, color: CD_PINK, word: '¡RESTAURACIÓN!' });
+  // devuelve las balas enemigas cercanas hacia el enemigo más próximo (esquirlas restauradas)
+  for (let k = projectiles.length - 1; k >= 0; k--) {
+    const p = projectiles[k];
+    if (p.type !== 'enemy') continue;
+    const dx = p.x - player.x, dy = p.y - player.y;
+    if (dx * dx + dy * dy > R * R) continue;
+    let tgt = null, best = Infinity;
+    for (let j = 0; j < enemies.length; j++) {
+      const e = enemies[j];
+      if (e.ally) continue;
+      const d = distSq(e, p);
+      if (d < best) { best = d; tgt = e; }
+    }
+    const ang = tgt ? Math.atan2(tgt.y - p.y, tgt.x - p.x) : Math.atan2(-dy, -dx);
+    projectiles.splice(k, 1);
+    projectiles.push({
+      x: p.x, y: p.y,
+      vx: Math.cos(ang) * 15, vy: Math.sin(ang) * 15,
+      r: 6, dmg: 90, life: 90, type: 'cdrestore', color: CD_CYAN,
+      angle: ang, hits: new Set(), pierce: 3, trail: []
+    });
+  }
+  // cura a los aliados cercanos al máximo (Josuke cura a otros, no a sí mismo)
+  for (let j = 0; j < enemies.length; j++) {
+    const e = enemies[j];
+    if (!e.ally) continue;
+    const dx = e.x - player.x, dy = e.y - player.y;
+    if (dx * dx + dy * dy > R * R) continue;
+    if (e.maxHp) e.hp = e.maxHp;
+    effects.push({ type: 'debuff', x: e.x, y: e.y - 24, value: '💠', life: 26, max: 26 });
   }
 }
 
@@ -5007,6 +5107,26 @@ function updateEnemies() {
           effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 30, max: 30, r: 0, color: '#b5f' });
         }
       }
+      // DESPERTAR Hilo Liberado (Stone Free) → hilos mejorados + telaraña cazadora (slot 1)
+      if (active === 1 && owned.has(1) && !threadAwakened) {
+        threadKills++;
+        if (threadKills >= 40) {
+          threadAwakened = true;
+          threadUnlockFlash = 240;
+          effects.push({ type: 'flash', life: 36, max: 36, color: '#5fe' });
+          effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 30, max: 30, r: 0, color: '#5fe' });
+        }
+      }
+      // DESPERTAR Puños Rompedores (Crazy Diamond) → RESTAURACIÓN (slot 2)
+      if (active === 2 && owned.has(2) && !crazyAwakened) {
+        crazyKills++;
+        if (crazyKills >= 40) {
+          crazyAwakened = true;
+          crazyUnlockFlash = 240;
+          effects.push({ type: 'flash', life: 36, max: 36, color: CD_PINK });
+          effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 30, max: 30, r: 0, color: CD_PINK });
+        }
+      }
       // Progresión Vida Dorada → Réquiem Dorado (slot 16)
       if (active === 16 && owned.has(16) && !gerUnlocked) {
         gerKills++;
@@ -5660,7 +5780,7 @@ function updateProjectiles() {
         const rr = e.r + p.r;
         if (distSq(e, p) < rr * rr) {
           damageEnemy(e, p.dmg, '#5fe');
-          snareEnemy(e, 150); // 2.5s enredado
+          snareEnemy(e, p.snare || 150);
           effects.push({ type: 'debuff', x: e.x, y: e.y - 24, value: '🕸', life: 28, max: 28 });
           p.hits.add(e.id);
         }
@@ -5676,6 +5796,20 @@ function updateProjectiles() {
           damageEnemy(e, p.dmg, SF_TEAL);
           snareEnemy(e, 110); // ~1.8s enredado
           effects.push({ type: 'debuff', x: e.x, y: e.y - 24, value: '🕸', life: 26, max: 26 });
+          p.hits.add(e.id);
+          p.pierce--;
+          if (p.pierce <= 0) { consumed = true; break; }
+        }
+      }
+    } else if (p.type === 'cdrestore') {
+      // esquirla restaurada de Crazy Diamond: bala enemiga devuelta, atraviesa varios
+      for (let j = 0; j < enemies.length; j++) {
+        const e = enemies[j];
+        if (e.ally || p.hits.has(e.id)) continue;
+        const rr = e.r + p.r;
+        if (distSq(e, p) < rr * rr) {
+          damageEnemy(e, p.dmg, CD_CYAN);
+          effects.push({ type: 'cdpunch', x: e.x, y: e.y, angle: p.angle, life: 8, max: 8 });
           p.hits.add(e.id);
           p.pierce--;
           if (p.pierce <= 0) { consumed = true; break; }
@@ -8134,11 +8268,13 @@ function draw() {
       const size = f.big ? 38 : 22;
       ctx.font = `bold ${size}px monospace`;
       ctx.textAlign = 'center';
-      ctx.shadowColor = '#c8f';
+      const col = f.color || '#c8f';
+      ctx.shadowColor = col;
       ctx.shadowBlur = f.big ? 18 : 8;
-      ctx.fillStyle = f.big ? '#fff' : '#c8f';
+      ctx.fillStyle = f.big ? '#fff' : col;
       const yOff = (1 - f.life / f.max) * -14;
-      ctx.fillText(f.big ? 'ORAAA!!' : 'ORA', f.x, f.y + yOff);
+      const word = f.word || (f.big ? 'ORAAA!!' : 'ORA');
+      ctx.fillText(word, f.x, f.y + yOff);
       ctx.shadowBlur = 0;
       ctx.textAlign = 'left';
       ctx.globalAlpha = 1;
@@ -10669,6 +10805,25 @@ function drawUI() {
       ctx.fillStyle = '#5fe';
       ctx.fillText(`Y Ruptura: LISTO`, 280, 33);
     }
+    if (threadAwakened) {
+      ctx.fillStyle = '#5fe';
+      ctx.fillText(`✦ Stone Free DESPIERTO`, 480, 33);
+    } else {
+      ctx.fillStyle = '#fff';
+      ctx.fillText(`☠ Despertar: ${Math.min(threadKills, 40)}/40`, 480, 33);
+    }
+  }
+  if (active === 2) {
+    if (!crazyAwakened) {
+      ctx.fillStyle = '#fff';
+      ctx.fillText(`☠ Despertar: ${Math.min(crazyKills, 40)}/40 → RESTAURACIÓN`, 280, 33);
+    } else if (restoreCD > 0) {
+      ctx.fillStyle = '#888';
+      ctx.fillText(`C Restauración: ${(restoreCD / 60).toFixed(1)}s`, 280, 33);
+    } else {
+      ctx.fillStyle = CD_PINK;
+      ctx.fillText(`C Restauración: LISTO`, 280, 33);
+    }
   }
   if (active === 10) {
     // muestra cargas y CD aunque no haya cutscene
@@ -11124,6 +11279,36 @@ function drawUI() {
     ctx.restore();
     ctx.textAlign = 'left';
   }
+  if (threadUnlockFlash > 0) {
+    const a = Math.min(1, threadUnlockFlash / 60);
+    ctx.save();
+    ctx.font = 'bold 36px monospace';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(85, 255, 238, 1)';
+    ctx.shadowBlur = 22;
+    ctx.fillStyle = `rgba(170, 255, 245, ${a})`;
+    ctx.fillText('¡STONE FREE DESPIERTA!', W / 2, 130);
+    ctx.font = 'bold 16px monospace';
+    ctx.fillStyle = `rgba(220, 255, 250, ${a})`;
+    ctx.fillText('Hilos que atraviesan más + telaraña que caza balas', W / 2, 158);
+    ctx.restore();
+    ctx.textAlign = 'left';
+  }
+  if (crazyUnlockFlash > 0) {
+    const a = Math.min(1, crazyUnlockFlash / 60);
+    ctx.save();
+    ctx.font = 'bold 36px monospace';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(244, 154, 194, 1)';
+    ctx.shadowBlur = 22;
+    ctx.fillStyle = `rgba(255, 200, 225, ${a})`;
+    ctx.fillText('¡CRAZY DIAMOND DESPIERTA!', W / 2, 130);
+    ctx.font = 'bold 16px monospace';
+    ctx.fillStyle = `rgba(255, 225, 240, ${a})`;
+    ctx.fillText('Pulsa C: RESTAURACIÓN (devuelve balas + cura aliados)', W / 2, 158);
+    ctx.restore();
+    ctx.textAlign = 'left';
+  }
 
   // hotbar
   const hbY = H - 70;
@@ -11317,6 +11502,8 @@ function restart() {
   skPhase = 0; skTimer = 0; skCD = 0;
   rhcpPhase = 0; rhcpTimer = 0; rhcpCD = 0; rhcpCharges = 0;
   sfPhase = 0; sfTimer = 0; sfCD = 0;
+  threadKills = 0; threadAwakened = false; threadUnlockFlash = 0; threadCombo = 0; threadTimer = 0;
+  crazyKills = 0; crazyAwakened = false; crazyUnlockFlash = 0; restoreCD = 0;
   nrPhase = 0; nrTimer = 0; nrCD = 0; stormTimer = 0; nrGauge = 0; rainLightningCD = 0; rainCounter = 0;
   mmPhase = 0; mmTimer = 0; mmCD = 0;
   nkcPhase = 0; nkcTimer = 0; nkcCD = 0;
