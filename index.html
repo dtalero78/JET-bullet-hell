@@ -121,14 +121,14 @@
     <button class="normal" data-mode="normal">NORMAL</button>
     <button class="hard" data-mode="hard">DIFÍCIL</button>
     <button class="sandbox" data-mode="sandbox">SANDBOX</button>
-    <button class="race" data-mode="race" style="background:#c83; color:#fff;">🐎 STEEL BALL RUN</button>
-    <button id="ol-open" style="background:#39c; color:#fff;">🌐 STEEL BALL RUN ONLINE</button>
+    <button class="race" data-mode="race" style="background:#c83; color:#fff;">🐎 CARRERA</button>
+    <button id="ol-open" style="background:#39c; color:#fff;">🌐 CARRERA ONLINE</button>
   </div>
   <p style="margin-top:30px; color:#556; font-size: 12px;">WASD mover · Click atacar · 1-9, 0, -, =, ], [ cambiar · B tienda · R/T/G poderes · M panel sandbox</p>
 </div>
 
 <div id="online-panel">
-  <h2>🌐 STEEL BALL RUN — ONLINE 1v1</h2>
+  <h2>🌐 CARRERA — ONLINE 1v1</h2>
   <div id="ol-home">
     <p id="ol-home-msg">Corre la carrera contra alguien en tu misma red WiFi. Uno crea la partida; el otro la ve en la lista y se une.</p>
     <button id="ol-create">➕ Crear partida</button>
@@ -11795,7 +11795,7 @@ const RACE_STAGE_NAMES = [
 ];
 
 // Participantes numerados (#1, #2, ...) — sin nombres de la serie.
-const NPC_COUNT = 14;
+const NPC_COUNT = 10;
 const NPC_PALETTE = ['#a33','#dd9','#fc4','#f8a','#cb6','#8cf','#6cf','#f6c','#cf6','#fcd','#8fc','#c8f','#fc8','#6fc'];
 // Habilidades cíclicas (cada participante recibe una según su número):
 // scratch / sand / luck / cream / lasso / steelball
@@ -12040,9 +12040,9 @@ function setupRaceStage() {
   raceShake = 0;
   raceDustCD = 0;
 
-  // NPCs numerados — muchos participantes, todos duros
+  // NPCs numerados — carrera más asequible (rivales algo más lentos y blandos)
   raceNPCs.length = 0;
-  const npcBase = 5.4 + raceStage * 0.30;
+  const npcBase = 4.9 + raceStage * 0.20;
   const abilSeen = {};
   for (let i = 0; i < NPC_COUNT; i++) {
     const abil = NPC_ABIL_CYCLE[i % NPC_ABIL_CYCLE.length];
@@ -12058,16 +12058,16 @@ function setupRaceStage() {
       aggro: trait.aggro,
       lane: i % 3,
       x: RACE_LANES[i % 3] + rand(-40, 40),
-      progress: rand(80, 460),
+      progress: rand(40, 300),
       speed: npcBase + trait.spd + rand(-0.2, 1.0),
       baseSpeed: npcBase + trait.spd + rand(-0.2, 0.7),
-      hp: 90 + raceStage * 18, maxHp: 90 + raceStage * 18,
+      hp: 68 + raceStage * 11, maxHp: 68 + raceStage * 11,
       stamina: 100, maxStamina: 100,
       exhausted: false,
       stunned: 0,
       slowTimer: 0,
       laneChangeCD: rand(60, 180),
-      attackCD: rand(80, 180),         // dispara abilidad cada ~2-3s
+      attackCD: rand(140, 260),        // dispara abilidad con menos frecuencia
       lassoActive: 0,                  // frames con lazo enganchado al jugador
       healCD: rand(240, 600),
       arrowBoost: 0,                   // boost de velocidad por agarrar flecha
@@ -12271,7 +12271,7 @@ function updateRaceTutorial() {
 
   // ---- DASH (SPACE) ----
   if (racePlayer.sideDashCD > 0) racePlayer.sideDashCD--;
-  if (keyPressed[' '] && racePlayer.sideDashTimer <= 0 && racePlayer.sideDashCD <= 0 && racePlayer.stamina >= 20) {
+  if (keyPressed[' '] && racePlayer.sideDashTimer <= 0 && racePlayer.sideDashCD <= 0 && racePlayer.stamina >= 14) {
     let dx = 0, dy = 0;
     if (left)  dx -= 1;
     if (right) dx += 1;
@@ -12282,8 +12282,8 @@ function updateRaceTutorial() {
       racePlayer.sideDashVX = dx / mag;
       racePlayer.sideDashVY = dy / mag;
       racePlayer.sideDashTimer = 14;
-      racePlayer.stamina = Math.max(0, racePlayer.stamina - 20);
-      racePlayer.sideDashCD = 180;
+      racePlayer.stamina = Math.max(0, racePlayer.stamina - 14);
+      racePlayer.sideDashCD = 150;
       racePlayer.iframe = Math.max(racePlayer.iframe, 22);
       raceFlashTimer = 14; raceFlashColor = '#6cf';
       raceTut.dashed = true;
@@ -12444,7 +12444,7 @@ function updateRaceRacing() {
   // ---- DASH (sólo SPACE, CD 3s) — en la dirección de WASD ----
   // Atraviesas a los NPCs y los empujas/golpeas con iframes durante el dash.
   if (racePlayer.sideDashCD > 0) racePlayer.sideDashCD--;
-  if (keyPressed[' '] && racePlayer.sideDashTimer <= 0 && racePlayer.sideDashCD <= 0 && racePlayer.stamina >= 20) {
+  if (keyPressed[' '] && racePlayer.sideDashTimer <= 0 && racePlayer.sideDashCD <= 0 && racePlayer.stamina >= 14) {
     let dx = 0, dy = 0;
     if (left)  dx -= 1;
     if (right) dx += 1;
@@ -12455,8 +12455,8 @@ function updateRaceRacing() {
       racePlayer.sideDashVX = dx / mag;
       racePlayer.sideDashVY = dy / mag;
       racePlayer.sideDashTimer = 14;
-      racePlayer.stamina = Math.max(0, racePlayer.stamina - 20);
-      racePlayer.sideDashCD = 180;            // 3 segundos
+      racePlayer.stamina = Math.max(0, racePlayer.stamina - 14);
+      racePlayer.sideDashCD = 150;            // 3 segundos
       racePlayer.iframe = Math.max(racePlayer.iframe, 22);
       raceFlashTimer = 16; raceFlashColor = '#8ef';
       raceShake = Math.max(raceShake, 4);
@@ -12511,12 +12511,12 @@ function updateRaceRacing() {
   const sprinting = up && !racePlayer.exhausted;
   if (sprinting) {
     fwd += 1.1;
-    racePlayer.stamina -= 0.45;
+    racePlayer.stamina -= 0.30;
   } else if (down) {
     fwd -= 2.6;
-    racePlayer.stamina += 0.5;
+    racePlayer.stamina += 0.6;
   } else {
-    racePlayer.stamina -= 0.10;
+    racePlayer.stamina -= 0.06;
   }
   // dash y boost también cuestan algo
   if (racePlayer.dashTimer > 0) racePlayer.stamina -= 0.25;
@@ -12532,12 +12532,12 @@ function updateRaceRacing() {
     fwd = Math.min(fwd, racePlayer.baseSpeed * 0.55);
   }
 
-  if (racePlayer.lassoSlow > 0) { fwd *= 0.4; racePlayer.lassoSlow--; }
-  if (racePlayer.sandStun > 0)  { fwd *= 0.7; racePlayer.sandStun--; }
+  if (racePlayer.lassoSlow > 0) { fwd *= 0.55; racePlayer.lassoSlow--; }
+  if (racePlayer.sandStun > 0)  { fwd *= 0.8; racePlayer.sandStun--; }
   if (racePlayer.scratchDot > 0) {
     racePlayer.scratchDot--;
     if (racePlayer.scratchDot % 30 === 0 && racePlayer.iframe <= 0) {
-      racePlayer.hp -= 2;
+      racePlayer.hp -= 1;
       spawnRaceImpact(racePlayer.x, racePlayer.y, '#f44');
     }
   }
@@ -12695,13 +12695,13 @@ function updateRaceRacing() {
         case 'scratch': {
           // Diego: arañazo a corto rango — sangrado
           if (dist < 110 && racePlayer.iframe <= 0) {
-            racePlayer.hp -= 6;
-            racePlayer.scratchDot = Math.max(racePlayer.scratchDot, 120);
+            racePlayer.hp -= 4;
+            racePlayer.scratchDot = Math.max(racePlayer.scratchDot, 90);
             racePlayer.iframe = 20;
             spawnRaceImpact(racePlayer.x, racePlayer.y, '#f44');
             shake = Math.max(shake, 6);
           }
-          n.attackCD = rand(60, 110);
+          n.attackCD = rand(100, 170);
           break;
         }
         case 'sand': {
@@ -12711,11 +12711,11 @@ function updateRaceRacing() {
             raceProjectiles.push({
               x: n.x, y: screenY,
               vx: Math.cos(ang) * 8, vy: Math.sin(ang) * 8,
-              kind: 'sand', dmg: 8, life: 70, color: '#dd9',
-              owner: 'npc', stun: 40,
+              kind: 'sand', dmg: 5, life: 70, color: '#dd9',
+              owner: 'npc', stun: 30,
             });
           }
-          n.attackCD = rand(90, 160);
+          n.attackCD = rand(140, 220);
           break;
         }
         case 'luck': {
@@ -12726,7 +12726,7 @@ function updateRaceRacing() {
               raceProjectiles.push({
                 x: n.x, y: screenY,
                 vx: Math.cos(ang) * 7, vy: Math.sin(ang) * 7,
-                kind: 'luck', dmg: 6, life: 70, color: '#fc4',
+                kind: 'luck', dmg: 4, life: 70, color: '#fc4',
                 owner: 'npc',
               });
             }
@@ -12734,13 +12734,13 @@ function updateRaceRacing() {
           if (Math.random() < 0.35) {
             n.arrowBoost = Math.max(n.arrowBoost, 60);
           }
-          n.attackCD = rand(120, 200);
+          n.attackCD = rand(170, 270);
           break;
         }
         case 'cream': {
           // Hot Pants: Cream Starter — se cura
           if (n.healCD <= 0 && n.hp < n.maxHp) {
-            n.hp = Math.min(n.maxHp, n.hp + 30);
+            n.hp = Math.min(n.maxHp, n.hp + 22);
             for (let k = 0; k < 10; k++) {
               raceParticles.push({
                 x: n.x + rand(-12, 12), y: screenY + rand(-12, 12),
@@ -12756,22 +12756,22 @@ function updateRaceRacing() {
             raceProjectiles.push({
               x: n.x, y: screenY,
               vx: Math.cos(ang) * 9, vy: Math.sin(ang) * 9,
-              kind: 'cream', dmg: 9, life: 70, color: '#fbe',
+              kind: 'cream', dmg: 6, life: 70, color: '#fbe',
               owner: 'npc',
             });
           }
-          n.attackCD = rand(100, 170);
+          n.attackCD = rand(150, 230);
           break;
         }
         case 'lasso': {
           // Mountain Tim: lazo que frena al jugador 90 frames
           if (dist < 280 && n.lassoActive <= 0) {
-            n.lassoActive = 90;
-            racePlayer.lassoSlow = Math.max(racePlayer.lassoSlow, 90);
+            n.lassoActive = 70;
+            racePlayer.lassoSlow = Math.max(racePlayer.lassoSlow, 70);
             spawnRaceImpact(racePlayer.x, racePlayer.y, '#cb6');
-            if (racePlayer.iframe <= 0) { racePlayer.hp -= 5; racePlayer.iframe = 18; }
+            if (racePlayer.iframe <= 0) { racePlayer.hp -= 3; racePlayer.iframe = 18; }
           }
-          n.attackCD = rand(150, 240);
+          n.attackCD = rand(200, 300);
           break;
         }
         case 'steelball': {
@@ -12781,17 +12781,17 @@ function updateRaceRacing() {
             raceProjectiles.push({
               x: n.x, y: screenY,
               vx: Math.cos(ang) * 7, vy: Math.sin(ang) * 7,
-              kind: 'spiralball', dmg: 12, life: 80, color: '#cde',
+              kind: 'spiralball', dmg: 7, life: 80, color: '#cde',
               owner: 'npc', homing: 0.5, spin: 0,
             });
           }
-          n.attackCD = rand(100, 170);
+          n.attackCD = rand(150, 230);
           break;
         }
       }
       // personalidad: los rivales agresivos atacan más seguido; en la RECTA FINAL todos aceleran su cadencia
       let aggroMul = n.aggro || 1;
-      if (raceFinalStretch) aggroMul *= 0.65;
+      if (raceFinalStretch) aggroMul *= 0.82;
       n.attackCD = Math.round(n.attackCD * aggroMul);
     }
   }
@@ -12822,8 +12822,8 @@ function updateRaceRacing() {
     const gap = o.progress - racePlayer.progress;
     if (Math.abs(gap) < 30 && Math.abs(o.x - racePlayer.x) < 36 && racePlayer.iframe <= 0) {
       o.hit = true;
-      racePlayer.hp -= 10;
-      racePlayer.iframe = 50;
+      racePlayer.hp -= 6;
+      racePlayer.iframe = 70;
       racePlayer.dashTimer = 0;
       racePlayer.draftBoost = 0;
       shake = 10;
@@ -15637,7 +15637,7 @@ function drawRaceWeaponSelect() {
   ctx.textAlign = 'center';
   ctx.fillStyle = '#fd6';
   ctx.font = 'bold 56px monospace';
-  ctx.fillText('STEEL BALL RUN', W / 2, 120);
+  ctx.fillText('LA CARRERA', W / 2, 120);
   ctx.fillStyle = '#fff';
   ctx.font = '18px monospace';
   ctx.fillText('La gran carrera transcontinental — 9 etapas, partes del Santo Cadáver en juego', W / 2, 160);
@@ -15803,7 +15803,7 @@ function drawRaceFinale() {
   ctx.fillText('🏆 CRUZASTE EL CONTINENTE 🏆', W / 2, 110);
   ctx.fillStyle = '#fff';
   ctx.font = '22px monospace';
-  ctx.fillText('Steel Ball Run completada — 9 etapas', W / 2, 150);
+  ctx.fillText('Carrera completada — 9 etapas', W / 2, 150);
 
   ctx.fillStyle = '#fec';
   ctx.font = 'bold 22px monospace';
