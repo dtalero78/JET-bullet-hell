@@ -329,80 +329,105 @@ const player = {
 const ABILITIES = [
   { id: 'whip',     name: '1. Látigo Eléctrico Morado', cost: 0,
     desc: 'Latigazo eléctrico que restalla en línea y encadena daño entre enemigos. Con 50 kills desbloqueas una 2ª forma: pulsa C para cambiar los clicks a un LÁTIGO-CUERDA eléctrico (como Oh! Lonesome Me pero morado): te jala hasta el punto dañando en el camino, y a quien sobreviva lo deja PARALIZADO 5s.', color: '#c4f' },
-  { id: 'threads',  name: '2. Hilo Liberado',              cost: 25,
+  { id: 'threads',  name: '2. Hilo Liberado',              cost: 120,
     desc: 'Stone Free (Jolyne). Click: RÁFAGA de puños "ORAORAORA" a corta distancia + un tendón de hilo que ATRAVIESA y ENREDA (inmoviliza + daño continuo), tejiendo telaraña entre los atrapados. DESPERTAR a los 40 kills: los hilos atraviesan más, la telaraña CAZA balas enemigas (las corta) y la Ruptura crece. Y: RUPTURA DE HILOS — cutscene + hilos en 360° que enredan alrededor (CD 15s).', color: '#2cb' },
-  { id: 'breaker',  name: '3. Puños Rompedores',        cost: 120,
+  { id: 'breaker',  name: '3. Puños Rompedores',        cost: 180,
     desc: 'Crazy Diamond (Josuke). Click: barrage "DORARARARA" de puños limpios. A cada enemigo que MATAS lo fusionas en una ROCA que bloquea el paso (como la Roca de Angelo). DESPERTAR a los 40 kills: RESTAURACIÓN — pulsa C para restaurar el campo: devuelve las balas enemigas cercanas como esquirlas y cura a los aliados al máximo (Josuke no puede curarse a sí mismo). CD 12s.', color: '#f8c' },
-  { id: 'rain',     name: '4. Tormenta Torrencial',           cost: 250,
+  { id: 'rain',     name: '4. Tormenta Torrencial',           cost: 400,
     desc: 'Una nube te sigue ENCIMA y su lluvia se vuelve arma: daña sola a los enemigos a tu alrededor (posiciónate para mojarlos). CLICK: RELÁMPAGO dirigido al cursor (área + parálisis; +daño a los mojados). Mojar y golpear carga el medidor DILUVIO; al llenarlo, pulsa O para desatar la TORMENTA FINAL que cubre la pantalla 5s.', color: '#69c' },
-  { id: 'arrow',    name: '5. Flechas Perforantes',     cost: 300,
+  { id: 'arrow',    name: '5. Flechas Perforantes',     cost: 25,
     desc: 'Flechas que atraviesan y empujan a los enemigos en su dirección.', color: '#cf8' },
-  { id: 'bastion',     name: '6. Bastión Inmóvil',         cost: 400,
+  { id: 'bastion',     name: '6. Bastión Inmóvil',         cost: 300,
     desc: 'Quédate quieto: cúpula azul-morado, inmunidad y reflejo (30s c/50s). Moverte pausa la carga.', color: '#a8f' },
-  { id: 'flurry',      name: '7. Frenesí de Estocadas',    cost: 420,
+  { id: 'flurry',      name: '7. Frenesí de Estocadas',    cost: 460,
     desc: 'Pasiva: +60% velocidad. Click: ráfaga de 5 estocadas ultra rápidas en línea.', color: '#fef' },
-  { id: 'firebullet',  name: '8. Bala Incendiaria',        cost: 450,
+  { id: 'firebullet',  name: '8. Bala Incendiaria',        cost: 420,
     desc: 'Bala que crea una hoguera donde cae. El fuego dura 10s y daña a quien lo pise.', color: '#f73' },
-  { id: 'emerald',     name: '9. Esmeraldas',              cost: 460,
+  { id: 'emerald',     name: '9. Esmeraldas',              cost: 450,
     desc: 'Rayos verdes. J: telarañas 8s — enemigos atrapados disparan esmeraldas (CD 2min).', color: '#4f8' },
-  { id: 'nutking',     name: '10. Pernos Letales',          cost: 180,
+  { id: 'nutking',     name: '10. Pernos Letales',          cost: 470,
     desc: '3 pernos por click; cada hit clava un NUT al enemigo (hasta 5 stacks). C: DISASSEMBLE — cutscene + desensambla a todos los marcados (250 × nuts de daño + paralizados 1s) (CD 18s).', color: '#c97' },
-  { id: 'spirit',      name: '11. Furia Eléctrica',   cost: 470,
+  { id: 'spirit',      name: '11. Furia Eléctrica',   cost: 500,
     desc: 'Rayo encadenado rojo-amarillo que salta entre enemigos, paraliza 0.5s y acumula CARGA ELÉCTRICA (hasta 10). P: Electric Scream — cutscene + descarga TODAS las cargas en una tormenta que pega a todos los enemigos, daño escalado por cargas (CD 15s).', color: '#f63' },
   { id: 'bounty',      name: '12. Don del Milagro',            cost: 750,
     desc: 'Marca 10 enemigos con un milagro aleatorio (💰 monedas, ❤ cura, ⚡ cadena, 🛑 stun) + 30% HP de daño. El milagro se dispara al morir. I: DIVINE INTERVENTION — cutscene + detona todos los milagros, +200 monedas, cura 40% HP (CD 30s).', color: '#fc4' },
-  { id: 'shortrewind', name: '13. Eco Temporal',           cost: 500,
+  { id: 'shortrewind', name: '13. Eco Temporal',           cost: 550,
     desc: 'Puños ágiles + T: rebobina enemigos 6s cada 8s. Limpia balas enemigas.', color: '#b9f' },
   { id: 'speedking',   name: '14. Calor Cinético',             cost: 580,
     desc: 'Puños ardientes que marcan al enemigo con CALOR (hasta 5 stacks). Mientras el enemigo se mueve, el calor lo quema según su velocidad. U: Heat Detonation — cutscene + todos los marcados explotan según calor acumulado (CD 12s).', color: '#f73' },
-  { id: 'steelball',   name: '15. Pelota de Acero',        cost: 550,
+  { id: 'steelball',   name: '15. Pelota de Acero',        cost: 470,
     desc: 'Bola verde metálica giratoria que rebota en bordes y curva su trayectoria. F: Lesson 3 — bola dorada que rebota entre enemigos con daño escalado (CD 8s).', color: '#4fe07a' },
   { id: 'dash',        name: '16. Plaga Primigenia',         cost: 900,
     desc: 'Mordida-dash que infecta enemigos. Los infectados al morir se vuelven DINOSAURIOS aliados (más veloces, mordida en área). R: APEX PREDATOR — cutscene + rugido que aturde y daña a todos en pantalla, infecta supervivientes y recarga la vida de los dinos (CD 25s).', color: '#6b3' },
-  { id: 'mirage',      name: '17. Vida Dorada', cost: 1000,
+  { id: 'mirage',      name: '17. Vida Dorada', cost: 5000,
     desc: 'Vida Dorada: balas de vida dorada. K: INÚTIL INÚTIL INÚTIL — lluvia de puños de vida en área; los supervivientes quedan SOBRECARGADOS y reciben +80% de daño durante 5s (CD 7s). 4000 kills → Réquiem Dorado: clics mejores + R: RETURN TO ZERO — 30s inmune; todo enemigo que te ataque cae en un bucle de muerte infinito que se contagia al contacto y, al acabar, todos mueren (los bosses reciben mucho daño).', color: '#fd0' },
-  { id: 'rewind',      name: '18. Carmesí Inmortal', cost: 1010,
+  { id: 'rewind',      name: '18. Carmesí Inmortal', cost: 4800,
     desc: 'Puños carmesí brutales que golpean en área. T: 10s inmortal + tiempo borrado, los enemigos del futuro aparecen en el centro (CD 90s).', color: '#d02' },
-  { id: 'vortex',      name: '19. Uña Espiral',                   cost: 3000,
+  { id: 'vortex',      name: '19. Uña Espiral',                   cost: 2200,
     desc: 'Poder evolutivo de el Jinete. Act 1: par de uñas en V que perforan 1 + U: TORNADO DE UÑAS (16 uñas en 360°). 500 kills → Act 2 (uñas más fuertes + Y: NAIL STORM). 1000 kills → Act 3 (uñas-wormhole que perforan dimensiones + Z: WORMHOLE PUNCH). 3000 kills → Act 4: G alterna PUÑOS dorados (daño + empuje) y BALAS hiper-veloces (doradas, casi invisibles, con orbes y estela); ambos dejan al enemigo en GIRO INFINITO recibiendo daño hasta morir. V: GOLDEN RATIO. T: cicla entre Actos desbloqueados.', color: '#fd6' },
-  { id: 'd4c',         name: '20. Copias Dimensionales',                    cost: 2200,
+  { id: 'd4c',         name: '20. Copias Dimensionales',                    cost: 1200,
     desc: 'Lanza copias dimensionales en paralelo: 3 estrellas que atraviesan enemigos desde universos alternos. L: BARRERA DORADA — cutscene + 10s de barrera de rayos dorados que te cubre: refleja balas enemigas (×4 daño) y daña/empuja a todo enemigo que toca el halo (CD 90s).', color: '#f06' },
   { id: 'starplatinum', name: '21. Puño Estelar',         cost: 1800,
     desc: 'Ráfaga GOLPE GOLPE GOLPE — 8 puños ultra rápidos en línea con golpe final masivo. R: cutscene "MUNDO DETENIDO" — paraliza el tiempo 12s (CD 25s).', color: '#93f' },
   { id: 'theworld',    name: '22. Mundo Detenido',        cost: 1800,
     desc: 'Lanza cuchillos voladores. Durante la parada de tiempo, los cuchillos se quedan flotando y al terminar salen disparados a toda velocidad. Z: cutscene "ALTO TEMPORAL!" — paraliza el tiempo 12s (CD 25s).', color: '#fd2' },
-  { id: 'detonate',    name: '23. Reina Explosiva',           cost: 1200,
+  { id: 'detonate',    name: '23. Reina Explosiva',           cost: 1000,
     desc: 'Touch Bombs rosadas teledirigidas que se pegan al enemigo y detonan tras 1.5s (daño en área). G: Vuelta Mortal — cutscene + onda final que mata todo en pantalla, invulnerable durante el ritual + cura 30% HP (CD 2min).', color: '#f48' },
-  { id: 'smoke',       name: '24. Cortina de Humo',        cost: 2500,
+  { id: 'smoke',       name: '24. Cortina de Humo',        cost: 1010,
     desc: 'Bombas de humo que dañan. H: niebla total 5s — invulnerable, rápido, dañas a todos.', color: '#bbb' },
-  { id: 'bubble',      name: '25. Burbujas Infinitas',     cost: 4500,
+  { id: 'bubble',      name: '25. Burbujas Infinitas',     cost: 2500,
     desc: 'Puños fuertes. N: balas que paralizan/ciegan/resbalan. L: ejército de clones con burbujas mortales (CD 2min).', color: '#9ff' },
-  { id: 'wonder',      name: '26. Calamidad',            cost: 4500,
+  { id: 'wonder',      name: '26. Calamidad',            cost: 3000,
     desc: 'Rocas teledirigidas que se pegan (+daño con el tiempo). N: tira carros. X: calamidad mata todo (CD 2min).', color: '#c30' },
-  { id: 'pucci',       name: '27. Disco del Alma → Gravedad Lunar → Cielo Acelerado', cost: 5000,
+  { id: 'pucci',       name: '27. Disco del Alma → Gravedad Lunar → Cielo Acelerado', cost: 4500,
     desc: 'Poder evolutivo del el Sacerdote. Empieza como Disco del Alma (disco blanco DISC + K: ONCE DISCOS). 500 kills desbloquea Gravedad Lunar (discos lunares teledirigidos que aturden + M: GRAVITY INVERSION). 2000 kills más desbloquea Cielo Acelerado (velocidad sobrehumana + H: HEAVEN ASCENSION). L: cicla entre las poderes desbloqueados.', color: '#ddd' },
-  { id: 'paintblack',  name: '28. Mancha Negra',         cost: 4800,
+  { id: 'paintblack',  name: '28. Mancha Negra',         cost: 4500,
     desc: 'Dispara 5 balas negras que dejan charcos: enemigo tocado muere, sobrevivientes quedan MANCHADOS (paralizados y dañados al salir según tiempo en charco). De noche: balas y charcos con contorno arcoíris neón, velocidad y daño aumentados. P: DÍA → bala gigante de pintura, cutscene "BLACK, EVERYTHING MUST BE BLACK" + X negra en el corazón = muerte instantánea por presión. NOCHE → dash de hitbox total mientras grita BLACK en ráfaga (CD 35s).', color: '#000' },
   { id: 'michael',     name: '29. Rey del Pop',           cost: 8000,
     desc: 'El nuevo mejor poder: tres estilos que ciclas con M. THRILLER (puños) — combo de golpes ENORMES; cada enemigo que matas se levanta como un ZOMBIE bailarín aliado que ataca a los demás. PASO LUNAR (dash) — embestida hacia adelante con daño devastador, invulnerable y dejando estela de imágenes. CRIMINAL (balazos) — ráfaga densa de 7 disparos dorados súper rápidos y perforantes. Pulsa M para rotar entre los tres estilos.', color: '#e33' },
-  { id: 'lonesome', name: 'Oh! Lonesome Me (Cuerda)', cost: 300,
+  { id: 'lonesome', name: 'Oh! Lonesome Me (Cuerda)', cost: 250,
     desc: 'Lanza una cuerda hacia el cursor: se engancha donde cae y te jala hasta ahi como un dash, danando a los enemigos en el camino. Quien sobreviva al tiron queda AMARRADO 5s sin poder moverse.', color: '#cb6' },
-  { id: 'pistols', name: 'Balas Vivientes', cost: 470,
+  { id: 'pistols', name: 'Balas Vivientes', cost: 300,
     desc: 'Sex Pistols (Mista). Los 6 Pistols numerados Nº1, 2, 3, 5, 6 y 7 (sin el 4, que Mista odia) flotan a tu alrededor. CLICK dispara: si la bala pasa por un Pistol, este la PATEA hacia el enemigo mas cercano (banco canon) y rebota entre enemigos con daño creciente. V: recolocar los 6 Pistols.', color: '#fd0' },
 ];
 
 // Orden de la TIENDA (y de la cadena de compra), desacoplado del indice de juego.
-// 'Balas Vivientes' (30) y 'Oh! Lonesome Me' (29) van justo DETRAS de
-// 'Furia Electrica' (indice 10), es decir antes de 'Don del Milagro' (indice 11).
-const SHOP_ORDER = (() => {
-  const o = [];
-  for (let i = 0; i < ABILITIES.length; i++) {
-    if (i === 29 || i === 30) continue;   // se colocan manualmente
-    if (i === 11) { o.push(30); o.push(29); }  // Balas Vivientes y Oh! Lonesome Me tras Furia Electrica
-    o.push(i);
-  }
-  return o;
-})();
+// Progresión por PODER: de las armas básicas a las más ROTAS al final. Debes comprar
+// cada una para desbloquear la siguiente (ver renderShop/buyAbility). Los precios de
+// ABILITIES ya están ordenados ascendentes según este mismo orden.
+const SHOP_ORDER = [
+  0,   // Látigo Eléctrico (inicio)
+  4,   // Flechas Perforantes
+  1,   // Hilo Liberado
+  2,   // Puños Rompedores
+  29,  // Oh! Lonesome Me
+  30,  // Balas Vivientes
+  5,   // Bastión Inmóvil
+  3,   // Tormenta Torrencial
+  7,   // Bala Incendiaria
+  8,   // Esmeraldas
+  6,   // Frenesí de Estocadas
+  9,   // Pernos Letales
+  14,  // Pelota de Acero
+  10,  // Furia Eléctrica
+  12,  // Eco Temporal
+  13,  // Calor Cinético
+  11,  // Don del Milagro
+  15,  // Plaga Primigenia (requiere Pelota de Acero antes)
+  22,  // Reina Explosiva
+  23,  // Cortina de Humo
+  19,  // Copias Dimensionales
+  20,  // Puño Estelar
+  21,  // Mundo Detenido
+  18,  // Uña Espiral
+  24,  // Burbujas Infinitas
+  25,  // Calamidad
+  26,  // Disco del Alma → ...
+  27,  // Mancha Negra
+  17,  // Carmesí Inmortal
+  16,  // Vida Dorada → Réquiem Dorado
+  28,  // Rey del Pop (la más rota, al final)
+];
 
 const owned = new Set([0]); // start with whip
 let active = 0;
