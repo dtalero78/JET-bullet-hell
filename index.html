@@ -2,44 +2,81 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Bullet Hell — Hordas Infinitas</title>
+<title>A Bizarre Bullet Hell</title>
 <style>
   html, body { margin: 0; padding: 0; background: #07071a; color: #eee; font-family: monospace; overflow: hidden; height: 100%; }
   body { display: flex; align-items: center; justify-content: center; }
   canvas { display: block; background: #11112a; box-shadow: 0 0 40px #000; image-rendering: pixelated; }
   #shop {
     position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    background: rgba(10,10,30,0.96); border: 2px solid #88f; border-radius: 8px;
-    padding: 20px; min-width: 520px; max-width: 720px; max-height: 80vh; overflow-y: auto;
-    box-shadow: 0 0 30px #44f8; display: none; z-index: 10;
+    background: linear-gradient(160deg, rgba(18,14,40,0.98), rgba(8,8,22,0.98));
+    border: 2px solid #88f; border-radius: 12px;
+    padding: 20px 22px; min-width: 540px; max-width: 760px; max-height: 82vh; overflow-y: auto;
+    box-shadow: 0 0 40px #44f9, inset 0 0 60px rgba(80,80,255,0.05); display: none; z-index: 10;
   }
-  #shop h2 { color: #aaf; margin: 0 0 12px 0; }
+  #shop::-webkit-scrollbar { width: 10px; }
+  #shop::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 6px; }
+  #shop::-webkit-scrollbar-thumb { background: #45c; border-radius: 6px; }
+  #shop::-webkit-scrollbar-thumb:hover { background: #57e; }
+  #shop h2 { color: #cdf; margin: 0 0 6px 0; font-size: 22px; text-shadow: 0 0 12px #44f8; }
+  #shop h2 .coins { color: #fd4; text-shadow: 0 0 10px #fd48; }
+  #shop .shop-sub { color: #99b; font-size: 12px; margin-bottom: 12px; line-height: 1.4; }
   .ability {
-    padding: 10px 12px; border: 1px solid #444; margin: 6px 0; border-radius: 4px;
-    cursor: pointer; transition: background 0.15s;
+    position: relative; padding: 11px 14px; border: 1px solid #3a3a5a;
+    background: rgba(255,255,255,0.02); margin: 7px 0; border-radius: 7px;
+    cursor: pointer; transition: transform 0.12s, background 0.15s, box-shadow 0.15s;
   }
-  .ability.owned { border-color: #6f6; background: #0a2a0a; cursor: default; }
-  .ability.locked { opacity: 0.45; cursor: not-allowed; }
-  .ability:not(.owned):not(.locked):hover { background: #1a1a44; }
-  .ability .title { color: #fff; font-weight: bold; }
-  .ability .cost { color: #fc4; }
-  .ability .desc { color: #aac; font-size: 12px; margin-top: 4px; }
+  .ability:not(.owned):not(.locked):hover { background: #1a1a48; transform: translateX(4px); box-shadow: -3px 0 16px rgba(120,120,255,0.25); }
+  .ability.owned { border-color: #4c6; background: linear-gradient(90deg, rgba(20,50,20,0.6), rgba(10,20,10,0.25)); cursor: default; }
+  .ability.locked { opacity: 0.4; cursor: not-allowed; filter: grayscale(0.5); }
+  .ability.buyable { border-color: #fd4; animation: buyPulse 1.6s ease-in-out infinite; }
+  @keyframes buyPulse {
+    0%,100% { box-shadow: 0 0 0 1px #fd44, 0 0 12px rgba(255,210,60,0.18); }
+    50% { box-shadow: 0 0 0 1px #fd4a, 0 0 22px rgba(255,210,60,0.4); }
+  }
+  .ability .title { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: #fff; font-weight: bold; font-size: 14px; }
+  .ability .cost { background: #2a2f14; color: #fd4; border: 1px solid #7a6a20; border-radius: 20px; padding: 2px 10px; font-size: 12px; white-space: nowrap; }
+  .ability .desc { color: #9ab; font-size: 11.5px; margin-top: 5px; line-height: 1.45; }
   #help { position: fixed; bottom: 8px; right: 12px; color: #556; font-size: 11px; }
   #title {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.85); color: #fff; display: flex;
-    flex-direction: column; align-items: center; justify-content: center;
-    z-index: 20; cursor: pointer;
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse at 50% 34%, #241040 0%, #0a0820 55%, #050510 100%);
+    color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 20; overflow: hidden;
   }
-  #title h1 { font-size: 56px; color: #a4f; text-shadow: 0 0 20px #a4f; margin: 0; }
-  #title p { color: #88a; }
-  #title button { padding: 12px 30px; font-size: 18px; background: #a4f; color: #fff; border: none; border-radius: 6px; cursor: pointer; margin: 6px; min-width: 160px; }
-  #title button.easy { background: #4a8; }
-  #title button.normal { background: #48a; }
-  #title button.hard { background: #a44; }
-  #title button.sandbox { background: #aa4; color: #111; }
-  #title button:hover { filter: brightness(1.2); }
-  #modes { display: flex; flex-wrap: wrap; justify-content: center; max-width: 700px; margin-top: 20px; }
+  #title::before {
+    content: 'ゴ ゴ ゴ ゴ ゴ ゴ'; position: absolute; top: 7%; left: 0; right: 0; text-align: center;
+    font-size: 46px; color: rgba(160,80,255,0.12); letter-spacing: 18px; pointer-events: none;
+    animation: menace 3s ease-in-out infinite;
+  }
+  @keyframes menace { 0%,100% { opacity: 0.10; transform: translateY(0); } 50% { opacity: 0.24; transform: translateY(-6px); } }
+  #title h1 {
+    font-size: 68px; margin: 0; letter-spacing: 2px; line-height: 1.02; text-align: center;
+    background: linear-gradient(100deg, #b46bff 0%, #ff5db2 46%, #ffd35d 100%);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    animation: titleGlow 2.6s ease-in-out infinite;
+  }
+  @keyframes titleGlow {
+    0%,100% { filter: drop-shadow(0 0 18px rgba(180,90,255,0.45)); }
+    50% { filter: drop-shadow(0 0 32px rgba(255,120,200,0.7)); }
+  }
+  #title .tagline { color: #b9a9e0; font-size: 15px; margin: 16px 0 4px; letter-spacing: 1px; text-align: center; }
+  #title .hint { margin-top: 26px; color: #5a5a72; font-size: 12px; max-width: 660px; text-align: center; line-height: 1.5; }
+  #modes { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 26px; }
+  #modes .row { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+  #modes .sep { color: #556; font-size: 11px; letter-spacing: 4px; margin: 4px 0 0; }
+  #title button {
+    padding: 13px 30px; font-size: 17px; font-weight: bold; font-family: monospace;
+    background: #a4f; color: #fff; border: none; border-radius: 8px; cursor: pointer;
+    min-width: 150px; letter-spacing: 1px; box-shadow: 0 4px 0 rgba(0,0,0,0.35);
+    transition: transform 0.1s, box-shadow 0.15s, filter 0.15s;
+  }
+  #title button:hover { transform: translateY(-2px); filter: brightness(1.15); box-shadow: 0 7px 18px rgba(0,0,0,0.5); }
+  #title button:active { transform: translateY(1px); box-shadow: 0 2px 0 rgba(0,0,0,0.35); }
+  #title button.easy { background: linear-gradient(#5cbf8f,#3a8f66); }
+  #title button.normal { background: linear-gradient(#5aa0e0,#3a72b0); }
+  #title button.hard { background: linear-gradient(#d15a5a,#a33); }
+  #title button.sandbox { background: linear-gradient(#d4c24a,#a8971f); color: #111; }
   #sandbox-panel {
     position: fixed; top: 80px; right: 20px;
     background: rgba(20,20,40,0.95); border: 2px solid #aa4; border-radius: 8px;
@@ -114,17 +151,23 @@
 <div id="help">WASD · Click · 1-9, 0, -, =, Tab, ], [, \, /, ;, ', , · Q/E/rueda/hotbar · B tienda · R/T/F/G/H/J poderes · ESC</div>
 
 <div id="title">
-  <h1>BULLET HELL</h1>
-  <p>Sobrevive a las hordas. Compra armas. Cada arma supera a la anterior.</p>
+  <h1>A BIZARRE<br>BULLET HELL</h1>
+  <p class="tagline">Sobrevive a las hordas · Compra Stands · Cada arma supera a la anterior</p>
   <div id="modes">
-    <button class="easy" data-mode="easy">FÁCIL</button>
-    <button class="normal" data-mode="normal">NORMAL</button>
-    <button class="hard" data-mode="hard">DIFÍCIL</button>
-    <button class="sandbox" data-mode="sandbox">SANDBOX</button>
-    <button class="race" data-mode="race" style="background:#c83; color:#fff;">🐎 CARRERA</button>
-    <button id="ol-open" style="background:#39c; color:#fff;">🌐 CARRERA ONLINE</button>
+    <div class="sep">— DIFICULTAD —</div>
+    <div class="row">
+      <button class="easy" data-mode="easy">FÁCIL</button>
+      <button class="normal" data-mode="normal">NORMAL</button>
+      <button class="hard" data-mode="hard">DIFÍCIL</button>
+    </div>
+    <div class="sep">— MODOS —</div>
+    <div class="row">
+      <button class="sandbox" data-mode="sandbox">SANDBOX</button>
+      <button class="race" data-mode="race" style="background:linear-gradient(#e0a24a,#c8842f); color:#fff;">🐎 CARRERA</button>
+      <button id="ol-open" style="background:linear-gradient(#4aa0d8,#2f78b0); color:#fff;">🌐 ONLINE</button>
+    </div>
   </div>
-  <p style="margin-top:30px; color:#556; font-size: 12px;">WASD mover · Click atacar · 1-9, 0, -, =, ], [ cambiar · B tienda · R/T/G poderes · M panel sandbox</p>
+  <p class="hint">WASD mover · Click atacar · 1-9 0 - = ] [ cambiar arma · B tienda · R/T/F/G/H/J poderes · M panel sandbox</p>
 </div>
 
 <div id="online-panel">
@@ -11463,8 +11506,9 @@ function closeShop() {
 }
 
 function renderShop() {
-  let html = `<h2>Tienda — 💰 ${player.coins} monedas <span style="float:right; font-size:13px; color:#aa4">Modo: ${mode.toUpperCase()}</span></h2>`;
-  html += `<div style="color:#aac; font-size:12px; margin-bottom:10px;">Compra en orden. Cada arma supera a la anterior. Click en el ítem para comprar.</div>`;
+  const ownedCount = SHOP_ORDER.filter(i => owned.has(i)).length;
+  let html = `<h2>🛒 Tienda <span class="coins">💰 ${player.coins}</span><span style="float:right; font-size:13px; color:#aa6">${mode.toUpperCase()} · ${ownedCount}/${SHOP_ORDER.length}</span></h2>`;
+  html += `<div class="shop-sub">Compra en orden: cada arma desbloquea la siguiente. Las más ROTAS están al final. Click en un ítem para comprar.</div>`;
   SHOP_ORDER.forEach((i, pos) => {
     const ab = ABILITIES[i];
     const prev = pos === 0 ? -1 : SHOP_ORDER[pos - 1];
@@ -11472,24 +11516,24 @@ function renderShop() {
     const canBuy = pos === 0 || owned.has(prev);
     const c = abilityCost(ab);
     const affordable = player.coins >= c;
-    const cls = isOwned ? 'owned' : (!canBuy || !affordable ? 'locked' : '');
+    let cls = 'ability';
+    if (isOwned) cls += ' owned';
+    else if (!canBuy || !affordable) cls += ' locked';
+    if (!isOwned && canBuy && affordable) cls += ' buyable';
     let label = '';
     if (isOwned) label = '<span style="color:#6f6">✓ ADQUIRIDO</span>';
-    else if (!canBuy) label = '<span style="color:#f88">🔒 Compra el anterior primero</span>';
-    else if (!affordable) label = `<span style="color:#f88">Faltan ${c - player.coins} monedas</span>`;
+    else if (!canBuy) label = '<span style="color:#f88">🔒 Compra el anterior</span>';
+    else if (!affordable) label = `<span style="color:#f88">Faltan 💰${c - player.coins}</span>`;
     else label = `<span class="cost">💰 ${c}</span>`;
-    html += `<div class="ability ${cls}" data-idx="${i}" style="border-left: 4px solid ${ab.color}">
-      <div class="title">${ab.name} &nbsp; ${label}</div>
+    html += `<div class="${cls}" data-idx="${i}" style="border-left: 5px solid ${ab.color}">
+      <div class="title"><span>${ab.name}</span> ${label}</div>
       <div class="desc">${ab.desc}</div>
     </div>`;
   });
-  html += `<div style="color:#666; margin-top:10px; font-size:11px;">B o ESC para cerrar</div>`;
+  html += `<div style="color:#667; margin-top:12px; font-size:11px;">B o ESC para cerrar</div>`;
   shopEl.innerHTML = html;
   shopEl.querySelectorAll('[data-idx]').forEach(div => {
-    div.onclick = () => {
-      const idx = +div.dataset.idx;
-      buyAbility(idx);
-    };
+    div.onclick = () => { buyAbility(+div.dataset.idx); };
   });
 }
 
