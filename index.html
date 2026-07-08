@@ -364,7 +364,7 @@ const ABILITIES = [
   { id: 'rewind',      name: '18. Carmesí Inmortal', cost: 4800,
     desc: 'Puños carmesí brutales que golpean en área. T: 10s inmortal + tiempo borrado, los enemigos del futuro aparecen en el centro (CD 90s).', color: '#d02' },
   { id: 'vortex',      name: '19. Uña Espiral',                   cost: 2200,
-    desc: 'Poder evolutivo de el Jinete. Act 1: par de uñas en V que perforan 1 + U: TORNADO DE UÑAS (16 uñas en 360°). 500 kills → Act 2 (uñas más fuertes + Y: NAIL STORM). 1000 kills → Act 3 (uñas-wormhole que perforan dimensiones + Z: WORMHOLE PUNCH). 3000 kills → Act 4: G alterna PUÑOS dorados (daño + empuje) y BALAS hiper-veloces (doradas, casi invisibles, con orbes y estela); ambos dejan al enemigo en GIRO INFINITO recibiendo daño hasta morir. V: GOLDEN RATIO. T: cicla entre Actos desbloqueados.', color: '#fd6' },
+    desc: 'Poder evolutivo de el Jinete. Act 1: par de uñas en V que perforan 1 + U: TORNADO DE UÑAS (16 uñas en 360°). 50 kills → Act 2 (uñas más fuertes + Y: NAIL STORM). 100 kills → Act 3 (uñas-wormhole que perforan dimensiones + Z: WORMHOLE PUNCH). 150 kills → Act 4: G alterna PUÑOS dorados (daño + empuje) y BALAS hiper-veloces (doradas, casi invisibles, con orbes y estela); ambos dejan al enemigo en GIRO INFINITO recibiendo daño hasta morir. V: GOLDEN RATIO. T: cicla entre Actos desbloqueados.', color: '#fd6' },
   { id: 'd4c',         name: '20. Copias Dimensionales',                    cost: 1200,
     desc: 'Lanza copias dimensionales en paralelo: 3 estrellas que atraviesan enemigos desde universos alternos. L: BARRERA DORADA — cutscene + 10s de barrera de rayos dorados que te cubre: refleja balas enemigas (×4 daño) y daña/empuja a todo enemigo que toca el halo (CD 90s).', color: '#f06' },
   { id: 'starplatinum', name: '21. Puño Estelar',         cost: 1800,
@@ -5143,21 +5143,21 @@ function updateEnemies() {
       if (active === 18 && owned.has(18)) {
         if (tuskAct === 1) {
           tuskA1Kills++;
-          if (tuskA1Kills >= 500 && !tuskUnlocked.has(2)) {
+          if (tuskA1Kills >= 50 && !tuskUnlocked.has(2)) {
             tuskUnlocked.add(2);
             tuskA2Flash = 240;
             effects.push({ type: 'flash', life: 36, max: 36, color: '#fd9' });
           }
         } else if (tuskAct === 2) {
           tuskA2Kills++;
-          if (tuskA2Kills >= 1000 && !tuskUnlocked.has(3)) {
+          if (tuskA2Kills >= 100 && !tuskUnlocked.has(3)) {
             tuskUnlocked.add(3);
             tuskA3Flash = 240;
             effects.push({ type: 'flash', life: 36, max: 36, color: '#fc7' });
           }
         } else if (tuskAct === 3) {
           tuskA3Kills++;
-          if (tuskA3Kills >= 3000 && !tuskUnlocked.has(4)) {
+          if (tuskA3Kills >= 150 && !tuskUnlocked.has(4)) {
             tuskUnlocked.add(4);
             tuskA4Flash = 300;
             effects.push({ type: 'flash', life: 40, max: 40, color: '#fd6' });
@@ -11100,18 +11100,18 @@ function drawUI() {
     if (tuskAct === 1) {
       if (tuskA1UltCD > 0) { ctx.fillStyle = '#888'; ctx.fillText(`U Tornado Uñas: ${(tuskA1UltCD / 60).toFixed(0)}s`, 280, 33); }
       else { ctx.fillStyle = '#fea'; ctx.fillText(`U Tornado Uñas: LISTO`, 280, 33); }
-      ctx.fillStyle = tuskA1Kills >= 500 ? '#fd9' : '#fff';
-      ctx.fillText(`☠ Kills Act 1: ${Math.min(tuskA1Kills, 500)}/500`, 480, 33);
+      ctx.fillStyle = tuskA1Kills >= 50 ? '#fd9' : '#fff';
+      ctx.fillText(`☠ Kills Act 1: ${Math.min(tuskA1Kills, 50)}/50`, 480, 33);
     } else if (tuskAct === 2) {
       if (tuskNailStormCD > 0) { ctx.fillStyle = '#888'; ctx.fillText(`Y Nail Barrage: ${(tuskNailStormCD / 60).toFixed(0)}s`, 280, 33); }
       else { ctx.fillStyle = '#fd9'; ctx.fillText(`Y Nail Barrage: LISTO`, 280, 33); }
-      ctx.fillStyle = tuskA2Kills >= 1000 ? '#fc7' : '#fff';
-      ctx.fillText(`☠ Kills Act 2: ${Math.min(tuskA2Kills, 1000)}/1000`, 480, 33);
+      ctx.fillStyle = tuskA2Kills >= 100 ? '#fc7' : '#fff';
+      ctx.fillText(`☠ Kills Act 2: ${Math.min(tuskA2Kills, 100)}/100`, 480, 33);
     } else if (tuskAct === 3) {
       if (tuskWormholeCD > 0) { ctx.fillStyle = '#888'; ctx.fillText(`Z Wormhole: ${(tuskWormholeCD / 60).toFixed(0)}s`, 280, 33); }
       else { ctx.fillStyle = '#fc7'; ctx.fillText(`Z Wormhole Punch: LISTO`, 280, 33); }
-      ctx.fillStyle = tuskA3Kills >= 3000 ? '#fd6' : '#fff';
-      ctx.fillText(`☠ Kills Act 3: ${Math.min(tuskA3Kills, 3000)}/3000`, 480, 33);
+      ctx.fillStyle = tuskA3Kills >= 150 ? '#fd6' : '#fff';
+      ctx.fillText(`☠ Kills Act 3: ${Math.min(tuskA3Kills, 150)}/150`, 480, 33);
     } else if (tuskAct === 4) {
       if (vortexUltPhase > 0) { ctx.fillStyle = '#fd6'; ctx.fillText(`✨ ESPIRAL ACTO 4`, 280, 33); }
       else if (vortexUltCD > 0) { ctx.fillStyle = '#888'; ctx.fillText(`V Golden Ratio: ${(vortexUltCD / 60).toFixed(0)}s`, 280, 33); }
