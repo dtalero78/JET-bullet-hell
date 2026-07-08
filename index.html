@@ -12094,18 +12094,58 @@ function setupRaceStage() {
     }
   }
 
-  // obstáculos — muchísimos más, variedad
+  // obstáculos — muchísimos más, variedad. Se pueden ROMPER a golpes/disparos.
   const kinds = ['rock', 'cactus', 'log', 'pit'];
+  const OBST_HP = { rock: 36, log: 30, cactus: 16, pit: 28 };
   for (let d = 500; d < raceStageDist - 300; d += rand(180, 340)) {
     const lane = Math.floor(Math.random() * 3);
+    const kind = kinds[Math.floor(Math.random() * kinds.length)];
     raceObstacles.push({
       progress: d,
       x: RACE_LANES[lane] + rand(-40, 40),
       r: 30,
       hit: false,
-      kind: kinds[Math.floor(Math.random() * kinds.length)],
+      hp: OBST_HP[kind] || 30, maxHp: OBST_HP[kind] || 30,
+      hitFlash: 0,
+      kind,
     });
   }
+}
+
+// Daña un obstáculo con un ataque del jugador; al llegar a 0 lo ROMPE (lo quita del camino).
+function damageRaceObstacle(o, dmg, color) {
+  o.hp -= dmg;
+  o.hitFlash = 6;
+  const sy = raceScreenY(o.progress);
+  spawnRaceImpact(o.x, sy, color || '#eca');
+  if (o.hp <= 0) {
+    // escombros y desaparece
+    for (let k = 0; k < 12; k++) {
+      raceParticles.push({
+        x: o.x + rand(-10, 10), y: sy + rand(-10, 10),
+        vx: rand(-4, 4), vy: rand(-5, 1),
+        life: 26, max: 26, color: o.kind === 'cactus' ? '#3a2' : (o.kind === 'pit' ? '#0a0805' : '#987'), size: rand(2, 5)
+      });
+    }
+    raceShake = Math.max(raceShake, 4);
+    const idx = raceObstacles.indexOf(o);
+    if (idx >= 0) raceObstacles.splice(idx, 1);
+    return true;
+  }
+  return false;
+}
+// Rompe cualquier obstáculo dentro de un radio (para golpes cuerpo a cuerpo). Devuelve si tocó alguno.
+function hitRaceObstaclesAt(x, y, radius, dmg, color) {
+  let any = false;
+  for (let i = raceObstacles.length - 1; i >= 0; i--) {
+    const o = raceObstacles[i];
+    const sy = raceScreenY(o.progress);
+    if (Math.hypot(o.x - x, sy - y) < radius + o.r) {
+      any = true;
+      damageRaceObstacle(o, dmg, color);
+    }
+  }
+  return any;
 }
 
 // ---------- update ----------
@@ -12963,6 +13003,7 @@ function doRaceAttack() {
         spawnRaceImpact(n.x, sy, '#fff');
       }
     }
+    hitRaceObstaclesAt(tx, ty, 50, 20, '#fec');   // el puño también rompe obstáculos
     spawnRaceImpact(tx, ty, '#fec');
     racePlayer.attackCD = 22;
   } else if (raceWeapon === 'steelballs') {
@@ -13737,6 +13778,7 @@ function updateRaceProjectiles() {
           spawnRaceImpact(n.x, sy, sbCol, 1.6, n);
         }
       }
+      hitRaceObstaclesAt(sb.x, sb.y, 13, sbDmg, sbCol);   // la pelota arrasa obstáculos
       if (sb.life > 50 || sb.x < 20 || sb.x > W - 20 || sb.y < 20 || sb.y > H - 20) {
         sb.phase = 'back';
       }
@@ -13760,6 +13802,7 @@ function updateRaceProjectiles() {
           spawnRaceImpact(n.x, sy, sbCol, 1.6, n);
         }
       }
+      hitRaceObstaclesAt(sb.x, sb.y, 13, sbDmg, sbCol);
       if (d < 30) racePlayer.steelBallActive = null;
     }
   }
@@ -13900,6 +13943,19 @@ function updateRaceProjectiles() {
           if (p.pierce && p.hits) { p.hits.add(n); continue; }
           hit = true;
           break;
+        }
+      }
+      // romper obstáculos del camino con el ataque
+      if (!hit) {
+        for (let oi = raceObstacles.length - 1; oi >= 0; oi--) {
+          const o = raceObstacles[oi];
+          const sy = raceScreenY(o.progress);
+          if (Math.hypot(o.x - p.x, sy - p.y) < o.r + (p.r || 6)) {
+            damageRaceObstacle(o, p.dmg, p.color);
+            if ((p.pierce || p.ricochet) && p.hits) break;  // atraviesa/rebota: no se consume
+            hit = true;
+            break;
+          }
         }
       }
       // bombas explotan al impactar o al expirar
@@ -14831,10 +14887,12 @@ function drawRaceTrack() {
     drawRaceFinishLine(finishY);
   }
 
-  // obstáculos
+  // obstáculos (se pueden romper: se agrietan y destellan al golpearlos)
   for (const o of raceObstacles) {
     const sy = raceScreenY(o.progress);
     if (sy < -60 || sy > H + 60) continue;
+    if (o.hitFlash > 0) o.hitFlash--;
+    const hurt = o.maxHp ? o.hp / o.maxHp : 1;
     if (o.kind === 'rock') {
       ctx.fillStyle = o.hit ? '#765' : '#876';
       ctx.beginPath(); ctx.arc(o.x, sy, o.r, 0, Math.PI * 2); ctx.fill();
@@ -14869,6 +14927,21 @@ function drawRaceTrack() {
       ctx.fillRect(o.x - 8, sy - 30, 16, 60);
       ctx.fillRect(o.x - 22, sy - 6, 14, 22);
       ctx.fillRect(o.x + 8, sy - 12, 14, 22);
+    }
+    // grietas cuando está dañado
+    if (hurt < 0.6) {
+      ctx.strokeStyle = 'rgba(20,10,0,0.55)'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(o.x - 12, sy - 8); ctx.lineTo(o.x + 2, sy + 2); ctx.lineTo(o.x + 10, sy - 6);
+      ctx.moveTo(o.x - 2, sy + 10); ctx.lineTo(o.x + 4, sy - 2);
+      ctx.stroke();
+    }
+    // destello blanco al recibir un golpe
+    if (o.hitFlash > 0) {
+      ctx.globalAlpha = Math.min(0.7, o.hitFlash / 6);
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(o.x, sy, o.r, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
     }
   }
 
