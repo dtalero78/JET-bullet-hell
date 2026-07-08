@@ -164,7 +164,11 @@
     <div class="row">
       <button class="sandbox" data-mode="sandbox">SANDBOX</button>
       <button class="race" data-mode="race" style="background:linear-gradient(#e0a24a,#c8842f); color:#fff;">🐎 CARRERA</button>
-      <button id="ol-open" style="background:linear-gradient(#4aa0d8,#2f78b0); color:#fff;">🌐 ONLINE</button>
+    </div>
+    <div class="sep">— ONLINE 1v1 —</div>
+    <div class="row">
+      <button id="ol-open-normal" style="background:linear-gradient(#8a5ae0,#5f3fb0); color:#fff;">🌐 NORMAL ONLINE</button>
+      <button id="ol-open" style="background:linear-gradient(#4aa0d8,#2f78b0); color:#fff;">🌐 CARRERA ONLINE</button>
     </div>
   </div>
   <p class="hint">WASD mover · Click atacar · 1-9 0 - = ] [ cambiar arma · B tienda · R/T/F/G/H/J poderes · M panel sandbox</p>
@@ -10780,6 +10784,7 @@ function draw() {
   ctx.restore();
 
   drawUI();
+  drawNetNormalHud();
 
   if (gameOver) drawGameOver();
   if (paused && !shopOpen && !gameOver) drawPaused();
@@ -11475,7 +11480,27 @@ function drawGameOver() {
   ctx.fillStyle = '#fff';
   ctx.font = '20px monospace';
   ctx.fillText(`Llegaste a la oleada ${wave}`, W / 2, H / 2 + 20);
-  ctx.fillText('Pulsa ESPACIO para reiniciar', W / 2, H / 2 + 60);
+  if (net.active && net.mode === 'normal') {
+    const r = net.rival;
+    if (r) {
+      ctx.fillStyle = '#8df';
+      ctx.fillText(`Rival: oleada ${r.wv || 0} ${r.dead ? '(☠)' : '(vivo)'}`, W / 2, H / 2 + 54);
+      if (r.dead) {
+        const verdict = wave > (r.wv || 0) ? '¡GANASTE!' : (wave < (r.wv || 0) ? 'Perdiste' : 'Empate');
+        ctx.fillStyle = wave > (r.wv || 0) ? '#6f6' : (wave < (r.wv || 0) ? '#f88' : '#fd6');
+        ctx.font = 'bold 26px monospace';
+        ctx.fillText(verdict, W / 2, H / 2 + 88);
+        ctx.font = '20px monospace';
+      } else {
+        ctx.fillStyle = '#aac';
+        ctx.fillText('El rival sigue vivo…', W / 2, H / 2 + 88);
+      }
+    }
+    ctx.fillStyle = '#fff';
+    ctx.fillText('Pulsa ESPACIO para salir', W / 2, H / 2 + 122);
+  } else {
+    ctx.fillText('Pulsa ESPACIO para reiniciar', W / 2, H / 2 + 60);
+  }
   ctx.textAlign = 'left';
 }
 
@@ -11570,7 +11595,7 @@ function consumeKeyPresses() {
     sandboxOpen = !sandboxOpen;
     sandboxPanel.style.display = sandboxOpen ? 'block' : 'none';
   }
-  if (keyPressed[' '] && gameOver) restart();
+  if (keyPressed[' '] && gameOver) { if (net.active) netLeave(); restart(); }
   // clear
   for (const k in keyPressed) keyPressed[k] = false;
 }
@@ -11702,6 +11727,8 @@ function loop() {
       shake = 24;
     }
   }
+
+  if (net.active && net.mode === 'normal') netNormalTick();
 
   draw();
   consumeKeyPresses();
@@ -12513,7 +12540,7 @@ function tutFinishTutorial() {
 
 // Arranca la carrera online sólo cuando ambos terminaron (o no eligieron) el tutorial.
 function netCheckTutBarrier() {
-  if (!net.active) return;
+  if (!net.active || net.mode !== 'race') return;
   if (net.myTutorialDone && net.rivalTutorialDone) {
     raceStage = 1;
     setupRaceStage();
@@ -16180,7 +16207,8 @@ function drawRaceHud() {
 // deterministas, así que comparar el avance es justo.
 // ============================================================
 const net = {
-  active: false,      // dentro de una carrera online
+  active: false,      // dentro de una partida online
+  mode: 'race',       // 'race' (Carrera) | 'normal' (supervivencia versus)
   role: null,         // 'host' | 'guest'
   peer: null,
   conn: null,
@@ -16263,7 +16291,25 @@ async function detectLanServer() {
     return !!(j && j.ok);
   } catch (e) { return false; }
 }
-async function openOnlinePanel() {
+// Ajusta el panel online al modo elegido (Carrera vs Normal): oculta las filas
+// de montura/tutorial (propias de la carrera) y cambia los textos.
+function applyOnlineModeUI() {
+  const isNormal = net.mode === 'normal';
+  const wpRow = document.getElementById('ol-weapons');
+  const tutRow = document.getElementById('ol-tutrow');
+  if (wpRow) wpRow.style.display = isNormal ? 'none' : '';
+  if (tutRow) tutRow.style.display = isNormal ? 'none' : '';
+  const h2 = document.querySelector('#online-panel h2');
+  if (h2) h2.textContent = isNormal ? '🌐 NORMAL — ONLINE 1v1' : '🌐 CARRERA — ONLINE 1v1';
+  const hint = document.getElementById('ol-lobby-hint');
+  if (hint) hint.textContent = isNormal
+    ? 'Cuando los dos pongan LISTO, empieza la supervivencia. Sobrevive más oleadas que el rival.'
+    : 'Cuando los dos pongan LISTO, empieza la carrera.';
+}
+
+async function openOnlinePanel(gameMode) {
+  net.mode = (gameMode === 'normal') ? 'normal' : 'race';
+  applyOnlineModeUI();
   document.getElementById('title').style.display = 'none';
   document.getElementById('online-panel').style.display = 'block';
   olShow('ol-home');
@@ -16314,9 +16360,9 @@ function onLanEvent(ev) {
   if (ev.type === 'room') {
     applyLanRoom(ev);
   } else if (ev.type === 'start') {
-    beginOnlineRace();
+    beginOnline();
   } else if (ev.type === 'peer') {
-    onNetData(ev.data);          // mensajes de juego (sync 's')
+    onNetData(ev.data);          // mensajes de juego (sync 's'/'sn'/'mode')
   } else if (ev.type === 'peerleft') {
     net.rivalPresent = false; net.rivalReady = false; net.rival = null;
     if (net.active) { net.rivalTutorialDone = true; netCheckTutBarrier(); } // no te quedes esperando
@@ -16336,7 +16382,9 @@ function applyLanRoom(room) {
   net.rivalName = rival ? rival.name : '—';
   net.rivalWeapon = rival ? rival.weapon : 'fists';
   net.connected = !!rival;
-  if (net.active) return; // en plena carrera: no mostrar el lobby encima
+  // el anfitrión comunica el modo (Carrera/Normal) al rival por mensaje de juego
+  if (net.role === 'host' && net.rivalPresent) netSend({ t: 'mode', mode: net.mode });
+  if (net.active) return; // en plena partida: no mostrar el lobby encima
   if (me) net.myReady = me.ready;
   document.getElementById('online-panel').style.display = 'block';
   olShow('ol-lobby');
@@ -16471,7 +16519,7 @@ function netSetupConn(conn) {
     olClearConnectTimer();
     net.connected = true;
     net.rivalPresent = true;
-    conn.send({ t: 'hello', name: net.myName, weapon: net.myWeapon, ready: net.myReady, tut: net.myTutorial });
+    conn.send({ t: 'hello', name: net.myName, weapon: net.myWeapon, ready: net.myReady, tut: net.myTutorial, mode: net.mode });
     olSetStatus('¡Conectado! Elige montura y pon LISTO.');
     renderLobby();
   });
@@ -16509,7 +16557,11 @@ function onNetData(d) {
     net.rivalWeapon = d.weapon || 'fists';
     net.rivalReady = !!d.ready;
     if (d.tut !== undefined) net.rivalTutorial = !!d.tut;
+    if (net.role === 'guest' && d.mode) { net.mode = d.mode; applyOnlineModeUI(); }
     renderLobby();
+  } else if (d.t === 'mode') {
+    // el anfitrión indica el modo (Carrera/Normal): el invitado se adapta
+    if (net.role === 'guest' && d.mode) { net.mode = d.mode; applyOnlineModeUI(); renderLobby(); }
   } else if (d.t === 'ready') {
     net.rivalReady = !!d.ready;
     if (d.name) net.rivalName = d.name;
@@ -16524,8 +16576,9 @@ function onNetData(d) {
     net.rivalTutorialDone = true;
     netCheckTutBarrier();
   } else if (d.t === 'start') {
-    beginOnlineRace();
-  } else if (d.t === 's') {
+    if (d.mode) net.mode = d.mode;
+    beginOnline();
+  } else if (d.t === 's' || d.t === 'sn') {
     net.rival = d;
     net.rivalTimeout = 150;
   } else if (d.t === 'leave') {
@@ -16540,9 +16593,14 @@ function onNetData(d) {
 function netMaybeStart() {
   if (net.role !== 'host') return;
   if (net.connected && net.myReady && net.rivalReady) {
-    netSend({ t: 'start' });
-    beginOnlineRace();
+    netSend({ t: 'start', mode: net.mode });
+    beginOnline();
   }
+}
+
+// Arranca la partida online según el modo elegido por el anfitrión.
+function beginOnline() {
+  if (net.mode === 'normal') beginOnlineNormal(); else beginOnlineRace();
 }
 
 function toggleReady() {
@@ -16631,6 +16689,67 @@ function beginOnlineRace() {
     racePhaseTimer = 0;
     netCheckTutBarrier();   // si el rival tampoco, arranca ya
   }
+}
+
+// ===== ONLINE en MODO NORMAL (supervivencia versus, misma red que la Carrera) =====
+// Cada jugador corre su propia supervivencia; se comparten oleada/HP y se compite
+// por sobrevivir más oleadas (igual que la Carrera comparte el % de progreso).
+function beginOnlineNormal() {
+  closeOnlinePanel();
+  raceMode = false;                  // por si se venía de una carrera
+  net.active = true;
+  net.rival = null;
+  net.rivalTimeout = 0;
+  net.sendCD = 0;
+  restart();                         // estado limpio (owned=látigo, oleada 0, etc.)
+  applyMode('normal');
+  document.getElementById('title').style.display = 'none';
+  gameStarted = true;
+  gameOver = false;
+  paused = false;
+  startWave();
+}
+
+function netNormalTick() {
+  if (!net.active || net.mode !== 'normal') return;
+  if (net.rivalTimeout > 0) net.rivalTimeout--;
+  if (net.rivalTimeout <= 0) net.rival = null;
+  net.sendCD--;
+  if (net.sendCD <= 0) {
+    net.sendCD = 4;                  // ~15 envíos/seg
+    netSend({
+      t: 'sn',
+      wv: wave,
+      hp: Math.round(Math.max(0, player.hp)),
+      mhp: player.maxHp,
+      co: player.coins,
+      dead: gameOver,
+    });
+  }
+}
+
+function drawNetNormalHud() {
+  if (!net.active || net.mode !== 'normal') return;
+  ctx.save();
+  ctx.font = 'bold 14px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(W / 2 - 220, 6, 440, 26);
+  ctx.fillStyle = '#6cf';
+  ctx.fillText('🌐 ONLINE', W / 2, 24);
+  ctx.textAlign = 'left';
+  ctx.fillStyle = gameOver ? '#c88' : '#9f9';
+  ctx.fillText(`TÚ  Oleada ${wave}  ${Math.max(0, Math.floor(player.hp))}hp${gameOver ? ' ☠' : ''}`, W / 2 - 212, 24);
+  ctx.textAlign = 'right';
+  if (net.rival) {
+    const r = net.rival;
+    ctx.fillStyle = r.dead ? '#c66' : '#ff7';
+    ctx.fillText(`RIVAL  Oleada ${r.wv || 0}  ${r.hp || 0}hp${r.dead ? ' ☠' : ''}`, W / 2 + 212, 24);
+  } else {
+    ctx.fillStyle = '#c66';
+    ctx.fillText('RIVAL  conectando…', W / 2 + 212, 24);
+  }
+  ctx.restore();
 }
 
 function netTeardownPeer() {
@@ -16730,7 +16849,8 @@ function drawNetHud() {
 }
 
 // ---------- wiring de botones del lobby ----------
-document.getElementById('ol-open').addEventListener('click', openOnlinePanel);
+document.getElementById('ol-open').addEventListener('click', () => openOnlinePanel('race'));
+{ const b = document.getElementById('ol-open-normal'); if (b) b.addEventListener('click', () => openOnlinePanel('normal')); }
 document.getElementById('ol-home-back').addEventListener('click', () => {
   netLeave(); closeOnlinePanel(); document.getElementById('title').style.display = 'flex';
 });
