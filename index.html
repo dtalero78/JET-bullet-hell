@@ -530,6 +530,7 @@ const MJ_FORM_COLORS = ['#e33', '#5cf', '#fd6'];
 const bossHazards = []; // relojes, charcos, portales, pisotones, meteoros
 
 let nextEnemyId = 1;
+let nextHazId = 1;   // id estable de bossHazards para sincronizar co-op
 let wave = 0;
 let waveTimer = 0;
 let waveActive = false;
@@ -4421,6 +4422,21 @@ function bubbleAttack(angle) {
 }
 
 // ---------------- Updates ----------------
+
+// Co-op NORMAL: el host es autoridad de enemigos. Cada enemigo persigue al
+// jugador MÁS CERCANO entre el host local (player) y el rival (net.rivalP).
+// Fuera de co-op, o si el rival no existe/está muerto, devuelve al player local.
+function coopTargetFor(e) {
+  if (!(net.active && net.mode === 'normal' && net.role === 'host')) return player;
+  const rp = net.rivalP;
+  const rivalOk = rp && !rp.dead;
+  const meOk = player.hp > 0 && !net.myDead;
+  if (!rivalOk) return player;
+  if (!meOk) return rp;                       // el host cayó: van por el rival
+  const dpx = player.x - e.x, dpy = player.y - e.y;
+  const drx = rp.x - e.x, dry = rp.y - e.y;
+  return (drx * drx + dry * dry < dpx * dpx + dpy * dpy) ? rp : player;
+}
 function updateEnemies() {
   // Cielo Acelerado: el tiempo de los enemigos se ralentiza.
   // Pasivo: 1 de cada 2 frames; durante el boost de la ult: 1 de cada 4.
@@ -4541,6 +4557,11 @@ function updateEnemies() {
       return;
     }
 
+    // Objetivo de este enemigo: en co-op NORMAL, el jugador más cercano (host
+    // autoritario); si no, el jugador local. Se usa para mover y para apuntar
+    // las habilidades de jefe cuyos ataques SÍ viajan por la red (proyectiles).
+    const tgt = coopTargetFor(e);
+
     // ---- Boss special abilities ----
     if (e.bossKind) {
       e.bossTimer++;
@@ -4553,12 +4574,12 @@ function updateEnemies() {
           if (e.laserCD <= 0) {
             e.laserPhase = 1;
             e.laserTimer = 90;
-            e.laserAngle = angleBetween(e, player);
+            e.laserAngle = angleBetween(e, tgt);
           }
         } else if (e.laserPhase === 1) {
           e.laserTimer--;
           // ligera persecución mientras carga
-          const targetAng = angleBetween(e, player);
+          const targetAng = angleBetween(e, tgt);
           let da = targetAng - e.laserAngle;
           while (da > Math.PI) da -= 2 * Math.PI;
           while (da < -Math.PI) da += 2 * Math.PI;
@@ -4601,7 +4622,7 @@ function updateEnemies() {
         }
         // disparos dobles más espaciados
         if (e.bossTimer % 80 === 0) {
-          const a = angleBetween(e, player);
+          const a = angleBetween(e, tgt);
           for (let i = -1; i <= 1; i += 2) {
             projectiles.push({
               x: e.x, y: e.y,
@@ -4648,7 +4669,7 @@ function updateEnemies() {
       // ESPEJO — Clon eco que copia movimiento con 1s de retraso
       if (e.bossKind === 'mirror' && !e.isClone) {
         if (!e.echoBuffer) e.echoBuffer = [];
-        e.echoBuffer.push({ x: player.x, y: player.y });
+        e.echoBuffer.push({ x: tgt.x, y: tgt.y });
         if (e.echoBuffer.length > 60) e.echoBuffer.shift();
         if (e.echoBuffer.length === 60) {
           const echo = e.echoBuffer[0];
@@ -4686,7 +4707,7 @@ function updateEnemies() {
         if (e.stompCD <= 0) {
           // Marca el punto donde aterrizará (donde está el jugador ahora)
           bossHazards.push({
-            type: 'stomp', x: player.x, y: player.y,
+            type: 'stomp', x: tgt.x, y: tgt.y,
             r: 80, life: 60, max: 60, color: '#888',
             dmg: e.dmg * 1.6, source: e
           });
@@ -4709,7 +4730,7 @@ function updateEnemies() {
         if (e.phase === 0) {
           // Muralla de balas en línea con un hueco
           if (e.bossTimer % 50 === 0) {
-            const a = angleBetween(e, player);
+            const a = angleBetween(e, tgt);
             const perpA = a + Math.PI / 2;
             const gap = Math.floor(rand(2, 8)); // posición del hueco
             for (let i = -7; i <= 7; i++) {
@@ -4725,10 +4746,10 @@ function updateEnemies() {
         } else if (e.phase === 1) {
           // Embestidas cargadas: telegrafía con flecha 1s, luego dash
           if (e.bossDashTimer === undefined || e.bossDashTimer === 0) {
-            if (e.dashCharge === undefined) { e.dashCharge = 60; e.dashAimAngle = angleBetween(e, player); }
+            if (e.dashCharge === undefined) { e.dashCharge = 60; e.dashAimAngle = angleBetween(e, tgt); }
             e.dashCharge--;
             // ligera persecución del ángulo
-            const tA = angleBetween(e, player);
+            const tA = angleBetween(e, tgt);
             let da = tA - e.dashAimAngle;
             while (da > Math.PI) da -= 2 * Math.PI;
             while (da < -Math.PI) da += 2 * Math.PI;
@@ -4744,8 +4765,8 @@ function updateEnemies() {
           if (e.bossTimer % 28 === 0) {
             bossHazards.push({
               type: 'meteor',
-              x: player.x + rand(-160, 160),
-              y: player.y + rand(-120, 120),
+              x: tgt.x + rand(-160, 160),
+              y: tgt.y + rand(-120, 120),
               r: 56, life: 50, max: 50, color: '#f8f',
               dmg: e.dmg * 0.9
             });
@@ -4796,12 +4817,12 @@ function updateEnemies() {
         e.kiraCD--;
         if (e.kiraCD <= 0) {
           bossHazards.push({
-            type: 'kqbomb', x: player.x, y: player.y,
+            type: 'kqbomb', x: tgt.x, y: tgt.y,
             r: 70, life: 120, max: 120, color: '#f9c',
             dmg: e.dmg * 1.5, source: e
           });
           e.kiraCD = 180;
-          effects.push({ type: 'punch', x: player.x, y: player.y, life: 10, max: 10, color: '#f9c' });
+          effects.push({ type: 'punch', x: tgt.x, y: tgt.y, life: 10, max: 10, color: '#f9c' });
         }
         // Sheer Heart Attack periódico: pequeño proyectil teledirigido lento
         if (e.shaCD === undefined) e.shaCD = 480;
@@ -4824,15 +4845,15 @@ function updateEnemies() {
         if (e.diaPhase === 0 && e.diaCD <= 0) {
           e.diaPhase = 1;
           e.diaTimer = 72; // 1.2s borrado
-          e.diaTargetX = player.x;
-          e.diaTargetY = player.y;
+          e.diaTargetX = tgt.x;
+          e.diaTargetY = tgt.y;
           effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 22, max: 22, r: 0, color: '#f06' });
         }
         if (e.diaPhase === 1) {
           e.diaTimer--;
           // sigue actualizando el predictor
-          e.diaTargetX = e.diaTargetX * 0.85 + player.x * 0.15;
-          e.diaTargetY = e.diaTargetY * 0.85 + player.y * 0.15;
+          e.diaTargetX = e.diaTargetX * 0.85 + tgt.x * 0.15;
+          e.diaTargetY = e.diaTargetY * 0.85 + tgt.y * 0.15;
           if (e.diaTimer <= 0) {
             // reaparece con golpe
             e.x = e.diaTargetX;
@@ -4864,7 +4885,7 @@ function updateEnemies() {
         if (e.phase === 0) {
           // Whitesnake: DISCs teledirigidos
           if (e.bossTimer % 90 === 0) {
-            const a = angleBetween(e, player);
+            const a = angleBetween(e, tgt);
             projectiles.push({
               x: e.x, y: e.y,
               vx: Math.cos(a) * 3, vy: Math.sin(a) * 3,
@@ -4884,7 +4905,7 @@ function updateEnemies() {
         } else if (e.phase === 2) {
           // Cielo Acelerado: balas rápidas constantes
           if (e.bossTimer % 22 === 0) {
-            const a = angleBetween(e, player) + rand(-0.2, 0.2);
+            const a = angleBetween(e, tgt) + rand(-0.2, 0.2);
             projectiles.push({
               x: e.x, y: e.y,
               vx: Math.cos(a) * 9, vy: Math.sin(a) * 9,
@@ -4916,7 +4937,7 @@ function updateEnemies() {
         }
         // Disparos de estrellas
         if (e.bossTimer % 65 === 0) {
-          const a = angleBetween(e, player);
+          const a = angleBetween(e, tgt);
           for (let k = -1; k <= 1; k++) {
             projectiles.push({
               x: e.x, y: e.y,
@@ -4929,7 +4950,7 @@ function updateEnemies() {
       // VALENTINE clones también disparan
       if (e.bossKind === 'valentine' && e.isClone) {
         if (e.bossTimer % 90 === 0) {
-          const a = angleBetween(e, player);
+          const a = angleBetween(e, tgt);
           projectiles.push({
             x: e.x, y: e.y,
             vx: Math.cos(a) * 5.5, vy: Math.sin(a) * 5.5,
@@ -4943,7 +4964,7 @@ function updateEnemies() {
       if (e.bossKind === 'tuskslayer') {
         // Rayo rojo cada 240 frames
         if (e.bossTimer % 240 === 60) {
-          const ang = angleBetween(e, player);
+          const ang = angleBetween(e, tgt);
           bossHazards.push({
             type: 'tslRedRay',
             x: e.x, y: e.y,
@@ -4954,7 +4975,7 @@ function updateEnemies() {
         }
         // Rayo morado cada 300 frames (intercalado)
         if (e.bossTimer % 300 === 180) {
-          const ang = angleBetween(e, player) + rand(-0.35, 0.35);
+          const ang = angleBetween(e, tgt) + rand(-0.35, 0.35);
           bossHazards.push({
             type: 'tslPurpleRay',
             x: e.x, y: e.y,
@@ -4967,8 +4988,8 @@ function updateEnemies() {
         if (e.bossTimer % 360 === 120) {
           bossHazards.push({
             type: 'tslBlueHole',
-            x: player.x + rand(-100, 100),
-            y: player.y + rand(-100, 100),
+            x: tgt.x + rand(-100, 100),
+            y: tgt.y + rand(-100, 100),
             r: 110,            // radio de atracción
             coreR: 18,         // núcleo visible
             life: 300, max: 300, color: '#48f',
@@ -4984,8 +5005,8 @@ function updateEnemies() {
           if (Math.random() < 0.75) {
             bossHazards.push({
               type: 'calamity',
-              x: player.x + rand(-140, 140),
-              y: player.y + rand(-110, 110),
+              x: tgt.x + rand(-140, 140),
+              y: tgt.y + rand(-110, 110),
               r: 64, life: 56, max: 56, color: '#79d',
               dmg: e.dmg * 1.1
             });
@@ -4996,8 +5017,8 @@ function updateEnemies() {
         if (e.bossTimer % 220 === 0) {
           bossHazards.push({
             type: 'calamity',
-            x: player.x + rand(-180, 180),
-            y: player.y + rand(-140, 140),
+            x: tgt.x + rand(-180, 180),
+            y: tgt.y + rand(-140, 140),
             r: 60, life: 60, max: 60, color: '#79d',
             dmg: e.dmg * 1.0
           });
@@ -5010,8 +5031,8 @@ function updateEnemies() {
       e.zombieTimer = (e.zombieTimer || 0) + 1;
       if (e.zombieAbility === 'shoot') {
         // Tirador débil: un proyectil lento cada 2.5s
-        if (e.zombieTimer % 150 === 0 && distSq(player, e) < 360 * 360) {
-          const a = angleBetween(e, player);
+        if (e.zombieTimer % 150 === 0 && distSq(tgt, e) < 360 * 360) {
+          const a = angleBetween(e, tgt);
           projectiles.push({
             x: e.x, y: e.y,
             vx: Math.cos(a) * 3.2, vy: Math.sin(a) * 3.2,
@@ -5038,9 +5059,9 @@ function updateEnemies() {
         }
       } else if (e.zombieAbility === 'bomb') {
         // Kira débil: bomba pequeña en pies del jugador cada 5s
-        if (e.zombieTimer % 300 === 0 && distSq(player, e) < 320 * 320) {
+        if (e.zombieTimer % 300 === 0 && distSq(tgt, e) < 320 * 320) {
           bossHazards.push({
-            type: 'kqbomb', x: player.x, y: player.y,
+            type: 'kqbomb', x: tgt.x, y: tgt.y,
             r: 28, life: 110, max: 110, color: '#bca',
             dmg: e.dmg * 0.6, source: e
           });
@@ -5056,7 +5077,7 @@ function updateEnemies() {
       }
     }
 
-    let tx = player.x, ty = player.y;
+    let tx = tgt.x, ty = tgt.y;             // objetivo ya calculado arriba (tgt)
     if (e.spinning > 0 && e.vortexTarget) {
       e.spinning--;
       e.spinAngle += 0.16;
@@ -5064,9 +5085,9 @@ function updateEnemies() {
       ty = e.vortexTarget.y + Math.sin(e.spinAngle) * 35;
     } else if (e.ranged) {
       // shooters mantienen distancia
-      if (distSq(player, e) < 280 * 280) {
-        tx = e.x - (player.x - e.x);
-        ty = e.y - (player.y - e.y);
+      if (distSq(tgt, e) < 280 * 280) {
+        tx = e.x - (tgt.x - e.x);
+        ty = e.y - (tgt.y - e.y);
       }
     }
 
@@ -5102,7 +5123,7 @@ function updateEnemies() {
       const period = e.type === 'boss' ? 50 : 110;
       if (e.shootTimer > period) {
         e.shootTimer = 0;
-        const a = Math.atan2(player.y - e.y, player.x - e.x);
+        const a = Math.atan2(tgt.y - e.y, tgt.x - e.x);
         const count = e.type === 'boss' ? 5 : 1;
         for (let i = 0; i < count; i++) {
           const off = (i - (count - 1) / 2) * 0.18;
@@ -11714,6 +11735,7 @@ function loop() {
     updateProjectiles();
     updateVortexFields();
     if (!coopGuest) updateBossHazards();
+    else coopGuestHazardTick();
     updateFires();
     updatePowerups();
     updatePibPuddles();
@@ -16795,7 +16817,18 @@ function netSendEnemySnapshot() {
                p.r | 0, p.dmg | 0, p.color || '#f66']);
     }
   }
-  netSend({ t: 'es', w: wave, wa: waveActive ? 1 : 0, es, eb });
+  // Peligros de área (pisotones, meteoros, bombas, rayos, hoyos, relojes…): el
+  // invitado los recibe para dibujarlos Y para aplicarse el daño localmente.
+  const hz = [];
+  for (const h of bossHazards) {
+    if (h._nid === undefined) h._nid = nextHazId++;
+    hz.push([h._nid, h.type, h.x | 0, h.y | 0, h.r | 0,
+             h.life | 0, (h.max | 0) || 0,
+             (h.hp === undefined ? -1 : Math.ceil(h.hp)),
+             +(h.angle || 0).toFixed(2), h.len | 0, h.coreR | 0,
+             h.dmg | 0, h.detonated ? 1 : 0]);
+  }
+  netSend({ t: 'es', w: wave, wa: waveActive ? 1 : 0, es, eb, hz });
 }
 
 // ===== Co-op: el INVITADO reporta al host los enemigos que él mató localmente =====
@@ -16877,6 +16910,30 @@ function coopApplyEnemySnapshot(d) {
       vx: b[2] / 10, vy: b[3] / 10, r: b[4], dmg: b[5], color: b[6], life: 600,
     });
   }
+  // Peligros de área: fusiona por id (conserva _detDone local entre snapshots).
+  if (d.hz) {
+    if (!net.hzById) net.hzById = new Map();
+    const hzSeen = new Set();
+    for (const a of d.hz) {
+      const id = a[0];
+      hzSeen.add(id);
+      let h = net.hzById.get(id);
+      if (!h) { h = { _nid: id }; bossHazards.push(h); net.hzById.set(id, h); }
+      h.type = a[1]; h.x = a[2]; h.y = a[3]; h.r = a[4];
+      h.life = a[5]; h.max = a[6];
+      h.hp = (a[7] < 0 ? undefined : a[7]);
+      h.angle = a[8]; h.len = a[9]; h.coreR = a[10];
+      h.dmg = a[11];
+      if (a[12]) h.detonated = true;
+    }
+    for (let i = bossHazards.length - 1; i >= 0; i--) {
+      const h = bossHazards[i];
+      if (h._nid !== undefined && !hzSeen.has(h._nid)) {
+        net.hzById.delete(h._nid);
+        bossHazards.splice(i, 1);
+      }
+    }
+  }
 }
 
 // ===== Co-op: tick de enemigos del INVITADO (no simula IA; interpola + contacto) =====
@@ -16896,6 +16953,55 @@ function coopGuestEnemyTick() {
         player.iframe = 40;
         shake = Math.max(shake, 8);
       }
+    }
+  }
+}
+
+// ===== Co-op: tick de peligros de área del INVITADO =====
+// No simula la lógica del host (vida, spawns de portal, cura del vampiro): sólo
+// aplica a MI jugador local los efectos que el host no puede aplicarme.
+function coopGuestHazardTick() {
+  if (player.hp <= 0) return;
+  for (const h of bossHazards) {
+    if (h.type === 'clock') {
+      const dx = player.x - h.x, dy = player.y - h.y;
+      const rr = player.r + h.r;
+      if (dx * dx + dy * dy < rr * rr) player.slowed = Math.max(player.slowed, 20);
+    } else if (h.type === 'gravity') {
+      const dx = player.x - h.x, dy = player.y - h.y;
+      const dSq = dx * dx + dy * dy;
+      if (dSq < h.r * h.r && dSq > 1) {
+        const d = Math.sqrt(dSq);
+        const pull = 0.7 * (1 - d / h.r);
+        player.x -= (dx / d) * pull; player.y -= (dy / d) * pull;
+      }
+    } else if (h.type === 'stomp' || h.type === 'meteor' || h.type === 'kqbomb' || h.type === 'calamity') {
+      // Detonan una sola vez: el host marca detonated; aplico el área a mi jugador.
+      if (h.detonated && !h._detDone) {
+        h._detDone = true;
+        const dx = player.x - h.x, dy = player.y - h.y;
+        const rr = h.r + player.r;
+        if (dx * dx + dy * dy < rr * rr) tryDamagePlayer(h.dmg, 50, 18);
+        effects.push({ type: 'shockwave', x: h.x, y: h.y, life: 32, max: 32, r: 0, color: h.color || '#fff' });
+      }
+    } else if (h.type === 'tslRedRay' || h.type === 'tslPurpleRay') {
+      const ca = Math.cos(h.angle), sa = Math.sin(h.angle);
+      const dxp = player.x - h.x, dyp = player.y - h.y;
+      const along = ca * dxp + sa * dyp;
+      const perp = Math.abs(-sa * dxp + ca * dyp);
+      if (h.life > 8 && along > 0 && along < h.len && perp < player.r + h.r * 0.6) {
+        tryDamagePlayer(h.dmg, 40, 16);
+      }
+    } else if (h.type === 'tslBlueHole') {
+      const dx = h.x - player.x, dy = h.y - player.y;
+      const dSq = dx * dx + dy * dy;
+      if (dSq < h.r * h.r && dSq > 1) {
+        const d = Math.sqrt(dSq);
+        const pull = 1.0 * (1 - d / h.r);
+        player.x += (dx / d) * pull; player.y += (dy / d) * pull;
+      }
+      const cr = player.r + h.coreR;
+      if (dSq < cr * cr) tryDamagePlayer(h.dmg, 36, 12);
     }
   }
 }
@@ -16981,6 +17087,7 @@ function netLeave() {
   net.active = false; net.role = null; net.code = null;
   net.myReady = false; net.rivalReady = false; net.rivalPresent = false; net.rival = null;
   net.myDead = false; net.rivalP = null; net.eById = null; net.deadIds = null; net._lastWave = 0;
+  net.hzById = null;
 }
 
 // ---------- sync en carrera ----------
