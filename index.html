@@ -340,8 +340,19 @@ canvas.addEventListener('wheel', e => {
 }, { passive: false });
 
 canvas.addEventListener('click', e => {
-  // hotbar click
   const p = getMousePos(e);
+  // pantalla de elección de power-up permanente
+  if (perkSelectOpen) {
+    for (let i = 0; i < perkCardRects.length; i++) {
+      const r = perkCardRects[i];
+      if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) {
+        choosePerk(i);
+        return;
+      }
+    }
+    return;
+  }
+  // hotbar click
   const hbY = H - 70;
   for (let i = 0; i < ABILITIES.length; i++) {
     const x = 20 + i * 31;
@@ -497,6 +508,51 @@ let raidAnnounceText = '';
 let raidAnnounceColor = '#fd6';
 // power-up activos del jugador
 let puDmgTimer = 0, puRateTimer = 0, puInvulnTimer = 0, puMagnetTimer = 0;
+// Power-ups PERMANENTES: cada 5 oleadas ELIGES uno de 3 (se acumulan). Se PIERDEN al morir.
+const PERMA_TYPES = {
+  dmg:       { color: '#f48', icon: '⚔', name: 'DAÑO',        desc: '+25% de daño con todas las armas.' },
+  rate:      { color: '#fc4', icon: '⚡', name: 'CADENCIA',    desc: '+15% de velocidad de ataque.' },
+  hp:        { color: '#4f8', icon: '❤', name: 'VIGOR',       desc: '+30 de vida máxima (y te cura al elegirlo).' },
+  speed:     { color: '#6cf', icon: '💨', name: 'AGILIDAD',    desc: '+10% de velocidad de movimiento.' },
+  regen:     { color: '#8f6', icon: '✚', name: 'REGENERACIÓN', desc: 'Recuperas +1 de vida por segundo.' },
+  crit:      { color: '#f66', icon: '🎯', name: 'CRÍTICO',     desc: '+18% de probabilidad de golpe crítico (x2.5 daño).' },
+  lifesteal: { color: '#c39', icon: '🩸', name: 'VAMPIRISMO',  desc: 'Al matar recuperas 3% de tu vida máxima.' },
+  armor:     { color: '#9cf', icon: '🛡', name: 'CORAZA',      desc: '-12% de daño recibido.' },
+  thorns:    { color: '#6c6', icon: '🌵', name: 'ESPINAS',     desc: 'Refleja 60% del daño a quien te toca.' },
+  luck:      { color: '#a9f', icon: '🌙', name: 'SUERTE NOCTURNA', desc: 'De NOCHE: monedas x2 y muchos más power-ups.' },
+  greed:     { color: '#fe6', icon: '💰', name: 'CODICIA',     desc: '+40% de monedas por cada enemigo.' },
+  rage:      { color: '#f73', icon: '🔥', name: 'ADRENALINA',  desc: 'Con poca vida (<35%): +40% daño y +25% velocidad.' },
+  dayFury:   { color: '#fd6', icon: '☀', name: 'FURIA DIURNA', desc: 'De DÍA: +30% de daño.' },
+  dodge:     { color: '#7ef', icon: '🌀', name: 'EVASIÓN',     desc: '+8% de probabilidad de esquivar todo el daño.' },
+  magnet:    { color: '#fe8', icon: '🧲', name: 'MAGNETISMO',  desc: 'Atraes power-ups y monedas desde lejos, siempre.' },
+  execute:   { color: '#e55', icon: '☠', name: 'EJECUTOR',    desc: 'Enemigos comunes bajo 6% de vida mueren al instante.' },
+  explode:   { color: '#f95', icon: '💣', name: 'DETONACIÓN',  desc: 'Los enemigos EXPLOTAN al morir y dañan alrededor.' },
+  chill:     { color: '#8df', icon: '❄', name: 'ESCARCHA',    desc: 'Tus golpes pueden CONGELAR a los enemigos.' },
+  revive:    { color: '#dfd', icon: '👼', name: 'ÁNGEL GUARDIÁN', desc: 'Una vez por partida sobrevives a un golpe mortal (35% vida).' },
+  haste:     { color: '#7fd', icon: '⏩', name: 'ÍMPETU',      desc: 'Al matar ganas un impulso de velocidad breve.' },
+  ambush:    { color: '#fa7', icon: '🗡', name: 'EMBOSCADA',   desc: '+40% de daño a enemigos con la vida llena.' },
+  hunter:    { color: '#d97', icon: '🏹', name: 'CAZADOR',     desc: '+25% de daño contra jefes y raids.' },
+  aura:      { color: '#f85', icon: '🌋', name: 'AURA ARDIENTE', desc: 'Quemas sin parar a los enemigos que te rodean.' },
+  combo:     { color: '#fd8', icon: '🔗', name: 'COMBO',       desc: 'Cada muerte seguida acumula +daño temporal.' },
+  ward:      { color: '#adf', icon: '🔰', name: 'GUARDIA',     desc: 'Empiezas cada oleada con un escudo de invulnerabilidad.' },
+  payback:   { color: '#f79', icon: '😤', name: 'REPRESALIA',  desc: 'Al recibir daño, tu daño sube unos segundos.' },
+  orbit:     { color: '#9df', icon: '🪐', name: 'ÓRBITA',      desc: 'Orbes giran a tu alrededor y dañan al contacto.' },
+  shock:     { color: '#adf', icon: '🌩', name: 'DESCARGA',    desc: 'Al recibir daño sueltas una onda eléctrica alrededor.' },
+  venom:     { color: '#9c5', icon: '🧪', name: 'VENENO',      desc: 'Tus golpes ENVENENAN: daño continuo por segundos.' },
+  deadeye:   { color: '#f88', icon: '💢', name: 'PUNTERÍA',    desc: '+10% de crítico y tus críticos pegan mucho más fuerte.' },
+  frost:     { color: '#adf', icon: '🧊', name: 'CAMPO GÉLIDO', desc: 'Los enemigos a tu alrededor se congelan sin parar.' },
+  snowball:  { color: '#fe8', icon: '📈', name: 'BOLA DE NIEVE', desc: 'Cada jefe derrotado te da +daño el resto de la partida.' },
+  barrier:   { color: '#6cf', icon: '🔵', name: 'BARRERA',     desc: 'Escudo que absorbe daño y se recarga cada oleada.' },
+};
+const PERMA_KEYS = Object.keys(PERMA_TYPES);
+const permaStacks = { dmg: 0, rate: 0, hp: 0, speed: 0, regen: 0, crit: 0, lifesteal: 0, armor: 0, thorns: 0, luck: 0, greed: 0, rage: 0, dayFury: 0, dodge: 0, magnet: 0, execute: 0, explode: 0, chill: 0, revive: 0, haste: 0, ambush: 0, hunter: 0, aura: 0, combo: 0, ward: 0, payback: 0, orbit: 0, shock: 0, venom: 0, deadeye: 0, frost: 0, snowball: 0, barrier: 0 };
+// Pantalla de elección de power-up (cada 5 oleadas)
+let perkSelectOpen = false;
+let perkChoices = [];      // 3 claves ofrecidas
+let perkCardRects = [];    // hitboxes calculadas al dibujar
+let permaReviveUsed = false; // Ángel Guardián ya se usó en esta partida
+let hasteTimer = 0, comboCount = 0, comboTimer = 0, paybackTimer = 0; // temporizadores de poderes
+let orbitAngle = 0, snowballBonus = 0, barrierHp = 0; // órbita / bola de nieve / barrera
 // Puños Rompedores (slot 2): a quien matas se vuelve PIEDRA-obstáculo que bloquea
 // el paso; enemigos y jugador deben romperla a golpes.
 const stones = [];
@@ -775,9 +831,47 @@ function withAlpha(color, alpha) {
 // Aplica daño al jugador respetando iframe, escudo y Barrera Dorada. Devuelve true si pegó.
 function tryDamagePlayer(amount, iframeDur, shakeAmount) {
   if (player.iframe > 0 || shieldActive || ltActiveTimer > 0) return false;
+  // poder: evasión — esquiva total con cierta probabilidad
+  if (permaStacks.dodge > 0 && Math.random() < Math.min(0.60, permaStacks.dodge * 0.08)) {
+    player.iframe = Math.max(player.iframe, 8);
+    effects.push({ type: 'debuff', x: player.x, y: player.y - player.r - 10, value: '✦', life: 18, max: 18 });
+    return false;
+  }
+  if (permaStacks.armor > 0) amount *= Math.max(0.25, 1 - permaStacks.armor * 0.12); // poder: coraza
+  // poder: barrera — absorbe daño antes que la vida
+  if (barrierHp > 0 && amount > 0) {
+    const absorbed = Math.min(barrierHp, amount);
+    barrierHp -= absorbed;
+    amount -= absorbed;
+    if (barrierHp <= 0) effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 16, max: 16, r: 0, color: '#6cf' });
+  }
   player.hp -= amount;
   player.iframe = iframeDur;
   shake = Math.max(shake, shakeAmount);
+  if (permaStacks.payback > 0) paybackTimer = 150; // poder: represalia — daño extra tras ser golpeado
+  // poder: descarga — onda eléctrica al recibir daño
+  if (permaStacks.shock > 0) {
+    const rad = 90 + permaStacks.shock * 30;
+    for (let j = 0; j < enemies.length; j++) {
+      const o = enemies[j];
+      if (o.ally || o.hp <= 0) continue;
+      if (Math.hypot(o.x - player.x, o.y - player.y) < rad + o.r) {
+        damageEnemy(o, 30 * permaStacks.shock, '#adf');
+        o.frozen = Math.max(o.frozen || 0, 10);
+      }
+    }
+    effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 22, max: 22, r: 0, color: '#adf' });
+  }
+  // poder: espinas — refleja daño a los enemigos que te tocan
+  if (permaStacks.thorns > 0 && amount > 0) {
+    for (let i = 0; i < enemies.length; i++) {
+      const e = enemies[i];
+      if (e.ally || e.hp <= 0) continue;
+      if (Math.hypot(e.x - player.x, e.y - player.y) < e.r + player.r + 6) {
+        damageEnemy(e, amount * 0.6 * permaStacks.thorns, '#8f8');
+      }
+    }
+  }
   return true;
 }
 
@@ -841,7 +935,8 @@ function spawnPowerup(x, y, forceType) {
 }
 
 function updatePowerups() {
-  const magnetRange = puMagnetTimer > 0 ? 220 : 50;
+  let magnetRange = puMagnetTimer > 0 ? 220 : 50;
+  if (permaStacks.magnet > 0) magnetRange = Math.max(magnetRange, 120 + permaStacks.magnet * 90); // poder: magnetismo
   for (let i = powerups.length - 1; i >= 0; i--) {
     const pu = powerups[i];
     pu.life--;
@@ -853,7 +948,8 @@ function updatePowerups() {
     const dx = player.x - pu.x, dy = player.y - pu.y;
     const d = Math.hypot(dx, dy);
     if (d < magnetRange) {
-      const pull = puMagnetTimer > 0 ? 0.6 : 0.18;
+      let pull = puMagnetTimer > 0 ? 0.6 : 0.18;
+      if (permaStacks.magnet > 0) pull = Math.max(pull, 0.35 + permaStacks.magnet * 0.15); // poder: magnetismo
       pu.vx += (dx / Math.max(d, 1)) * pull;
       pu.vy += (dy / Math.max(d, 1)) * pull;
     }
@@ -897,6 +993,55 @@ function applyPowerup(type) {
   raidAnnounceText = `${info.icon} ${info.name}`;
   raidAnnounceColor = info.color;
   raidAnnounceTimer = 90;
+}
+
+// Cada 5 oleadas: abre la pantalla para ELEGIR entre 3 power-ups permanentes.
+function openPerkSelect() {
+  const pool = PERMA_KEYS.slice();
+  perkChoices = [];
+  for (let n = 0; n < 3 && pool.length; n++) {
+    const idx = Math.floor(Math.random() * pool.length);
+    perkChoices.push(pool.splice(idx, 1)[0]);
+  }
+  perkSelectOpen = true;
+}
+
+// Aplica un power-up permanente (por clave) con su fanfarria. Se pierde al morir.
+function applyPermaPowerup(t) {
+  if (!t || permaStacks[t] === undefined) return;
+  permaStacks[t]++;
+  const info = PERMA_TYPES[t];
+  if (t === 'hp') { player.maxHp += 30; player.hp += 30; }
+  const total = PERMA_KEYS.reduce((n, k) => n + permaStacks[k], 0);
+  raidAnnounceText = `★ ${info.icon} ${info.name} x${permaStacks[t]} (${total} poderes)`;
+  raidAnnounceColor = info.color;
+  raidAnnounceTimer = 200;
+  shake = Math.max(shake, 12);
+  effects.push({ type: 'flash', life: 24, max: 24, color: info.color });
+  effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 32, max: 32, r: 0, color: info.color });
+  for (let p = 0; p < 16; p++) {
+    particles.push({
+      x: player.x, y: player.y, vx: rand(-4, 4), vy: rand(-4, 4),
+      life: 30, max: 30, color: info.color, r: 2 + Math.random() * 2
+    });
+  }
+}
+
+// El jugador elige la carta i (0..2) de la pantalla de selección.
+function choosePerk(i) {
+  if (!perkSelectOpen) return;
+  const t = perkChoices[i];
+  if (!t) return;
+  applyPermaPowerup(t);
+  perkSelectOpen = false;
+  perkChoices = [];
+}
+
+// Teclas 1/2/3 para elegir el power-up en la pantalla de selección.
+function handlePerkInput() {
+  if (keyPressed['1']) choosePerk(0);
+  else if (keyPressed['2']) choosePerk(1);
+  else if (keyPressed['3']) choosePerk(2);
 }
 
 function spawnRaidBoss(tier) {
@@ -1040,6 +1185,10 @@ function spawnZombieHorde(n) {
 function startWave() {
   wave++;
   waveActive = true;
+  // poder: guardia — escudo de invulnerabilidad al empezar la oleada
+  if (permaStacks.ward > 0) player.iframe = Math.max(player.iframe, 40 + permaStacks.ward * 35);
+  // poder: barrera — recarga el escudo que absorbe daño
+  if (permaStacks.barrier > 0) barrierHp = permaStacks.barrier * 40;
   const isBossWave = wave % 5 === 0;
   const base = isBossWave ? (17 + wave * 5) : (23 + wave * 9);
   enemiesToSpawn = Math.max(1, Math.floor(base * (enemySpawnMult || 1)));
@@ -1118,7 +1267,12 @@ function updateWave() {
   if (enemiesToSpawn === 0 && remaining === 0) {
     waveActive = false;
     waveTimer = 0;
-    if (wave % 5 === 0) player.maxHp += 5;
+    if (wave % 5 === 0) {
+      player.maxHp += 5;
+      const coopNow = net.active && net.mode === 'normal';
+      if (coopNow) applyPermaPowerup(PERMA_KEYS[Math.floor(Math.random() * PERMA_KEYS.length)]);
+      else openPerkSelect();
+    }
     player.hp = player.maxHp;
     effects.push({ type: 'heal', life: 60, max: 60 });
   }
@@ -1138,7 +1292,9 @@ function updatePlayer() {
   if (keys['d'] || keys['arrowright']) dx++;
   if (dx || dy) {
     const m = Math.hypot(dx, dy);
-    let mult = 1;
+    let mult = 1 + permaStacks.speed * 0.10; // poder: agilidad
+    if (permaStacks.rage > 0 && player.hp < player.maxHp * 0.35) mult *= (1 + permaStacks.rage * 0.25); // poder: adrenalina
+    if (permaStacks.haste > 0 && hasteTimer > 0) mult *= (1 + permaStacks.haste * 0.20); // poder: ímpetu
     if (active === 6) mult *= 1.6;
     if (smokeFogTimer > 0) mult *= 2.6;
     if (player.slowed > 0) mult *= 0.35;
@@ -1150,6 +1306,63 @@ function updatePlayer() {
     player.y += (dy / m) * sp;
   }
   if (player.slowed > 0) player.slowed--;
+  // poder permanente: regeneración (+1 HP/s por stack)
+  if (permaStacks.regen > 0 && player.hp > 0 && player.hp < player.maxHp && frame % 60 === 0) {
+    player.hp = Math.min(player.maxHp, player.hp + permaStacks.regen);
+  }
+  // temporizadores de poderes
+  if (hasteTimer > 0) hasteTimer--;
+  if (paybackTimer > 0) paybackTimer--;
+  if (comboTimer > 0) { comboTimer--; if (comboTimer === 0) comboCount = 0; }
+  // poder: aura ardiente — quema a los enemigos cercanos
+  if (permaStacks.aura > 0 && frame % 18 === 0) {
+    const rad = 68 + permaStacks.aura * 22;
+    for (let j = 0; j < enemies.length; j++) {
+      const e = enemies[j];
+      if (e.ally || e.hp <= 0) continue;
+      if (Math.hypot(e.x - player.x, e.y - player.y) < rad + e.r) {
+        damageEnemy(e, 6 * permaStacks.aura, '#f83');
+      }
+    }
+  }
+  // poder: campo gélido — congela sin parar a los enemigos cercanos
+  if (permaStacks.frost > 0 && frame % 10 === 0) {
+    const rad = 80 + permaStacks.frost * 25;
+    for (let j = 0; j < enemies.length; j++) {
+      const e = enemies[j];
+      if (e.ally || e.hp <= 0 || e.bossKind) continue;
+      if (Math.hypot(e.x - player.x, e.y - player.y) < rad + e.r) {
+        e.frozen = Math.max(e.frozen || 0, 12);
+      }
+    }
+  }
+  // poder: órbita — orbes giratorios que dañan al contacto
+  if (permaStacks.orbit > 0) {
+    orbitAngle += 0.11;
+    const orbs = 1 + permaStacks.orbit;
+    const rad = 52 + permaStacks.orbit * 6;
+    if (frame % 6 === 0) {
+      for (let o = 0; o < orbs; o++) {
+        const a = orbitAngle + (o / orbs) * Math.PI * 2;
+        const ox = player.x + Math.cos(a) * rad, oy = player.y + Math.sin(a) * rad;
+        for (let j = 0; j < enemies.length; j++) {
+          const e = enemies[j];
+          if (e.ally || e.hp <= 0) continue;
+          if (Math.hypot(e.x - ox, e.y - oy) < e.r + 14) damageEnemy(e, 14 * permaStacks.orbit, '#9df');
+        }
+      }
+    }
+  }
+  // poder: veneno — daño continuo a los enemigos envenenados
+  if (permaStacks.venom > 0 && frame % 30 === 0) {
+    for (let j = 0; j < enemies.length; j++) {
+      const e = enemies[j];
+      if (e.ally || e.hp <= 0 || !e.poisonTime || e.poisonTime <= 0) continue;
+      e.hp -= e.poison || 0;
+      e.poisonTime -= 30;
+      if (frame % 30 === 0) effects.push({ type: 'debuff', x: e.x, y: e.y - e.r - 6, value: '☠', life: 14, max: 14 });
+    }
+  }
   processFlurry();
   processBreakerCombo();
   processThreadCombo();
@@ -2187,6 +2400,7 @@ function updatePlayer() {
   if (timeStopTimer > 0) timeStopTimer--;
 
   let cd = getAttackCD();
+  if (permaStacks.rate > 0) cd = cd / (1 + permaStacks.rate * 0.15); // poder permanente: cadencia
   if (puRateTimer > 0) cd = cd / 2;
   if (noCooldowns) cd = Math.min(cd, 60); // sandbox sin-CD: ataque mínimo 60ms
   if (mouse.down && Date.now() - player.lastAttack > cd) {
@@ -2297,10 +2511,43 @@ function damageEnemy(e, dmg, color) {
   }
   // damage infinite is preserved (bubbles)
   let finalDmg = dmg >= 999999 ? dmg : dmg * playerDmgMult;
+  if (finalDmg < 999999) {
+    if (permaStacks.dmg > 0) finalDmg *= (1 + permaStacks.dmg * 0.25); // poder: daño
+    if (permaStacks.dayFury > 0 && !isNightWave(wave)) finalDmg *= (1 + permaStacks.dayFury * 0.30); // poder: furia diurna
+    if (permaStacks.ambush > 0 && e.hp >= e.maxHp * 0.9) finalDmg *= (1 + permaStacks.ambush * 0.40); // poder: emboscada (vida llena)
+    if (permaStacks.hunter > 0 && (e.bossKind || e.raid)) finalDmg *= (1 + permaStacks.hunter * 0.25); // poder: cazador (jefes)
+    if (permaStacks.combo > 0 && comboTimer > 0) finalDmg *= (1 + Math.min(comboCount, 20) * 0.02 * permaStacks.combo); // poder: combo
+    if (permaStacks.payback > 0 && paybackTimer > 0) finalDmg *= (1 + permaStacks.payback * 0.30); // poder: represalia
+    if (snowballBonus > 0) finalDmg *= (1 + snowballBonus); // poder: bola de nieve (jefes derrotados)
+    if (permaStacks.rage > 0 && player.hp > 0 && player.hp < player.maxHp * 0.35) {
+      finalDmg *= (1 + permaStacks.rage * 0.40); // poder: adrenalina (poca vida)
+    }
+    // poder: crítico (+ puntería aumenta prob. y multiplicador)
+    const critChance = permaStacks.crit * 0.18 + permaStacks.deadeye * 0.10;
+    if (critChance > 0 && Math.random() < Math.min(0.85, critChance)) {
+      finalDmg *= (2.5 + permaStacks.deadeye * 0.8);
+      effects.push({ type: 'debuff', x: e.x, y: e.y - e.r - 10, value: '💥', life: 20, max: 20 });
+    }
+    // poder: escarcha — congela brevemente al golpear
+    if (permaStacks.chill > 0 && !e.bossKind && Math.random() < Math.min(0.5, permaStacks.chill * 0.12)) {
+      e.frozen = Math.max(e.frozen || 0, 24);
+    }
+  }
   if (puDmgTimer > 0) finalDmg *= 2; // power-up daño x2
   if (e.geOvercharge > 0) finalDmg *= 1.8; // sobrecarga de vida de GE (MUDA)
   if (e.armor) finalDmg = finalDmg * (1 - e.armor);
   e.hp -= finalDmg;
+  // poder: ejecutor — remata a enemigos comunes con muy poca vida
+  if (permaStacks.execute > 0 && e.hp > 0 && !e.bossKind && !e.raid &&
+      e.hp < e.maxHp * Math.min(0.30, permaStacks.execute * 0.06)) {
+    e.hp = 0;
+    effects.push({ type: 'debuff', x: e.x, y: e.y - e.r - 10, value: '☠', life: 22, max: 22 });
+  }
+  // poder: veneno — marca al enemigo con daño continuo
+  if (permaStacks.venom > 0 && e.hp > 0) {
+    e.poison = 4 * permaStacks.venom;
+    e.poisonTime = 180;
+  }
   for (let p = 0; p < 3; p++) {
     particles.push({
       x: e.x, y: e.y, vx: rand(-3, 3), vy: rand(-3, 3),
@@ -5206,7 +5453,22 @@ function updateEnemies() {
       // Dispara milagro de Don del Milagro al morir
       if (e.miracle) triggerMiracle(e);
       const bonus = e.markCoins || 0;
-      player.coins += e.coins + bonus;
+      let killCoins = e.coins + bonus;
+      if (permaStacks.greed > 0) killCoins *= (1 + permaStacks.greed * 0.40); // poder: codicia
+      if (permaStacks.luck > 0 && isNightWave(wave)) killCoins *= (1 + permaStacks.luck); // poder: suerte nocturna (monedas x2 de noche)
+      player.coins += Math.round(killCoins);
+      // poder: vampirismo — cura al matar
+      if (permaStacks.lifesteal > 0 && player.hp > 0) {
+        player.hp = Math.min(player.maxHp, player.hp + Math.ceil(player.maxHp * 0.03 * permaStacks.lifesteal));
+      }
+      // poder: ímpetu — impulso de velocidad al matar
+      if (permaStacks.haste > 0) hasteTimer = 30 + permaStacks.haste * 20;
+      // poder: combo — acumula racha de muertes
+      if (permaStacks.combo > 0) { comboCount++; comboTimer = 180; }
+      // poder: bola de nieve — cada jefe/raid derrotado da +daño permanente en la partida
+      if (permaStacks.snowball > 0 && (e.bossKind || e.raid)) {
+        snowballBonus += permaStacks.snowball * 0.10;
+      }
       // Progresión Espiral Acto 1 → 2 → 3 → 4 (slot 18)
       if (active === 18 && owned.has(18)) {
         if (tuskAct === 1) {
@@ -5312,6 +5574,7 @@ function updateEnemies() {
       const isBoss = !!e.bossKind;
       const isRaid = !!e.raid;
       let dropChance = isRaid ? 1 : (isBoss ? 0.15 : 0.03);
+      if (permaStacks.luck > 0 && isNightWave(wave)) dropChance += permaStacks.luck * 0.08; // poder: suerte nocturna (más drops de noche)
       if (Math.random() < dropChance) spawnPowerup(e.x, e.y);
       // Raid bosses sueltan varias monedas extras + 1-3 power-ups
       if (isRaid) {
@@ -5325,6 +5588,21 @@ function updateEnemies() {
       // Puños Rompedores: el enemigo muerto se vuelve PIEDRA-obstáculo
       if (active === 2 && owned.has(2) && !e.bossKind && !e.ally && stones.length < 40) {
         spawnStone(e.x, e.y, e.r);
+      }
+      // poder: detonación — el enemigo explota al morir dañando alrededor
+      if (permaStacks.explode > 0) {
+        const ex = e.x, ey = e.y;
+        const radius = 70 + permaStacks.explode * 25;
+        const boomDmg = 40 + permaStacks.explode * 40;
+        for (let k = 0; k < enemies.length; k++) {
+          const o = enemies[k];
+          if (o === e || o.ally || o.hp <= 0) continue;
+          if (Math.hypot(o.x - ex, o.y - ey) < radius + o.r) damageEnemy(o, boomDmg, '#f95');
+        }
+        effects.push({ type: 'shockwave', x: ex, y: ey, life: 20, max: 20, r: 0, color: '#f95' });
+        for (let p = 0; p < 10; p++) {
+          particles.push({ x: ex, y: ey, vx: rand(-5, 5), vy: rand(-5, 5), life: 22, max: 22, color: '#f95', r: 3 });
+        }
       }
       e.dead = true;
       enemies.splice(i, 1);
@@ -8053,6 +8331,25 @@ function draw() {
   drawCoopRival();
 
   // player
+  // poder: barrera — anillo de escudo
+  if (barrierHp > 0) {
+    ctx.strokeStyle = `rgba(100,200,255,${0.5 + 0.3 * Math.sin(frame * 0.15)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(player.x, player.y, player.r + 12, 0, Math.PI * 2); ctx.stroke();
+  }
+  // poder: órbita — orbes girando alrededor del jugador
+  if (permaStacks.orbit > 0) {
+    const orbs = 1 + permaStacks.orbit;
+    const rad = 52 + permaStacks.orbit * 6;
+    for (let o = 0; o < orbs; o++) {
+      const a = orbitAngle + (o / orbs) * Math.PI * 2;
+      const ox = player.x + Math.cos(a) * rad, oy = player.y + Math.sin(a) * rad;
+      ctx.fillStyle = '#9df';
+      ctx.beginPath(); ctx.arc(ox, oy, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(180,230,255,0.4)';
+      ctx.beginPath(); ctx.arc(ox, oy, 11, 0, Math.PI * 2); ctx.fill();
+    }
+  }
   // after-images del Paso Lunar (Rey del Pop) — se dibujan detrás del jugador
   for (let i = mjGhosts.length - 1; i >= 0; i--) {
     const g = mjGhosts[i];
@@ -10811,7 +11108,8 @@ function draw() {
   drawNetNormalHud();
 
   if (gameOver) drawGameOver();
-  if (paused && !shopOpen && !gameOver) drawPaused();
+  if (perkSelectOpen && !gameOver) drawPerkSelect();
+  if (paused && !shopOpen && !gameOver && !perkSelectOpen) drawPaused();
 }
 
 function drawUI() {
@@ -10860,6 +11158,22 @@ function drawUI() {
     ctx.fillText(`${p.info.icon} ${p.info.name} ${(p.t / 60).toFixed(1)}s`, W - 260, puY);
     puY += 18;
   });
+  // Power-ups PERMANENTES acumulados (se pierden al morir)
+  const permaTotal = PERMA_KEYS.reduce((n, k) => n + permaStacks[k], 0);
+  if (permaTotal > 0) {
+    ctx.fillStyle = '#fe6';
+    ctx.font = 'bold 11px monospace';
+    ctx.fillText(`★ PODERES (${permaTotal})`, W - 260, puY);
+    puY += 16;
+    PERMA_KEYS.forEach(k => {
+      if (permaStacks[k] <= 0) return;
+      const info = PERMA_TYPES[k];
+      ctx.fillStyle = info.color;
+      ctx.font = 'bold 12px monospace';
+      ctx.fillText(`${info.icon} ${info.name} x${permaStacks[k]}`, W - 260, puY);
+      puY += 16;
+    });
+  }
   ctx.font = '14px monospace';
   if (active === 26) {
     ctx.fillStyle = STAND_COLORS[standForm];
@@ -11532,6 +11846,89 @@ function drawPaused() {
   ctx.textAlign = 'left';
 }
 
+function drawPerkSelect() {
+  ctx.fillStyle = 'rgba(0,0,0,0.78)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fe6';
+  ctx.font = 'bold 34px monospace';
+  ctx.fillText('★ ELIGE UN PODER ★', W / 2, 90);
+  ctx.fillStyle = '#9df';
+  ctx.font = '15px monospace';
+  ctx.fillText(`Oleada ${wave} superada · Se pierde si mueres`, W / 2, 118);
+
+  const cardW = 240, cardH = 260, gap = 30;
+  const totalW = perkChoices.length * cardW + (perkChoices.length - 1) * gap;
+  const startX = (W - totalW) / 2;
+  const cardY = H / 2 - cardH / 2 + 20;
+  perkCardRects = [];
+  const hovered = mouse;
+
+  perkChoices.forEach((t, i) => {
+    const info = PERMA_TYPES[t];
+    const x = startX + i * (cardW + gap);
+    perkCardRects.push({ x, y: cardY, w: cardW, h: cardH });
+    const isHover = hovered.x >= x && hovered.x <= x + cardW && hovered.y >= cardY && hovered.y <= cardY + cardH;
+    const have = permaStacks[t];
+
+    // marco
+    ctx.fillStyle = isHover ? 'rgba(40,44,58,0.98)' : 'rgba(24,26,36,0.96)';
+    ctx.fillRect(x, cardY, cardW, cardH);
+    ctx.lineWidth = isHover ? 4 : 2.5;
+    ctx.strokeStyle = info.color;
+    ctx.strokeRect(x, cardY, cardW, cardH);
+
+    // número de tecla
+    ctx.fillStyle = info.color;
+    ctx.font = 'bold 16px monospace';
+    ctx.fillText(`[ ${i + 1} ]`, x + cardW / 2, cardY + 28);
+
+    // icono
+    ctx.font = '58px monospace';
+    ctx.fillText(info.icon, x + cardW / 2, cardY + 96);
+
+    // nombre
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 19px monospace';
+    ctx.fillText(info.name, x + cardW / 2, cardY + 134);
+
+    // descripción (envuelta)
+    ctx.fillStyle = '#bcd';
+    ctx.font = '13px monospace';
+    wrapText(info.desc, x + cardW / 2, cardY + 162, cardW - 28, 17);
+
+    // ya poseídos
+    if (have > 0) {
+      ctx.fillStyle = '#8f6';
+      ctx.font = 'bold 13px monospace';
+      ctx.fillText(`Ya tienes: x${have}`, x + cardW / 2, cardY + cardH - 20);
+    }
+  });
+
+  ctx.fillStyle = '#889';
+  ctx.font = '14px monospace';
+  ctx.fillText('Pulsa 1 / 2 / 3 o haz click en una carta', W / 2, cardY + cardH + 42);
+  ctx.textAlign = 'left';
+}
+
+// Utilidad: dibuja texto centrado en varias líneas según ancho máximo.
+function wrapText(text, cx, y, maxW, lineH) {
+  const words = text.split(' ');
+  let line = '';
+  let yy = y;
+  for (let n = 0; n < words.length; n++) {
+    const test = line ? line + ' ' + words[n] : words[n];
+    if (ctx.measureText(test).width > maxW && line) {
+      ctx.fillText(line, cx, yy);
+      line = words[n];
+      yy += lineH;
+    } else {
+      line = test;
+    }
+  }
+  if (line) ctx.fillText(line, cx, yy);
+}
+
 // ---------------- Shop ----------------
 const shopEl = document.getElementById('shop');
 
@@ -11599,12 +11996,13 @@ function buyAbility(idx) {
 // ---------------- Input handling ----------------
 function consumeKeyPresses() {
   if (keyPressed['b']) {
-    if (gameStarted && !gameOver) {
+    if (gameStarted && !gameOver && !perkSelectOpen) {
       if (shopOpen) closeShop(); else openShop();
     }
   }
   if (keyPressed['escape']) {
-    if (shopOpen) closeShop();
+    if (perkSelectOpen) { /* elige un poder primero */ }
+    else if (shopOpen) closeShop();
     else if (gameStarted && !gameOver) paused = !paused;
   }
   if (keyPressed['m'] && mode === 'sandbox' && gameStarted && !gameOver) {
@@ -11634,6 +12032,11 @@ function restart() {
   darknessMode = false; darknessWave = -1;
   coinRainTimer = 0; raidAnnounceTimer = 0;
   puDmgTimer = 0; puRateTimer = 0; puInvulnTimer = 0; puMagnetTimer = 0;
+  // poder permanente: se pierde al morir
+  for (const k in permaStacks) permaStacks[k] = 0;
+  perkSelectOpen = false; perkChoices = []; permaReviveUsed = false;
+  hasteTimer = 0; comboCount = 0; comboTimer = 0; paybackTimer = 0;
+  orbitAngle = 0; snowballBonus = 0; barrierHp = 0;
   const nocdCheckbox = document.getElementById('sb-nocd');
   const bmCheckbox = document.getElementById('sb-bloodmoon');
   if (nocdCheckbox) nocdCheckbox.checked = false;
@@ -11722,7 +12125,9 @@ function loop() {
   // host debe seguir simulando enemigos aunque su propio jugador haya caído.
   const worldRunning = coop
     ? (gameStarted && !shopOpen && !paused && (player.hp > 0 || rivalAlive))
-    : (gameStarted && !shopOpen && !paused && !gameOver);
+    : (gameStarted && !shopOpen && !paused && !gameOver && !perkSelectOpen);
+
+  if (perkSelectOpen && !coop) handlePerkInput();
 
   if (worldRunning) {
     if (!(coop && player.hp <= 0)) updatePlayer();   // el jugador caído no actúa
@@ -11748,6 +12153,18 @@ function loop() {
     updateEffects();
     if (!coopGuest) updateWave();
     updateRewindBuffer();
+    if (player.hp <= 0 && permaStacks.revive > 0 && !permaReviveUsed) {
+      // poder: ángel guardián — sobrevive una vez con 35% de vida
+      permaReviveUsed = true;
+      player.hp = Math.ceil(player.maxHp * 0.35);
+      player.iframe = Math.max(player.iframe, 120);
+      shake = 26;
+      effects.push({ type: 'flash', life: 44, max: 44, color: '#dfd' });
+      effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 40, max: 40, r: 0, color: '#dfd' });
+      raidAnnounceText = '👼 ÁNGEL GUARDIÁN';
+      raidAnnounceColor = '#dfd';
+      raidAnnounceTimer = 180;
+    }
     if (player.hp <= 0) {
       if (coop) {
         if (!net.myDead) { net.myDead = true; shake = 24; }
@@ -16954,6 +17371,24 @@ function coopGuestEnemyTick() {
         shake = Math.max(shake, 8);
       }
     }
+  }
+  // Muertes locales: el invitado NO corre updateEnemies (donde el host elimina y
+  // premia a los enemigos), así que aquí retira los que su propio daño llevó a
+  // hp<=0. netSendGuestKills detecta la baja (desaparecen del array) y avisa al
+  // host, que también los elimina. Sin esto, el invitado "no puede matar".
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const e = enemies[i];
+    if (e.ally || e.hp > 0) continue;
+    player.coins += e.coins || 0;
+    effects.push({ type: 'coin', x: e.x, y: e.y, value: e.coins || 0, life: 50, max: 50 });
+    for (let p = 0; p < 8; p++) {
+      particles.push({
+        x: e.x, y: e.y, vx: rand(-5, 5), vy: rand(-5, 5),
+        life: 28, max: 28, color: e.color || '#f84', r: 3
+      });
+    }
+    e.dead = true;
+    enemies.splice(i, 1);
   }
 }
 
