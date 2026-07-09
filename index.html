@@ -398,11 +398,11 @@ const ABILITIES = [
   { id: 'bastion',     name: '6. Bastión Inmóvil',         cost: 300,
     desc: 'Quédate quieto: cúpula azul-morado, inmunidad y reflejo (30s c/50s). Moverte pausa la carga.', color: '#a8f' },
   { id: 'flurry',      name: '7. Frenesí de Estocadas',    cost: 460,
-    desc: 'Pasiva: +60% velocidad. Click: ráfaga de 5 estocadas ultra rápidas en línea.', color: '#fef' },
+    desc: 'Pasiva: +60% velocidad. Click: TROMBA de 7 estocadas encadenadas que ATRAVIESAN, te dan i-frames (esquiva), reapuntan al cursor y rematan con un CORTE FINAL en abanico.', color: '#fef' },
   { id: 'firebullet',  name: '8. Bala Incendiaria',        cost: 420,
-    desc: 'Bala que crea una hoguera donde cae. El fuego dura 10s y daña a quien lo pise.', color: '#f73' },
+    desc: 'Bola de fuego que deja RASTRO de llamas al volar y al impactar ESTALLA en una hoguera + prende a los enemigos cercanos. Los quemados sufren daño continuo; pisar fuego también prende.', color: '#f73' },
   { id: 'emerald',     name: '9. Esmeraldas',              cost: 450,
-    desc: 'Rayos verdes. J: telarañas 8s — enemigos atrapados disparan esmeraldas (CD 2min).', color: '#4f8' },
+    desc: 'Esmeralda que ATRAVIESA hasta 3 enemigos y en cada golpe SALPICA esquirlas teledirigidas que rebotan a otros (cadena). J: TORMENTA DE ESMERALDAS 8s — bombardeo teledirigido + enreda a los cercanos (CD 45s).', color: '#4f8' },
   { id: 'nutking',     name: '10. Pernos Letales',          cost: 470,
     desc: '3 pernos por click; cada hit clava un NUT al enemigo (hasta 5 stacks). C: DISASSEMBLE — cutscene + desensambla a todos los marcados (250 × nuts de daño + paralizados 1s) (CD 18s).', color: '#c97' },
   { id: 'spirit',      name: '11. Furia Eléctrica',   cost: 500,
@@ -604,6 +604,17 @@ let rewindFrame = 0;
 let dashTimer = 0;
 let dashAngle = 0;
 let dashHits = new Set();
+// --- Plaga Primigenia (Scary Monsters) — paleta tóxica/plaga + estado ---
+const SM_DARK   = '#16300f';  // piel oscura de pantano
+const SM_SKIN   = '#3f6b24';  // carne del dino
+const SM_ACID   = '#a6e22e';  // verde ácido (espinas / borde)
+const SM_BONE   = '#efe6c2';  // hueso / dientes
+const SM_INFECT = '#c14fe0';  // púrpura plaga (venas / infección)
+const SM_BLOOD  = '#d11e33';  // sangre / peligro
+const SM_EYE    = '#ffb020';  // ojo depredador ámbar
+let dashGhosts = [];          // estela de la embestida (after-images)
+let dashComboWindow = 0;      // ventana para encadenar otra embestida
+let dinoFrenzyTimer = 0;      // frenesí de la manada tras tu embestida
 // Oh! Lonesome Me (cuerda-dash) — compartido con el látigo eléctrico (forma 1)
 let lassoTimer = 0, lassoMax = 0;
 let lassoFromX = 0, lassoFromY = 0, lassoTX = 0, lassoTY = 0;
@@ -894,6 +905,14 @@ const ENEMY_TYPES = {
   shooter: { hp: 38,  speed: 0.6, dmg: 8,  r: 14, color: '#a4d', coins: 8, ranged: true },
   brute:   { hp: 280, speed: 0.6, dmg: 32, r: 30, color: '#622', coins: 30 },
   zombie:  { hp: 25,  speed: 0.55, dmg: 14, r: 13, color: '#3a5a3a', coins: 6 },
+  // Élites "cheveres" (minions con personalidad propia)
+  shade:    { hp: 42,  speed: 1.35, dmg: 18, r: 12, color: '#849', coins: 9 },   // acecha y embiste
+  bomber:   { hp: 28,  speed: 1.15, dmg: 12, r: 13, color: '#f72', coins: 10 },  // kamikaze: explota
+  healer:   { hp: 75,  speed: 0.5,  dmg: 8,  r: 15, color: '#3d8', coins: 16, ranged: true },  // cura aliados
+  splitter: { hp: 60,  speed: 0.7,  dmg: 14, r: 17, color: '#3cc', coins: 11 },  // se divide al morir
+  sniper:   { hp: 46,  speed: 0.4,  dmg: 10, r: 13, color: '#c7f', coins: 14, ranged: true },  // disparo cargado
+  frostling:{ hp: 38,  speed: 1.0,  dmg: 12, r: 11, color: '#8ef', coins: 8 },   // congela al tocarte
+  spawnling:{ hp: 11,  speed: 1.7,  dmg: 8,  r: 7,  color: '#7dd', coins: 2 },   // cría del divisor
   // Bosses (each with unique ability)
   boss:       { hp: 7000,   speed: 0.4, dmg: 40, r: 44, color: '#f33', coins: 200,  ranged: true, bossKind: 'bulletmaster', bossName: 'TIRADOR' },
   chronos:    { hp: 11000,  speed: 0.5, dmg: 45, r: 50, color: '#48f', coins: 350,  ranged: true, bossKind: 'chronos',      bossName: 'CRONOS' },
@@ -1256,10 +1275,16 @@ function updateWave() {
       const bIdx = Math.floor(wave / 5) - 1;
       type = BOSS_CYCLE[bIdx % BOSS_CYCLE.length];
     }
-    else if (wave > 8 && r < 0.08) type = 'brute';
-    else if (wave > 3 && r < 0.20) type = 'tank';
-    else if (wave > 4 && r < 0.40) type = 'shooter';
-    else if (wave > 1 && r < 0.62) type = 'fast';
+    else if (wave > 8 && r < 0.07) type = 'brute';
+    else if (wave > 9 && r < 0.12) type = 'sniper';
+    else if (wave > 6 && r < 0.18) type = 'healer';
+    else if (wave > 5 && r < 0.26) type = 'splitter';
+    else if (wave > 4 && r < 0.34) type = 'bomber';
+    else if (wave > 3 && r < 0.42) type = 'tank';
+    else if (wave > 5 && r < 0.50) type = 'shade';
+    else if (wave > 7 && r < 0.57) type = 'frostling';
+    else if (wave > 4 && r < 0.70) type = 'shooter';
+    else if (wave > 1 && r < 0.85) type = 'fast';
     spawnEnemy(type);
     enemiesToSpawn--;
   }
@@ -1410,6 +1435,8 @@ function updatePlayer() {
 
   if (dashTimer > 0) {
     const sp = 30;
+    // after-image del salto depredador
+    dashGhosts.push({ x: player.x, y: player.y, life: 12, max: 12 });
     player.x += Math.cos(dashAngle) * sp;
     player.y += Math.sin(dashAngle) * sp;
     const dashCos = Math.cos(dashAngle), dashSin = Math.sin(dashAngle);
@@ -1417,28 +1444,44 @@ function updatePlayer() {
       const e = enemies[j];
       if (e.ally) continue;
       if (dashHits.has(e.id)) continue;
-      const rr = player.r + e.r + 14;
+      const rr = player.r + e.r + 16;
       if (distSq(player, e) < rr * rr) {
-        damageEnemy(e, 260, '#8e3');
+        damageEnemy(e, 280, SM_ACID);
         dashHits.add(e.id);
-        e.vx += dashCos * 18;
-        e.vy += dashSin * 18;
-        e.infected = 240; // 4s para morir y volverse dino
-        if (e.hp <= 0) convertToAlly(e, true);
-        else {
-          effects.push({ type: 'punch', x: e.x, y: e.y, life: 8, max: 8, color: '#8e3' });
+        e.vx += dashCos * 20;
+        e.vy += dashSin * 20;
+        infectEnemy(e);   // la plaga: morirá y eclosionará en dino
+        // zarpazo sangriento
+        effects.push({ type: 'punch', x: e.x, y: e.y, life: 9, max: 9, color: SM_BLOOD });
+        for (let s = 0; s < 6; s++) {
+          particles.push({ x: e.x, y: e.y, vx: rand(-4, 4), vy: rand(-4, 4), life: 16, max: 16, color: Math.random() > 0.5 ? SM_BLOOD : SM_INFECT, r: 2 + Math.random() * 2 });
         }
+        if (e.hp <= 0) convertToAlly(e, true);
       }
     }
     for (let p = 0; p < 4; p++) {
       particles.push({
         x: player.x + rand(-8, 8), y: player.y + rand(-8, 8),
         vx: -Math.cos(dashAngle) * 2 + rand(-1, 1), vy: -Math.sin(dashAngle) * 2 + rand(-1, 1),
-        life: 20, max: 20, color: '#6c4', r: 4
+        life: 20, max: 20, color: rand(0, 1) > 0.5 ? SM_ACID : SM_SKIN, r: 4
       });
     }
     dashTimer--;
+    if (dashTimer === 0) {
+      // ATERRIZAJE: garrazo en área + ventana de combo
+      shake = Math.max(shake, 9);
+      effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 26, max: 26, r: 0, color: SM_ACID });
+      for (let j = 0; j < enemies.length; j++) {
+        const e = enemies[j];
+        if (e.ally) continue;
+        if (distSq(player, e) < 70 * 70) { damageEnemy(e, 120, SM_ACID); infectEnemy(e); }
+      }
+      dashComboWindow = 24;
+    }
+  } else if (dashComboWindow > 0) {
+    dashComboWindow--;
   }
+  if (dinoFrenzyTimer > 0) dinoFrenzyTimer--;
 
   player.x = Math.max(player.r, Math.min(W - player.r, player.x));
   player.y = Math.max(player.r, Math.min(H - player.r, player.y));
@@ -1531,9 +1574,10 @@ function updatePlayer() {
   }
   if (active === 8 && keyPressed['j'] && webModeCD <= 0) {
     webModeTimer = 60 * 8;
-    webModeCD = 60 * 120;
+    webModeCD = 60 * 45;
     shake = 10;
     effects.push({ type: 'flash', life: 18, max: 18, color: '#4f8' });
+    effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 24, max: 24, r: 0, color: '#4f8' });
   }
   if (active === 24 && keyPressed['n']) {
     bubbleBulletMode = !bubbleBulletMode;
@@ -1942,15 +1986,17 @@ function updatePlayer() {
       apexPhase = 2;
       apexTimer = 30;
       shake = 28;
-      effects.push({ type: 'flash', life: 18, max: 18, color: '#8e3' });
+      dinoFrenzyTimer = 240;   // el rugido desata el frenesí de la manada
+      effects.push({ type: 'flash', life: 18, max: 18, color: SM_BLOOD });
     }
   } else if (apexPhase === 2) {
     apexTimer--;
     player.iframe = Math.max(player.iframe, 8);
     if (apexTimer === 24) {
-      // ondas concéntricas verdes
+      // ondas concéntricas: ácido + sangre + plaga
+      const roarCols = [SM_ACID, SM_BLOOD, SM_INFECT, SM_ACID];
       for (let k = 0; k < 4; k++) {
-        effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 36 - k * 4, max: 36 - k * 4, r: k * 30, color: '#8e3' });
+        effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 40 - k * 4, max: 40 - k * 4, r: k * 30, color: roarCols[k] });
       }
     }
     if (apexTimer <= 0) {
@@ -1964,13 +2010,13 @@ function updatePlayer() {
               particles.push({
                 x: e.x, y: e.y,
                 vx: rand(-2, 2), vy: rand(-2, 2),
-                life: 22, max: 22, color: '#cf6', r: 3
+                life: 22, max: 22, color: SM_ACID, r: 3
               });
             }
           }
           continue;
         }
-        damageEnemy(e, 400, '#cf6');
+        damageEnemy(e, 400, SM_BLOOD);
         if (e.hp > 0) {
           e.infected = 360;
           e.paralyzed = 120;
@@ -2418,7 +2464,7 @@ function getAttackCD() {
   if (active === 28) return [240, 650, 90][mjForm];
   if (active === 29) return 360;
   if (active === 30) return 13;   // Balas Vivientes: disparo muy rápido (spam)
-  return [340, 260, 500, 0, 280, 320, 600, 300, 200, 260, 280, 700, 280, 280, 360, 380, 520, 240, 250, 320, 520, 250, 380, 320, 110, 320][active];
+  return [340, 260, 500, 0, 280, 320, 480, 300, 200, 260, 280, 700, 280, 280, 360, 380, 520, 240, 250, 320, 520, 250, 380, 320, 110, 320][active];
 }
 
 function doAttack() {
@@ -3089,20 +3135,28 @@ function d4cAttack(angle) {
   }
 }
 
-// 16. Embestida Fulgurante — bite dash, infecta, convierte en dinosaurio
+// 16. Plaga Primigenia — POUNCE (salto depredador): muerde, infecta y desata la manada
+function infectEnemy(e, dur = 300) {
+  if (e.ally) return;
+  e.infected = Math.max(e.infected || 0, dur);
+}
 function dashAttack(angle) {
   if (dashTimer > 0) return;
-  dashTimer = 20;
+  const combo = dashComboWindow > 0;   // encadenar dentro de la ventana = pounce doble
+  dashTimer = combo ? 16 : 20;
   dashAngle = angle;
   dashHits = new Set();
-  player.iframe = Math.max(player.iframe, 26);
-  effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 22, max: 22, r: 0, color: '#6c4' });
-  // estela de garras verdes
-  for (let p = 0; p < 10; p++) {
+  dashGhosts = [];
+  player.iframe = Math.max(player.iframe, combo ? 22 : 26);
+  dinoFrenzyTimer = 160;               // la manada entra en frenesí
+  shake = Math.max(shake, combo ? 12 : 7);
+  effects.push({ type: 'shockwave', x: player.x, y: player.y, life: 22, max: 22, r: 0, color: combo ? SM_INFECT : SM_ACID });
+  // estela de garras ácidas hacia atrás
+  for (let p = 0; p < 12; p++) {
     particles.push({
       x: player.x + rand(-6, 6), y: player.y + rand(-6, 6),
-      vx: rand(-2, 2), vy: rand(-2, 2),
-      life: 24, max: 24, color: '#8e3', r: 4
+      vx: -Math.cos(angle) * rand(1, 3), vy: -Math.sin(angle) * rand(1, 3),
+      life: 24, max: 24, color: rand(0, 1) > 0.5 ? SM_ACID : SM_SKIN, r: 4
     });
   }
 }
@@ -3312,33 +3366,55 @@ function arrowAttack(angle) {
 // 7. Frenesí de Estocadas — combo rápido de 5 estocadas, +60% velocidad pasiva
 function flurryAttack(angle) {
   if (flurryQueue > 0) return;
-  flurryQueue = 5;
+  flurryQueue = 7;            // tromba de 7 estocadas
   flurryTimer = 0;
   flurryAngle = angle;
+  player.iframe = Math.max(player.iframe, 12);  // arranca la esquiva
 }
 
 function processFlurry() {
   if (flurryQueue <= 0) return;
   flurryTimer--;
-  if (flurryTimer <= 0) {
-    const a = flurryAngle + rand(-0.05, 0.05);
-    // estocada: avanza un pelín y golpea adelante
-    player.x += Math.cos(a) * 10;
-    player.y += Math.sin(a) * 10;
-    punchAttack(a, 48, 160, 5, '#fef');
-    const tx = player.x + Math.cos(a) * 48;
-    const ty = player.y + Math.sin(a) * 48;
-    effects.push({ type: 'punch', x: tx, y: ty, life: 7, max: 7, color: '#fef' });
-    for (let p = 0; p < 4; p++) {
-      particles.push({
-        x: player.x + rand(-4,4), y: player.y + rand(-4,4),
-        vx: -Math.cos(a) * 2, vy: -Math.sin(a) * 2,
-        life: 12, max: 12, color: '#fef', r: 2
-      });
+  if (flurryTimer > 0) return;
+  // reapunta suavemente al cursor para encadenar la tromba
+  const aim = aimAngle();
+  let da = aim - flurryAngle;
+  while (da > Math.PI) da -= 2 * Math.PI;
+  while (da < -Math.PI) da += 2 * Math.PI;
+  flurryAngle += da * 0.5;
+  const a = flurryAngle;
+  const isFinisher = flurryQueue === 1;
+  // dash que atraviesa
+  player.x += Math.cos(a) * (isFinisher ? 24 : 16);
+  player.y += Math.sin(a) * (isFinisher ? 24 : 16);
+  player.x = Math.max(player.r, Math.min(W - player.r, player.x));
+  player.y = Math.max(player.r, Math.min(H - player.r, player.y));
+  player.iframe = Math.max(player.iframe, 6);   // i-frames durante toda la tromba
+  if (isFinisher) {
+    // CORTE FINAL: gran abanico + onda de choque
+    punchAttack(a, 56, 440, 10, '#fff', 62);
+    const fx = player.x + Math.cos(a) * 44, fy = player.y + Math.sin(a) * 44;
+    effects.push({ type: 'shockwave', x: fx, y: fy, life: 22, max: 22, r: 0, color: '#fef' });
+    effects.push({ type: 'flash', life: 12, max: 12, color: '#fff' });
+    shake = Math.max(shake, 12);
+    for (let p = 0; p < 12; p++) {
+      particles.push({ x: fx, y: fy, vx: rand(-5, 5), vy: rand(-5, 5), life: 18, max: 18, color: '#fef', r: 2 });
     }
-    flurryQueue--;
-    flurryTimer = 3;
+  } else {
+    punchAttack(a, 52, 155, 6, '#fef', 42);
   }
+  const tx = player.x + Math.cos(a) * 52, ty = player.y + Math.sin(a) * 52;
+  effects.push({ type: 'punch', x: tx, y: ty, life: 7, max: 7, color: '#fef' });
+  // estela de after-image
+  for (let p = 0; p < 5; p++) {
+    particles.push({
+      x: player.x + rand(-5, 5), y: player.y + rand(-5, 5),
+      vx: -Math.cos(a) * 3, vy: -Math.sin(a) * 3,
+      life: 12, max: 12, color: '#fef', r: 2
+    });
+  }
+  flurryQueue--;
+  flurryTimer = 2;   // encadenado más rápido
 }
 
 // 11. Don del Milagro — marca 10 enemigos con milagro aleatorio + 30% HP de daño
@@ -3491,20 +3567,35 @@ function electricScream() {
   shake = Math.max(shake, 22);
 }
 
-// 7. Bala Incendiaria — bala que deja hoguera por 10s
+// 7. Bala Incendiaria — bola de fuego con rastro que estalla en hoguera y prende
 function fireAttack(angle) {
   projectiles.push({
     x: player.x + Math.cos(angle) * 18,
     y: player.y + Math.sin(angle) * 18,
     vx: Math.cos(angle) * 9, vy: Math.sin(angle) * 9,
-    r: 7, dmg: 120, life: 90, type: 'firebullet', color: '#f73', trail: []
+    r: 8, dmg: 130, life: 80, type: 'firebullet', color: '#f73', trail: [],
+    angle, lastTrail: 0
   });
 }
 
-function createFire(x, y) {
-  fires.push({ x, y, life: 600, max: 600, r: 70 });
+// Prende a un enemigo: daño continuo (quemadura) durante unos segundos.
+function igniteEnemy(e, dur = 180, dps = 6) {
+  if (e.ally) return;
+  e.burn = Math.max(e.burn || 0, dur);
+  e.burnDmg = Math.max(e.burnDmg || 0, dps);
+}
+
+function createFire(x, y, r = 74) {
+  fires.push({ x, y, life: 600, max: 600, r });
   shake = Math.max(shake, 6);
-  for (let p = 0; p < 10; p++) {
+  // al nacer, prende y daña a los enemigos dentro
+  for (let j = 0; j < enemies.length; j++) {
+    const e = enemies[j];
+    if (e.ally) continue;
+    const rr = r + e.r;
+    if (distSq(e, { x, y }) < rr * rr) { damageEnemy(e, 24, '#f83'); igniteEnemy(e); }
+  }
+  for (let p = 0; p < 12; p++) {
     particles.push({
       x, y,
       vx: rand(-3, 3), vy: rand(-3, 3),
@@ -3521,7 +3612,7 @@ function updateFires() {
       const e = enemies[j];
       if (e.ally) continue;
       const rr = f.r + e.r;
-      if (distSq(e, f) < rr * rr) damageEnemy(e, 2.2, '#f73');
+      if (distSq(e, f) < rr * rr) { damageEnemy(e, 2.2, '#f73'); igniteEnemy(e, 90, 5); }
     }
     if (frame % 2 === 0) {
       const a = Math.random() * Math.PI * 2;
@@ -4009,28 +4100,61 @@ function emeraldAttack(angle) {
   projectiles.push({
     x: player.x + Math.cos(angle) * 18,
     y: player.y + Math.sin(angle) * 18,
-    vx: Math.cos(angle) * 13, vy: Math.sin(angle) * 13,
-    r: 5, dmg: 30, life: 75, type: 'emerald', color: '#4f8', trail: []
+    vx: Math.cos(angle) * 14, vy: Math.sin(angle) * 14,
+    r: 6, dmg: 42, life: 70, type: 'emerald', color: '#4f8', trail: [],
+    hits: new Set(), pierce: 3, shards: true
   });
+}
+
+// Salpica esquirlas de esmeralda teledirigidas hacia otros enemigos (cadena)
+function spawnEmeraldShards(from, n) {
+  const others = enemies
+    .filter(o => !o.ally && o !== from && o.hp > 0)
+    .sort((a, b) => distSq(a, from) - distSq(b, from))
+    .slice(0, n);
+  if (others.length > 0) {
+    for (const o of others) {
+      const a = angleBetween(from, o);
+      projectiles.push({
+        x: from.x, y: from.y, vx: Math.cos(a) * 8, vy: Math.sin(a) * 8,
+        r: 4, dmg: 22, life: 55, type: 'emeraldshard', color: '#6f8', trail: [],
+        target: o, hits: new Set()
+      });
+    }
+  } else {
+    // sin más objetivos: dispersa en abanico
+    for (let s = 0; s < 3; s++) {
+      const a = (s / 3) * Math.PI * 2 + Math.random();
+      projectiles.push({
+        x: from.x, y: from.y, vx: Math.cos(a) * 8, vy: Math.sin(a) * 8,
+        r: 4, dmg: 22, life: 45, type: 'emeraldshard', color: '#6f8', trail: [],
+        target: null, hits: new Set()
+      });
+    }
+  }
 }
 
 function processWebMode() {
   if (webModeTimer <= 0) return;
   webModeTimer--;
-  // cada 18 frames cada enemigo dispara 5 esmeraldas en direcciones aleatorias
-  if (frame % 18 === 0) {
+  player.iframe = Math.max(player.iframe, 3);   // ligera protección durante la tormenta
+  // bombardeo teledirigido: esquirlas a los enemigos más cercanos
+  if (frame % 10 === 0) {
+    const targets = enemies.filter(e => !e.ally && e.hp > 0).slice(0, 6);
+    for (const e of targets) {
+      const a = angleBetween(player, e);
+      projectiles.push({
+        x: player.x, y: player.y, vx: Math.cos(a) * 9, vy: Math.sin(a) * 9,
+        r: 4, dmg: 20, life: 60, type: 'emeraldshard', color: '#6f8', trail: [],
+        target: e, hits: new Set()
+      });
+    }
+  }
+  // enreda a los enemigos cercanos (telaraña de esmeralda)
+  if (frame % 30 === 0) {
     for (let j = 0; j < enemies.length; j++) {
       const e = enemies[j];
-      if (e.ally) continue;
-      for (let i = 0; i < 5; i++) {
-        const a = Math.random() * Math.PI * 2;
-        const ca = Math.cos(a), sa = Math.sin(a);
-        projectiles.push({
-          x: e.x + ca * (e.r + 12), y: e.y + sa * (e.r + 12),
-          vx: ca * 7, vy: sa * 7,
-          r: 4, dmg: 12, life: 60, type: 'emerald', color: '#6f8', trail: []
-        });
-      }
+      if (!e.ally && distSq(e, player) < 230 * 230) snareEnemy(e, 45);
     }
   }
 }
@@ -4697,6 +4821,13 @@ function updateEnemies() {
     if (e.geOvercharge > 0) e.geOvercharge--;
     if (e.wet > 0) e.wet--;
     if (e.snared > 0) { e.snared--; if (frame % 15 === 0) damageEnemy(e, 3, SF_TEAL); }
+    if (e.burn > 0) {
+      e.burn--;
+      if (frame % 12 === 0) damageEnemy(e, e.burnDmg || 5, '#f83');
+      if (frame % 5 === 0) {
+        particles.push({ x: e.x + rand(-e.r, e.r), y: e.y, vx: rand(-0.6, 0.6), vy: -1.6 - Math.random() * 1.6, life: 18, max: 18, color: Math.random() > 0.5 ? '#f73' : '#fc4', r: 2 });
+      }
+    }
     if (e.tied > 0) e.tied--;
     if (e.frozen > 0) { e.frozen--; return; }
     // rocas pegadas: más tiempo = más daño
@@ -4738,11 +4869,14 @@ function updateEnemies() {
     if (e.blinded > 0) e.blinded--;
     if (e.infected > 0) {
       e.infected--;
-      if (frame % 6 === 0) {
+      // la plaga corroe: daño continuo hasta que eclosiona en dino al morir
+      if (frame % 18 === 0) damageEnemy(e, Math.max(7, e.maxHp * 0.015), SM_INFECT);
+      // venas tóxicas: partículas púrpura/ácido burbujeando
+      if (frame % 4 === 0) {
         particles.push({
           x: e.x + rand(-e.r, e.r), y: e.y + rand(-e.r, e.r),
           vx: rand(-1, 1), vy: rand(-2, 0),
-          life: 18, max: 18, color: '#8e3', r: 2
+          life: 20, max: 20, color: Math.random() > 0.5 ? SM_INFECT : SM_ACID, r: 2
         });
       }
     }
@@ -4756,7 +4890,12 @@ function updateEnemies() {
         const dSq = distSq(e, other);
         if (dSq < bestSq) { bestSq = dSq; target = other; }
       }
-      const speedMult = e.dino ? 2.0 : (e.zombie ? 1.6 : 1.4);
+      const dinoFrenzy = e.dino && dinoFrenzyTimer > 0;
+      const speedMult = e.dino ? (dinoFrenzy ? 3.3 : 2.0) : (e.zombie ? 1.6 : 1.4);
+      // rastro de frenesí bajo el dino
+      if (dinoFrenzy && frame % 3 === 0) {
+        particles.push({ x: e.x, y: e.y, vx: rand(-1, 1), vy: rand(-1, 1), life: 12, max: 12, color: SM_ACID, r: 2 });
+      }
       if (target) {
         const a = angleBetween(e, target);
         const sp = e.speed * speedMult;
@@ -4776,14 +4915,15 @@ function updateEnemies() {
         const rr = e.r + other.r + 2;
         if (distSq(other, e) < rr * rr) {
           if (e.dino) {
-            damageEnemy(other, 4, '#8e3');
+            damageEnemy(other, dinoFrenzy ? 8 : 4, SM_ACID);
             if (e.biteCD <= 0) {
-              // mordida fuerte cada 30 frames
-              damageEnemy(other, 90, '#cf6');
+              // mordida fuerte; en frenesí muerde más rápido, más fuerte e infecta
+              damageEnemy(other, dinoFrenzy ? 150 : 90, SM_ACID);
+              if (dinoFrenzy) infectEnemy(other, 180);
               other.vx += (other.x - e.x) * 0.06;
               other.vy += (other.y - e.y) * 0.06;
-              effects.push({ type: 'punch', x: other.x, y: other.y, life: 7, max: 7, color: '#cf6' });
-              e.biteCD = 30;
+              effects.push({ type: 'punch', x: other.x, y: other.y, life: 7, max: 7, color: dinoFrenzy ? SM_BLOOD : SM_ACID });
+              e.biteCD = dinoFrenzy ? 16 : 30;
             }
           } else if (e.zombie) {
             damageEnemy(other, 3, '#7c4');
@@ -5324,6 +5464,55 @@ function updateEnemies() {
       }
     }
 
+    // ---- Élites: comportamiento propio ----
+    if (e.type === 'shade') {
+      // acechador: se lanza en embestidas rápidas cada pocos segundos
+      if (e.dashCD === undefined) e.dashCD = 80 + Math.random() * 90;
+      if (e.bossDashTimer > 0) e.bossDashTimer--;
+      else if (--e.dashCD <= 0) {
+        if (distSq(tgt, e) < 460 * 460) {
+          e.bossDashTimer = 16;
+          e.dashCD = 100 + Math.random() * 80;
+          effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 12, max: 12, r: 0, color: '#a6f' });
+        } else e.dashCD = 24;
+      }
+    } else if (e.type === 'healer') {
+      // sanador: cura a los enemigos cercanos y a sí mismo
+      if ((frame + e.id) % 90 === 0) {
+        let healed = false;
+        for (let j = 0; j < enemies.length; j++) {
+          const o = enemies[j];
+          if (o.ally || o.hp <= 0) continue;
+          if (o.hp < o.maxHp && distSq(o, e) < 180 * 180) {
+            o.hp = Math.min(o.maxHp, o.hp + Math.ceil(o.maxHp * 0.05) + 6);
+            healed = true;
+            effects.push({ type: 'debuff', x: o.x, y: o.y - o.r - 6, value: '＋', life: 16, max: 16 });
+          }
+        }
+        if (healed) effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 20, max: 20, r: 0, color: '#4f8' });
+      }
+    } else if (e.type === 'sniper') {
+      // francotirador: carga una bala potente y telegrafiada
+      if (e.snipePhase === undefined) { e.snipePhase = 0; e.snipeCD = 120; }
+      if (e.snipePhase === 0) {
+        if (--e.snipeCD <= 0 && distSq(tgt, e) < 720 * 720) {
+          e.snipePhase = 1; e.snipeTimer = 55; e.snipeAngle = angleBetween(e, tgt);
+        }
+      } else {
+        e.snipeTimer--;
+        e.snipeAngle = angleBetween(e, tgt); // sigue apuntando
+        if (e.snipeTimer <= 0) {
+          const a = e.snipeAngle;
+          projectiles.push({
+            x: e.x, y: e.y, vx: Math.cos(a) * 11, vy: Math.sin(a) * 11,
+            r: 6, dmg: e.dmg * 1.7, life: 220, type: 'enemy', color: '#c7f'
+          });
+          effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 14, max: 14, r: 0, color: '#c7f' });
+          e.snipePhase = 0; e.snipeCD = 150;
+        }
+      }
+    }
+
     let tx = tgt.x, ty = tgt.y;             // objetivo ya calculado arriba (tgt)
     if (e.spinning > 0 && e.vortexTarget) {
       e.spinning--;
@@ -5365,7 +5554,7 @@ function updateEnemies() {
       if (e.y > H - e.r) { e.y = H - e.r; if (e.vy > 0) e.vy = -e.vy * 0.4; }
     }
 
-    if (e.ranged && e.spinning <= 0 && !e.blinded) {
+    if (e.ranged && e.spinning <= 0 && !e.blinded && e.type !== 'healer' && e.type !== 'sniper') {
       e.shootTimer++;
       const period = e.type === 'boss' ? 50 : 110;
       if (e.shootTimer > period) {
@@ -5395,6 +5584,10 @@ function updateEnemies() {
           particles.push({ x: e.x, y: e.y, vx: rand(-3,3), vy: rand(-3,3), life: 22, max: 22, color: '#f44', r: 3 });
         }
       }
+      // gélido: te congela/ralentiza al tocarte
+      if (e.type === 'frostling') player.slowed = Math.max(player.slowed, 100);
+      // kamikaze: al tocarte, estalla (muere y detona en el bloque de muerte)
+      if (e.type === 'bomber') e.hp = 0;
     }
 
     if (e.spinning > 0) {
@@ -5589,6 +5782,38 @@ function updateEnemies() {
       if (active === 2 && owned.has(2) && !e.bossKind && !e.ally && stones.length < 40) {
         spawnStone(e.x, e.y, e.r);
       }
+      // KAMIKAZE: estalla al morir dañando al jugador y a los enemigos cercanos
+      if (e.type === 'bomber') {
+        const ex = e.x, ey = e.y, boomR = 78;
+        if (distSq(player, e) < boomR * boomR) tryDamagePlayer(e.dmg * 2.2 * enemyDmgMult, 45, 16);
+        for (let k = 0; k < enemies.length; k++) {
+          const o = enemies[k];
+          if (o === e || o.ally || o.hp <= 0) continue;
+          if (Math.hypot(o.x - ex, o.y - ey) < boomR + o.r) damageEnemy(o, 30, '#f83');
+        }
+        effects.push({ type: 'shockwave', x: ex, y: ey, life: 24, max: 24, r: 0, color: '#f72' });
+        effects.push({ type: 'flash', life: 14, max: 14, color: '#f83' });
+        for (let p = 0; p < 18; p++) {
+          particles.push({ x: ex, y: ey, vx: rand(-6, 6), vy: rand(-6, 6), life: 26, max: 26, color: p % 2 ? '#f72' : '#fd4', r: 3 });
+        }
+      }
+      // DIVISOR: al morir se parte en dos crías rápidas
+      if (e.type === 'splitter') {
+        for (let s = 0; s < 2; s++) {
+          const a = Math.random() * Math.PI * 2;
+          enemies.push({
+            ...ENEMY_TYPES.spawnling,
+            id: nextEnemyId++,
+            x: e.x + Math.cos(a) * 18, y: e.y + Math.sin(a) * 18,
+            hp: ENEMY_TYPES.spawnling.hp, maxHp: ENEMY_TYPES.spawnling.hp,
+            type: 'spawnling', ranged: false,
+            vx: Math.cos(a) * 2, vy: Math.sin(a) * 2,
+            frozen: 0, spinning: 0, spinAngle: 0, shootTimer: 0,
+            bossKind: null, bossName: null, armor: 0, entered: true,
+          });
+        }
+        effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 16, max: 16, r: 0, color: '#3cc' });
+      }
       // poder: detonación — el enemigo explota al morir dañando alrededor
       if (permaStacks.explode > 0) {
         const ex = e.x, ey = e.y;
@@ -5628,12 +5853,15 @@ function convertToAlly(e, isDino) {
   if (isDino) {
     e.dino = true;
     e.biteCD = 0;
-    effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 18, max: 18, r: 0, color: '#8e3' });
-    for (let p = 0; p < 14; p++) {
+    // ECLOSIÓN: estallido de plaga + hueso
+    effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 22, max: 22, r: 0, color: SM_ACID });
+    effects.push({ type: 'shockwave', x: e.x, y: e.y, life: 16, max: 16, r: 0, color: SM_INFECT });
+    for (let p = 0; p < 18; p++) {
+      const c = Math.random() < 0.4 ? SM_INFECT : (Math.random() < 0.5 ? SM_ACID : SM_BONE);
       particles.push({
         x: e.x, y: e.y,
-        vx: rand(-3, 3), vy: rand(-3, 3),
-        life: 28, max: 28, color: '#8e3', r: 3
+        vx: rand(-4, 4), vy: rand(-4, 4),
+        life: 30, max: 30, color: c, r: 3
       });
     }
   }
@@ -5959,6 +6187,50 @@ function updateProjectiles() {
           p.hits.add(e.id);
         }
       }
+    } else if (p.type === 'emerald') {
+      // esmeralda: atraviesa hasta `pierce` enemigos y salpica esquirlas en cada golpe
+      for (let j = 0; j < enemies.length; j++) {
+        const e = enemies[j];
+        if (e.ally || p.hits.has(e.id)) continue;
+        const rr = e.r + p.r;
+        if (distSq(e, p) < rr * rr) {
+          damageEnemy(e, p.dmg, '#4f8');
+          p.hits.add(e.id);
+          if (p.shards) spawnEmeraldShards(e, 2);
+          for (let s = 0; s < 4; s++) {
+            particles.push({ x: e.x, y: e.y, vx: rand(-3, 3), vy: rand(-3, 3), life: 14, max: 14, color: Math.random() > 0.5 ? '#4f8' : '#cfe', r: 2 });
+          }
+          p.pierce = (p.pierce || 1) - 1;
+          if (p.pierce <= 0) { consumed = true; break; }
+        }
+      }
+    } else if (p.type === 'emeraldshard') {
+      // esquirla teledirigida hacia su objetivo (o el más cercano)
+      if (!p.target || p.target.dead || p.target.ally || p.target.hp <= 0) {
+        let nearest = null, bestSq = 1e18;
+        for (let j = 0; j < enemies.length; j++) {
+          const e = enemies[j];
+          if (e.ally || p.hits.has(e.id)) continue;
+          const dSq = distSq(e, p);
+          if (dSq < bestSq) { bestSq = dSq; nearest = e; }
+        }
+        p.target = nearest;
+      }
+      if (p.target) {
+        const ang = angleBetween(p, p.target);
+        p.vx = p.vx * 0.82 + Math.cos(ang) * 9 * 0.34;
+        p.vy = p.vy * 0.82 + Math.sin(ang) * 9 * 0.34;
+      }
+      for (let j = 0; j < enemies.length; j++) {
+        const e = enemies[j];
+        if (e.ally || p.hits.has(e.id)) continue;
+        const rr = e.r + p.r;
+        if (distSq(e, p) < rr * rr) {
+          damageEnemy(e, p.dmg, '#6f8');
+          consumed = true;
+          break;
+        }
+      }
     } else if (p.type === 'smoke') {
       for (let j = 0; j < enemies.length; j++) {
         const e = enemies[j];
@@ -5972,13 +6244,26 @@ function updateProjectiles() {
         }
       }
     } else if (p.type === 'firebullet') {
+      // deja rastro de mini-llamas mientras vuela
+      if ((p.lastTrail = (p.lastTrail || 0) + 1) >= 5) {
+        p.lastTrail = 0;
+        fires.push({ x: p.x, y: p.y, life: 200, max: 200, r: 34 });
+      }
       for (let j = 0; j < enemies.length; j++) {
         const e = enemies[j];
         if (e.ally) continue;
         const rr = e.r + p.r;
         if (distSq(e, p) < rr * rr) {
           damageEnemy(e, p.dmg, '#f73');
-          createFire(p.x, p.y);
+          igniteEnemy(e);
+          createFire(p.x, p.y, 86);   // hoguera grande al impactar
+          // estallido: daña y prende en área
+          for (let k = 0; k < enemies.length; k++) {
+            const o = enemies[k];
+            if (o === e || o.ally || o.hp <= 0) continue;
+            if (distSq(o, p) < 92 * 92) { damageEnemy(o, 45, '#f83'); igniteEnemy(o); }
+          }
+          effects.push({ type: 'flash', life: 14, max: 14, color: '#f83' });
           consumed = true;
           break;
         }
@@ -7656,10 +7941,16 @@ function draw() {
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }
-    if (p.type === 'emerald') {
+    if (p.type === 'emerald' || p.type === 'emeraldshard') {
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(Math.atan2(p.vy, p.vx) + Math.PI/4);
+      // resplandor
+      const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, p.r * 2.4);
+      gr.addColorStop(0, 'rgba(120, 255, 170, 0.6)');
+      gr.addColorStop(1, 'rgba(80, 255, 140, 0)');
+      ctx.fillStyle = gr;
+      ctx.beginPath(); ctx.arc(0, 0, p.r * 2.4, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = p.color;
       ctx.fillRect(-p.r, -p.r, p.r*2, p.r*2);
       ctx.strokeStyle = '#cfe';
@@ -7994,13 +8285,15 @@ function draw() {
       ctx.globalAlpha = 0.15;
     }
     if (e.ally) {
-      ctx.fillStyle = e.dino ? '#6b3' : (e.zombie ? '#5a3' : '#5cf');
+      ctx.fillStyle = e.dino ? SM_SKIN : (e.zombie ? '#5a3' : '#5cf');
       ctx.globalAlpha = 0.5 + 0.5 * Math.min(1, e.allyLife / 60);
     } else if (e.zeroLoop) {
       const pul = 0.5 + 0.5 * Math.sin(frame * 0.5 + e.id);
       ctx.fillStyle = `rgb(${Math.floor(40 + 50 * pul)}, 8, 14)`;
     } else if (e.infected > 0) {
-      ctx.fillStyle = '#5a3';
+      // carne enferma que late entre verde pantano y púrpura plaga
+      const sick = 0.5 + 0.5 * Math.sin(frame * 0.25 + e.id);
+      ctx.fillStyle = sick > 0.6 ? SM_INFECT : SM_DARK;
     } else if (e.frozen > 0 || timeStopTimer > 0) {
       ctx.fillStyle = '#aaf';
     } else {
@@ -8064,6 +8357,71 @@ function draw() {
       ctx.fill();
       ctx.restore();
     }
+    // ---- Élites: rasgos visuales propios ----
+    if (!e.ally && e.frozen <= 0 && timeStopTimer === 0) {
+      if (e.type === 'shade') {
+        // acechador: estela oscura + ojos rojos; brilla al embestir
+        const dashing = e.bossDashTimer > 0;
+        ctx.strokeStyle = dashing ? '#f4f' : 'rgba(150,110,220,0.6)';
+        ctx.lineWidth = dashing ? 3 : 2;
+        ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 3 + (dashing ? 3 : 0), 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = '#f66';
+        ctx.beginPath(); ctx.arc(e.x - 4, e.y - 2, 1.8, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(e.x + 4, e.y - 2, 1.8, 0, Math.PI * 2); ctx.fill();
+      } else if (e.type === 'bomber') {
+        // kamikaze: parpadea más rápido cuanto más cerca del jugador
+        const near = distSq(player, e) < 200 * 200;
+        const blink = 0.5 + 0.5 * Math.sin(frame * (near ? 0.6 : 0.2));
+        ctx.strokeStyle = `rgba(255,${Math.floor(120 + 80 * blink)},40,${0.5 + 0.4 * blink})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 4, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center';
+        ctx.fillText('💥', e.x, e.y + 4); ctx.textAlign = 'left';
+      } else if (e.type === 'healer') {
+        // sanador: cruz verde + halo pulsante
+        const pul = 0.5 + 0.5 * Math.sin(frame * 0.12 + e.id);
+        ctx.strokeStyle = `rgba(80,240,150,${0.4 + 0.3 * pul})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 5 + pul * 2, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = '#dff';
+        ctx.fillRect(e.x - 2, e.y - 6, 4, 12);
+        ctx.fillRect(e.x - 6, e.y - 2, 12, 4);
+      } else if (e.type === 'splitter') {
+        // divisor: burbuja gelatinosa con línea de fractura
+        ctx.strokeStyle = 'rgba(80,230,220,0.7)';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(e.x, e.y - e.r); ctx.lineTo(e.x, e.y + e.r); ctx.stroke();
+        ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 2, 0, Math.PI * 2); ctx.stroke();
+      } else if (e.type === 'frostling') {
+        // gélido: cristales de hielo alrededor
+        ctx.strokeStyle = 'rgba(150,240,255,0.85)';
+        ctx.lineWidth = 2;
+        for (let s = 0; s < 6; s++) {
+          const a = frame * 0.02 + (s / 6) * Math.PI * 2;
+          ctx.beginPath();
+          ctx.moveTo(e.x + Math.cos(a) * e.r, e.y + Math.sin(a) * e.r);
+          ctx.lineTo(e.x + Math.cos(a) * (e.r + 6), e.y + Math.sin(a) * (e.r + 6));
+          ctx.stroke();
+        }
+      } else if (e.type === 'sniper') {
+        // francotirador: mira roja durante la carga
+        if (e.snipePhase === 1) {
+          const a = e.snipeAngle || 0;
+          ctx.strokeStyle = `rgba(255,60,60,${0.4 + 0.4 * Math.sin(frame * 0.4)})`;
+          ctx.lineWidth = 2;
+          ctx.setLineDash([6, 6]);
+          ctx.beginPath();
+          ctx.moveTo(e.x, e.y);
+          ctx.lineTo(e.x + Math.cos(a) * 700, e.y + Math.sin(a) * 700);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        ctx.strokeStyle = 'rgba(200,130,255,0.7)';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 3, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
     // zombie nocturno: aura verde y ojos brillantes
     if (e.type === 'zombie' && !e.ally) {
       const pul = 0.5 + 0.5 * Math.sin(frame * 0.12 + e.id);
@@ -8123,12 +8481,13 @@ function draw() {
     }
     // espinas de dinosaurio (aliado dino o infectado)
     if ((e.dino && e.ally) || (e.infected > 0 && !e.ally)) {
-      ctx.fillStyle = e.dino ? '#cf6' : '#8e3';
+      const frenzyGlow = e.dino && dinoFrenzyTimer > 0;
+      ctx.fillStyle = frenzyGlow ? SM_BLOOD : (e.dino ? SM_ACID : SM_INFECT);
       const spikes = 7;
       for (let s = 0; s < spikes; s++) {
         const ang = (s / spikes) * Math.PI * 2 + frame * 0.02;
         const r0 = e.r;
-        const r1 = e.r + (e.dino ? 7 : 5);
+        const r1 = e.r + (e.dino ? 8 : 5) + (frenzyGlow ? 2 : 0);
         ctx.beginPath();
         ctx.moveTo(e.x + Math.cos(ang - 0.15) * r0, e.y + Math.sin(ang - 0.15) * r0);
         ctx.lineTo(e.x + Math.cos(ang) * r1, e.y + Math.sin(ang) * r1);
@@ -8136,11 +8495,15 @@ function draw() {
         ctx.closePath(); ctx.fill();
       }
       if (e.dino && e.ally) {
-        // ojos pequeños de dinosaurio
-        ctx.fillStyle = '#fd4';
+        // ojos depredadores ámbar
+        ctx.fillStyle = SM_EYE;
         const dEye = e.r * 0.4;
-        ctx.beginPath(); ctx.arc(e.x - dEye, e.y - dEye * 0.4, 2.2, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(e.x + dEye, e.y - dEye * 0.4, 2.2, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(e.x - dEye, e.y - dEye * 0.4, 2.4, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(e.x + dEye, e.y - dEye * 0.4, 2.4, 0, Math.PI * 2); ctx.fill();
+        // pupila
+        ctx.fillStyle = '#200';
+        ctx.beginPath(); ctx.arc(e.x - dEye, e.y - dEye * 0.4, 1, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(e.x + dEye, e.y - dEye * 0.4, 1, 0, Math.PI * 2); ctx.fill();
       }
     }
 
@@ -8148,8 +8511,8 @@ function draw() {
     const w = e.r * 2;
     if (e.ally) {
       const allyMax = e.dino ? 2400 : 1800;
-      const barColor = e.dino ? '#cf6' : (e.zombie ? '#7c4' : '#5cf');
-      ctx.fillStyle = e.dino ? '#240' : (e.zombie ? '#132' : '#024');
+      const barColor = e.dino ? SM_ACID : (e.zombie ? '#7c4' : '#5cf');
+      ctx.fillStyle = e.dino ? SM_DARK : (e.zombie ? '#132' : '#024');
       ctx.fillRect(e.x - w / 2, e.y - e.r - 9, w, 4);
       ctx.fillStyle = barColor;
       ctx.fillRect(e.x - w / 2, e.y - e.r - 9, w * (e.allyLife / allyMax), 4);
@@ -8349,6 +8712,21 @@ function draw() {
       ctx.fillStyle = 'rgba(180,230,255,0.4)';
       ctx.beginPath(); ctx.arc(ox, oy, 11, 0, Math.PI * 2); ctx.fill();
     }
+  }
+  // after-images del POUNCE de Plaga Primigenia (estela depredadora)
+  for (let i = dashGhosts.length - 1; i >= 0; i--) {
+    const g = dashGhosts[i];
+    const al = g.life / g.max;
+    ctx.globalAlpha = al * 0.5;
+    ctx.fillStyle = SM_ACID;
+    ctx.beginPath(); ctx.arc(g.x, g.y, player.r, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = al * 0.7;
+    ctx.strokeStyle = SM_INFECT;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(g.x, g.y, player.r + 2, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+    g.life--;
+    if (g.life <= 0) dashGhosts.splice(i, 1);
   }
   // after-images del Paso Lunar (Rey del Pop) — se dibujan detrás del jugador
   for (let i = mjGhosts.length - 1; i >= 0; i--) {
@@ -9123,44 +9501,54 @@ function draw() {
   // Plaga Primigenia: APEX PREDATOR cutscene
   if (apexPhase === 1 || apexPhase === 2) {
     const total = apexPhase === 1 ? 1 - apexTimer / 70 : 1;
-    // fondo selva oscura
-    ctx.fillStyle = `rgba(8, 24, 10, ${0.6 * total})`;
+    // fondo: abismo enfermo + viñeta de sangre pulsante
+    ctx.fillStyle = `rgba(6, 14, 6, ${0.74 * total})`;
     ctx.fillRect(0, 0, W, H);
-    // siluetas de huellas/garras flotando
-    for (let i = 0; i < 18; i++) {
-      const baseA = i / 18 * Math.PI * 2;
-      const orbR = 220 + Math.sin(frame * 0.06 + i) * 40;
+    const vig = ctx.createRadialGradient(W / 2, H / 2, H * 0.18, W / 2, H / 2, H * 0.78);
+    const vigA = (0.30 + 0.22 * Math.sin(frame * 0.3)) * total;
+    vig.addColorStop(0, 'rgba(0,0,0,0)');
+    vig.addColorStop(1, `rgba(150, 18, 30, ${vigA})`);
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, W, H);
+    // garras flotando (ácido + plaga)
+    for (let i = 0; i < 20; i++) {
+      const baseA = i / 20 * Math.PI * 2;
+      const orbR = 210 + Math.sin(frame * 0.06 + i) * 46;
       const gx = W / 2 + Math.cos(baseA + frame * 0.015) * orbR;
       const gy = H / 2 + Math.sin(baseA + frame * 0.015) * orbR;
       ctx.save();
       ctx.translate(gx, gy);
       ctx.rotate(frame * 0.03 + i);
-      ctx.fillStyle = `rgba(140, 230, 80, ${0.5 * total})`;
-      // garra triple
+      ctx.fillStyle = (i % 3 === 0) ? `rgba(193, 79, 224, ${0.5 * total})` : `rgba(166, 226, 46, ${0.5 * total})`;
       for (let k = -1; k <= 1; k++) {
         ctx.beginPath();
-        ctx.moveTo(k * 7, -10);
-        ctx.lineTo(k * 7 - 2, 6);
-        ctx.lineTo(k * 7 + 2, 6);
+        ctx.moveTo(k * 7, -12);
+        ctx.lineTo(k * 7 - 2, 8);
+        ctx.lineTo(k * 7 + 2, 8);
         ctx.closePath(); ctx.fill();
       }
       ctx.restore();
     }
-    // silueta del T-Rex detrás del jugador
-    const px = player.x;
+    // T-Rex depredador: embiste hacia adelante y la mandíbula CHASQUEA
+    const lunge = apexPhase === 2 ? (1 - apexTimer / 30) : 0;
+    const jaw = apexPhase === 1
+      ? (10 + Math.abs(Math.sin(frame * 0.2)) * 20) * total   // fauces abiertas rugiendo
+      : (apexTimer > 14 ? 30 : 3);                            // CHASQUIDO al morder
+    const px = player.x + lunge * 46;
     const py = player.y - 30;
-    const scale = 1 + total * 0.6;
+    const scale = 1 + total * 0.6 + lunge * 0.16;
     ctx.save();
     ctx.translate(px, py);
     ctx.scale(scale, scale);
-    const auraR = 200;
-    const aurag = ctx.createRadialGradient(0, 0, 20, 0, 0, auraR);
-    aurag.addColorStop(0, `rgba(140, 230, 80, ${0.55 * total})`);
-    aurag.addColorStop(1, 'rgba(40, 90, 20, 0)');
+    // aura tóxica (ácido → plaga)
+    const aurag = ctx.createRadialGradient(0, 0, 20, 0, 0, 210);
+    aurag.addColorStop(0, `rgba(166, 226, 46, ${0.5 * total})`);
+    aurag.addColorStop(0.6, `rgba(120, 40, 150, ${0.28 * total})`);
+    aurag.addColorStop(1, 'rgba(20, 40, 10, 0)');
     ctx.fillStyle = aurag;
-    ctx.beginPath(); ctx.arc(0, 0, auraR, 0, Math.PI * 2); ctx.fill();
-    // cuerpo del dinosaurio (lateral)
-    ctx.fillStyle = `rgba(110, 180, 60, ${0.92 * total})`;
+    ctx.beginPath(); ctx.arc(0, 0, 210, 0, Math.PI * 2); ctx.fill();
+    // cuerpo del dinosaurio (carne de pantano)
+    ctx.fillStyle = `rgba(45, 90, 30, ${0.95 * total})`;
     ctx.beginPath();
     ctx.moveTo(-90, 20);
     ctx.lineTo(-50, -10);
@@ -9177,37 +9565,49 @@ function draw() {
     ctx.lineTo(-90, 35);
     ctx.closePath();
     ctx.fill();
-    // cabeza con mandíbula
-    ctx.fillStyle = `rgba(120, 200, 70, ${total})`;
+    // venas de plaga
+    ctx.strokeStyle = `rgba(193, 79, 224, ${0.6 * total})`;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(75, -18);
-    ctx.lineTo(150, -10);
-    ctx.lineTo(155, 8);
-    ctx.lineTo(95, 12);
+    ctx.moveTo(-40, 10); ctx.lineTo(0, -6); ctx.lineTo(40, 4);
+    ctx.moveTo(-20, 42); ctx.lineTo(20, 30);
+    ctx.stroke();
+    // MANDÍBULA SUPERIOR
+    ctx.fillStyle = `rgba(60, 110, 36, ${total})`;
+    ctx.beginPath();
+    ctx.moveTo(75, -18); ctx.lineTo(150, -14); ctx.lineTo(156, -2); ctx.lineTo(95, 2);
     ctx.closePath(); ctx.fill();
-    // dientes
-    ctx.fillStyle = `rgba(255, 250, 220, ${total})`;
+    // MANDÍBULA INFERIOR (se abre según `jaw`)
+    ctx.beginPath();
+    ctx.moveTo(95, 6 + jaw * 0.2); ctx.lineTo(152, 2 + jaw); ctx.lineTo(150, 14 + jaw); ctx.lineTo(95, 14 + jaw * 0.2);
+    ctx.closePath(); ctx.fill();
+    // dientes superiores (hueso)
+    ctx.fillStyle = `rgba(239, 230, 194, ${total})`;
     for (let t = 0; t < 6; t++) {
       const tx = 100 + t * 9;
       ctx.beginPath();
-      ctx.moveTo(tx, 12);
-      ctx.lineTo(tx + 3, 22);
-      ctx.lineTo(tx + 6, 12);
+      ctx.moveTo(tx, 2); ctx.lineTo(tx + 3, 11); ctx.lineTo(tx + 6, 2);
       ctx.closePath(); ctx.fill();
     }
-    // ojo amarillo
-    ctx.fillStyle = `rgba(255, 220, 80, ${total})`;
-    ctx.beginPath(); ctx.arc(120, -6, 5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = `rgba(20, 10, 0, ${total})`;
+    // dientes inferiores
+    for (let t = 0; t < 5; t++) {
+      const tx = 104 + t * 9;
+      const by = 12 + jaw * 0.2;
+      ctx.beginPath();
+      ctx.moveTo(tx, by + 2); ctx.lineTo(tx + 3, by - 7); ctx.lineTo(tx + 6, by + 2);
+      ctx.closePath(); ctx.fill();
+    }
+    // ojo depredador ámbar
+    ctx.fillStyle = `rgba(255, 176, 32, ${total})`;
+    ctx.beginPath(); ctx.arc(120, -6, 5.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = `rgba(20, 6, 0, ${total})`;
     ctx.beginPath(); ctx.arc(122, -6, 2.4, 0, Math.PI * 2); ctx.fill();
-    // espinas dorsales
-    ctx.fillStyle = `rgba(180, 240, 100, ${total})`;
+    // espinas dorsales ácidas
+    ctx.fillStyle = `rgba(166, 226, 46, ${total})`;
     const spines = [[-40, -16], [-10, -24], [25, -30], [55, -26]];
     for (const [sx, sy] of spines) {
       ctx.beginPath();
-      ctx.moveTo(sx - 6, sy + 6);
-      ctx.lineTo(sx, sy - 12);
-      ctx.lineTo(sx + 6, sy + 6);
+      ctx.moveTo(sx - 6, sy + 6); ctx.lineTo(sx, sy - 14); ctx.lineTo(sx + 6, sy + 6);
       ctx.closePath(); ctx.fill();
     }
     ctx.restore();
@@ -9216,12 +9616,12 @@ function draw() {
       const t = total;
       ctx.font = `bold ${44 + t * 26}px monospace`;
       ctx.textAlign = 'center';
-      ctx.shadowColor = '#8e3';
-      ctx.shadowBlur = 22;
+      ctx.shadowColor = SM_INFECT;
+      ctx.shadowBlur = 26;
       ctx.fillStyle = `rgba(200, 255, 140, ${Math.min(1, t * 2)})`;
       ctx.fillText('PLAGA PRIMIGENIA', W / 2, 84);
       ctx.font = `bold 16px monospace`;
-      ctx.fillStyle = `rgba(160, 230, 120, ${Math.min(1, t * 1.8)})`;
+      ctx.fillStyle = `rgba(209, 130, 224, ${Math.min(1, t * 1.8)})`;
       ctx.fillText('— el rey come a los reyes. —', W / 2, 114);
       ctx.shadowBlur = 0;
       ctx.textAlign = 'left';
@@ -9230,9 +9630,9 @@ function draw() {
       const size = 60 + t * 80;
       ctx.font = `bold ${size}px monospace`;
       ctx.textAlign = 'center';
-      ctx.shadowColor = '#cf6';
-      ctx.shadowBlur = 32;
-      ctx.fillStyle = `rgba(220, 255, 150, ${Math.min(1, t * 2.5)})`;
+      ctx.shadowColor = SM_BLOOD;
+      ctx.shadowBlur = 34;
+      ctx.fillStyle = `rgba(255, 210, 120, ${Math.min(1, t * 2.5)})`;
       ctx.fillText('APEX PREDATOR!', W / 2, H / 2 + 14);
       ctx.shadowBlur = 0;
       ctx.textAlign = 'left';
@@ -12051,6 +12451,7 @@ function restart() {
   timeStopTimer = 0; timeStopCD = 0; rewindCD = 0; shortRewindCD = 0;
   shieldCharge = SHIELD_MAX; shieldCD = 0; shieldActive = false;
   dashTimer = 0; dashHits = new Set();
+  dashGhosts = []; dashComboWindow = 0; dinoFrenzyTimer = 0;
   mjForm = 0; mjDashTimer = 0; mjDashHits = new Set(); mjPunchQueue = 0; mjPunchTimer = 0; mjGhosts = [];
   lassoTimer = 0; lassoHits = new Set();
   apexPhase = 0; apexTimer = 0; apexCD = 0;
