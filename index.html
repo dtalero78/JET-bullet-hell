@@ -416,7 +416,7 @@ const ABILITIES = [
   { id: 'steelball',   name: '15. Pelota de Acero',        cost: 470,
     desc: 'Bola verde metálica giratoria que rebota en bordes y curva su trayectoria. F: Lesson 3 — bola dorada que rebota entre enemigos con daño escalado (CD 8s).', color: '#4fe07a' },
   { id: 'dash',        name: '16. Plaga Primigenia',         cost: 900,
-    desc: 'Mordida-dash que infecta enemigos. Los infectados al morir se vuelven DINOSAURIOS aliados (más veloces, mordida en área). R: APEX PREDATOR — cutscene + rugido que aturde y daña a todos en pantalla, infecta supervivientes y recarga la vida de los dinos (CD 25s).', color: '#6b3' },
+    desc: 'POUNCE depredador que infecta: la plaga corroe y los infectados ECLOSIONAN en DINOSAURIOS aliados. Encadena embestidas (combo) y desata el FRENESÍ de la manada (más veloces, muerden e infectan). R: APEX PREDATOR — rugido que aturde y daña a todos, infecta supervivientes y recarga a los dinos (CD 25s).', color: '#5ab0e6' },
   { id: 'mirage',      name: '17. Vida Dorada', cost: 5000,
     desc: 'Vida Dorada: balas de vida dorada. K: INÚTIL INÚTIL INÚTIL — lluvia de puños de vida en área; los supervivientes quedan SOBRECARGADOS y reciben +80% de daño durante 5s (CD 7s). 4000 kills → Réquiem Dorado: clics mejores + R: RETURN TO ZERO — 30s inmune; todo enemigo que te ataque cae en un bucle de muerte infinito que se contagia al contacto y, al acabar, todos mueren (los bosses reciben mucho daño).', color: '#fd0' },
   { id: 'rewind',      name: '18. Carmesí Inmortal', cost: 4800,
@@ -604,14 +604,14 @@ let rewindFrame = 0;
 let dashTimer = 0;
 let dashAngle = 0;
 let dashHits = new Set();
-// --- Plaga Primigenia (Scary Monsters) — paleta tóxica/plaga + estado ---
-const SM_DARK   = '#16300f';  // piel oscura de pantano
-const SM_SKIN   = '#3f6b24';  // carne del dino
-const SM_ACID   = '#a6e22e';  // verde ácido (espinas / borde)
-const SM_BONE   = '#efe6c2';  // hueso / dientes
-const SM_INFECT = '#c14fe0';  // púrpura plaga (venas / infección)
-const SM_BLOOD  = '#d11e33';  // sangre / peligro
-const SM_EYE    = '#ffb020';  // ojo depredador ámbar
+// --- Plaga Primigenia (Scary Monsters) — paleta azul celeste / violeta / dorado ---
+const SM_DARK   = '#2a1e4a';  // base violeta oscuro
+const SM_SKIN   = '#4aa8e6';  // azul celeste (cuerpo)
+const SM_ACID   = '#9d6cf2';  // violeta brillante (espinas / energía / borde)
+const SM_BONE   = '#f2e4b0';  // hueso dorado pálido (dientes)
+const SM_INFECT = '#7b3fd4';  // violeta profundo (infección / venas)
+const SM_BLOOD  = '#ffcf40';  // dorado (impactos / remates / peligro)
+const SM_EYE    = '#ffcf40';  // ojo depredador dorado
 let dashGhosts = [];          // estela de la embestida (after-images)
 let dashComboWindow = 0;      // ventana para encadenar otra embestida
 let dinoFrenzyTimer = 0;      // frenesí de la manada tras tu embestida
@@ -9501,16 +9501,16 @@ function draw() {
   // Plaga Primigenia: APEX PREDATOR cutscene
   if (apexPhase === 1 || apexPhase === 2) {
     const total = apexPhase === 1 ? 1 - apexTimer / 70 : 1;
-    // fondo: abismo enfermo + viñeta de sangre pulsante
-    ctx.fillStyle = `rgba(6, 14, 6, ${0.74 * total})`;
+    // fondo: abismo violeta + viñeta pulsante
+    ctx.fillStyle = `rgba(20, 14, 40, ${0.74 * total})`;
     ctx.fillRect(0, 0, W, H);
     const vig = ctx.createRadialGradient(W / 2, H / 2, H * 0.18, W / 2, H / 2, H * 0.78);
     const vigA = (0.30 + 0.22 * Math.sin(frame * 0.3)) * total;
     vig.addColorStop(0, 'rgba(0,0,0,0)');
-    vig.addColorStop(1, `rgba(150, 18, 30, ${vigA})`);
+    vig.addColorStop(1, `rgba(120, 60, 210, ${vigA})`);
     ctx.fillStyle = vig;
     ctx.fillRect(0, 0, W, H);
-    // garras flotando (ácido + plaga)
+    // garras flotando (celeste + violeta)
     for (let i = 0; i < 20; i++) {
       const baseA = i / 20 * Math.PI * 2;
       const orbR = 210 + Math.sin(frame * 0.06 + i) * 46;
@@ -9519,7 +9519,7 @@ function draw() {
       ctx.save();
       ctx.translate(gx, gy);
       ctx.rotate(frame * 0.03 + i);
-      ctx.fillStyle = (i % 3 === 0) ? `rgba(193, 79, 224, ${0.5 * total})` : `rgba(166, 226, 46, ${0.5 * total})`;
+      ctx.fillStyle = (i % 3 === 0) ? `rgba(157, 108, 242, ${0.5 * total})` : `rgba(90, 180, 235, ${0.5 * total})`;
       for (let k = -1; k <= 1; k++) {
         ctx.beginPath();
         ctx.moveTo(k * 7, -12);
@@ -9540,15 +9540,15 @@ function draw() {
     ctx.save();
     ctx.translate(px, py);
     ctx.scale(scale, scale);
-    // aura tóxica (ácido → plaga)
+    // aura (celeste → violeta)
     const aurag = ctx.createRadialGradient(0, 0, 20, 0, 0, 210);
-    aurag.addColorStop(0, `rgba(166, 226, 46, ${0.5 * total})`);
-    aurag.addColorStop(0.6, `rgba(120, 40, 150, ${0.28 * total})`);
-    aurag.addColorStop(1, 'rgba(20, 40, 10, 0)');
+    aurag.addColorStop(0, `rgba(90, 180, 235, ${0.5 * total})`);
+    aurag.addColorStop(0.6, `rgba(120, 60, 200, ${0.30 * total})`);
+    aurag.addColorStop(1, 'rgba(30, 20, 60, 0)');
     ctx.fillStyle = aurag;
     ctx.beginPath(); ctx.arc(0, 0, 210, 0, Math.PI * 2); ctx.fill();
-    // cuerpo del dinosaurio (carne de pantano)
-    ctx.fillStyle = `rgba(45, 90, 30, ${0.95 * total})`;
+    // cuerpo del dinosaurio (azul celeste)
+    ctx.fillStyle = `rgba(60, 140, 210, ${0.95 * total})`;
     ctx.beginPath();
     ctx.moveTo(-90, 20);
     ctx.lineTo(-50, -10);
@@ -9565,15 +9565,15 @@ function draw() {
     ctx.lineTo(-90, 35);
     ctx.closePath();
     ctx.fill();
-    // venas de plaga
-    ctx.strokeStyle = `rgba(193, 79, 224, ${0.6 * total})`;
+    // venas violetas
+    ctx.strokeStyle = `rgba(157, 108, 242, ${0.7 * total})`;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(-40, 10); ctx.lineTo(0, -6); ctx.lineTo(40, 4);
     ctx.moveTo(-20, 42); ctx.lineTo(20, 30);
     ctx.stroke();
-    // MANDÍBULA SUPERIOR
-    ctx.fillStyle = `rgba(60, 110, 36, ${total})`;
+    // MANDÍBULA SUPERIOR (azul más oscuro)
+    ctx.fillStyle = `rgba(42, 100, 165, ${total})`;
     ctx.beginPath();
     ctx.moveTo(75, -18); ctx.lineTo(150, -14); ctx.lineTo(156, -2); ctx.lineTo(95, 2);
     ctx.closePath(); ctx.fill();
@@ -9581,8 +9581,8 @@ function draw() {
     ctx.beginPath();
     ctx.moveTo(95, 6 + jaw * 0.2); ctx.lineTo(152, 2 + jaw); ctx.lineTo(150, 14 + jaw); ctx.lineTo(95, 14 + jaw * 0.2);
     ctx.closePath(); ctx.fill();
-    // dientes superiores (hueso)
-    ctx.fillStyle = `rgba(239, 230, 194, ${total})`;
+    // dientes superiores (dorado pálido)
+    ctx.fillStyle = `rgba(245, 228, 160, ${total})`;
     for (let t = 0; t < 6; t++) {
       const tx = 100 + t * 9;
       ctx.beginPath();
@@ -9597,13 +9597,13 @@ function draw() {
       ctx.moveTo(tx, by + 2); ctx.lineTo(tx + 3, by - 7); ctx.lineTo(tx + 6, by + 2);
       ctx.closePath(); ctx.fill();
     }
-    // ojo depredador ámbar
-    ctx.fillStyle = `rgba(255, 176, 32, ${total})`;
+    // ojo depredador dorado
+    ctx.fillStyle = `rgba(255, 207, 64, ${total})`;
     ctx.beginPath(); ctx.arc(120, -6, 5.5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = `rgba(20, 6, 0, ${total})`;
+    ctx.fillStyle = `rgba(20, 10, 0, ${total})`;
     ctx.beginPath(); ctx.arc(122, -6, 2.4, 0, Math.PI * 2); ctx.fill();
-    // espinas dorsales ácidas
-    ctx.fillStyle = `rgba(166, 226, 46, ${total})`;
+    // espinas dorsales violetas
+    ctx.fillStyle = `rgba(157, 108, 242, ${total})`;
     const spines = [[-40, -16], [-10, -24], [25, -30], [55, -26]];
     for (const [sx, sy] of spines) {
       ctx.beginPath();
@@ -9618,10 +9618,10 @@ function draw() {
       ctx.textAlign = 'center';
       ctx.shadowColor = SM_INFECT;
       ctx.shadowBlur = 26;
-      ctx.fillStyle = `rgba(200, 255, 140, ${Math.min(1, t * 2)})`;
+      ctx.fillStyle = `rgba(140, 210, 255, ${Math.min(1, t * 2)})`;
       ctx.fillText('PLAGA PRIMIGENIA', W / 2, 84);
       ctx.font = `bold 16px monospace`;
-      ctx.fillStyle = `rgba(209, 130, 224, ${Math.min(1, t * 1.8)})`;
+      ctx.fillStyle = `rgba(255, 216, 120, ${Math.min(1, t * 1.8)})`;
       ctx.fillText('— el rey come a los reyes. —', W / 2, 114);
       ctx.shadowBlur = 0;
       ctx.textAlign = 'left';
@@ -11747,7 +11747,7 @@ function drawUI() {
       else if (!e.ally && e.infected > 0) infected++;
     }
     if (dinos > 0 || infected > 0) {
-      ctx.fillStyle = '#cf6';
+      ctx.fillStyle = SM_SKIN;
       ctx.fillText(`🦖${dinos} · 🦠${infected}`, 480, 33);
     }
   }
