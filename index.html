@@ -81,6 +81,7 @@
     position: fixed; top: 80px; right: 20px;
     background: rgba(20,20,40,0.95); border: 2px solid #aa4; border-radius: 8px;
     padding: 14px; min-width: 280px; color: #fff; font-size: 13px; z-index: 9; display: none;
+    max-height: calc(100vh - 100px); overflow-y: auto;
   }
   #sandbox-panel h3 { margin: 0 0 8px 0; color: #ff4; }
   #sandbox-panel button { background: #aa4; color: #111; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; margin: 2px; font-family: monospace; }
@@ -234,6 +235,7 @@
   <div class="row" style="margin-top:6px;">
     <button id="sb-coin-rain" style="background:#fc4;">💰 Lluvia de monedas</button>
     <button id="sb-boss-rush" style="background:#f48;">⚔ BOSS RUSH</button>
+    <button id="sb-final-duel" style="background:#822; color:#fff; box-shadow:0 0 8px #f44;">🎯 DUELO FINAL (ola 100)</button>
   </div>
   <div class="row" style="margin-top:4px;">
     <button id="sb-raid-brutal" style="background:#fd6;">🦁 Invocar Raid BRUTAL</button>
@@ -386,11 +388,11 @@ const player = {
 
 const ABILITIES = [
   { id: 'whip',     name: '1. Látigo Eléctrico Morado', cost: 0,
-    desc: 'Latigazo eléctrico que restalla en línea y encadena daño entre enemigos. Con 50 kills desbloqueas una 2ª forma: pulsa C para cambiar los clicks a un LÁTIGO-CUERDA eléctrico (como Oh! Lonesome Me pero morado): te jala hasta el punto dañando en el camino, y a quien sobreviva lo deja PARALIZADO 5s.', color: '#c4f' },
+    desc: 'Latigazo eléctrico que restalla en línea y encadena daño entre enemigos. Con 50 kills desbloqueas una 2ª forma: pulsa C para cambiar los clicks a un LÁTIGO-CUERDA eléctrico (un latigazo-cuerda morado): te jala hasta el punto dañando en el camino, y a quien sobreviva lo deja PARALIZADO 5s.', color: '#c4f' },
   { id: 'threads',  name: '2. Hilo Liberado',              cost: 120,
-    desc: 'Stone Free (Jolyne). Click: RÁFAGA de puños "ORAORAORA" a corta distancia + un tendón de hilo que ATRAVIESA y ENREDA (inmoviliza + daño continuo), tejiendo telaraña entre los atrapados. DESPERTAR a los 40 kills: los hilos atraviesan más, la telaraña CAZA balas enemigas (las corta) y la Ruptura crece. Y: RUPTURA DE HILOS — cutscene + hilos en 360° que enredan alrededor (CD 15s).', color: '#2cb' },
+    desc: 'Tejedora de hilos. Click: RÁFAGA de puños a corta distancia + un tendón de hilo que ATRAVIESA y ENREDA (inmoviliza + daño continuo), tejiendo telaraña entre los atrapados. DESPERTAR a los 40 kills: los hilos atraviesan más, la telaraña CAZA balas enemigas (las corta) y la Ruptura crece. Y: RUPTURA DE HILOS — cutscene + hilos en 360° que enredan alrededor (CD 15s).', color: '#2cb' },
   { id: 'breaker',  name: '3. Puños Rompedores',        cost: 180,
-    desc: 'Crazy Diamond (Josuke). Click: barrage "DORARARARA" de puños limpios. A cada enemigo que MATAS lo fusionas en una ROCA que bloquea el paso (como la Roca de Angelo). DESPERTAR a los 40 kills: RESTAURACIÓN — pulsa C para restaurar el campo: devuelve las balas enemigas cercanas como esquirlas y cura a los aliados al máximo (Josuke no puede curarse a sí mismo). CD 12s.', color: '#f8c' },
+    desc: 'Puños restauradores. Click: barrage de puños limpios. A cada enemigo que MATAS lo fusionas en una ROCA que bloquea el paso. DESPERTAR a los 40 kills: RESTAURACIÓN — pulsa C para restaurar el campo: devuelve las balas enemigas cercanas como esquirlas y cura a los aliados al máximo (no puedes curarte a ti mismo). CD 12s.', color: '#f8c' },
   { id: 'rain',     name: '4. Tormenta Torrencial',           cost: 400,
     desc: 'Una nube te sigue ENCIMA y su lluvia se vuelve arma: daña sola a los enemigos a tu alrededor (posiciónate para mojarlos). CLICK: RELÁMPAGO dirigido al cursor (área + parálisis; +daño a los mojados). Mojar y golpear carga el medidor DILUVIO; al llenarlo, pulsa O para desatar la TORMENTA FINAL que cubre la pantalla 5s.', color: '#69c' },
   { id: 'arrow',    name: '5. Flechas Perforantes',     cost: 25,
@@ -404,7 +406,7 @@ const ABILITIES = [
   { id: 'emerald',     name: '9. Esmeraldas',              cost: 450,
     desc: 'Esmeralda que ATRAVIESA hasta 3 enemigos y en cada golpe SALPICA esquirlas teledirigidas que rebotan a otros (cadena). J: TORMENTA DE ESMERALDAS 8s — bombardeo teledirigido + enreda a los cercanos (CD 45s).', color: '#4f8' },
   { id: 'nutking',     name: '10. Pernos Letales',          cost: 470,
-    desc: '3 pernos por click; cada hit clava un NUT al enemigo (hasta 5 stacks). C: DISASSEMBLE — cutscene + desensambla a todos los marcados (250 × nuts de daño + paralizados 1s) (CD 18s).', color: '#c97' },
+    desc: '3 pernos por click; cada hit clava un PERNO al enemigo (hasta 5 stacks). C: DESENSAMBLAR — cutscene + desensambla a todos los marcados (250 × nuts de daño + paralizados 1s) (CD 18s).', color: '#c97' },
   { id: 'spirit',      name: '11. Furia Eléctrica',   cost: 500,
     desc: 'Rayo encadenado rojo-amarillo que salta entre enemigos, paraliza 0.5s y acumula CARGA ELÉCTRICA (hasta 10). P: Electric Scream — cutscene + descarga TODAS las cargas en una tormenta que pega a todos los enemigos, daño escalado por cargas (CD 15s).', color: '#f63' },
   { id: 'bounty',      name: '12. Don del Milagro',            cost: 750,
@@ -418,17 +420,17 @@ const ABILITIES = [
   { id: 'dash',        name: '16. Plaga Primigenia',         cost: 900,
     desc: 'POUNCE depredador que infecta: la plaga corroe y los infectados ECLOSIONAN en DINOSAURIOS aliados. Encadena embestidas (combo) y desata el FRENESÍ de la manada (más veloces, muerden e infectan). R: APEX PREDATOR — rugido que aturde y daña a todos, infecta supervivientes y recarga a los dinos (CD 25s).', color: '#5ab0e6' },
   { id: 'mirage',      name: '17. Vida Dorada', cost: 5000,
-    desc: 'Vida Dorada: balas de vida dorada. K: INÚTIL INÚTIL INÚTIL — lluvia de puños de vida en área; los supervivientes quedan SOBRECARGADOS y reciben +80% de daño durante 5s (CD 7s). 4000 kills → Réquiem Dorado: clics mejores + R: RETURN TO ZERO — 30s inmune; todo enemigo que te ataque cae en un bucle de muerte infinito que se contagia al contacto y, al acabar, todos mueren (los bosses reciben mucho daño).', color: '#fd0' },
+    desc: 'Vida Dorada: balas de vida dorada. K: LLUVIA RADIANTE — lluvia de puños de vida en área; los supervivientes quedan SOBRECARGADOS y reciben +80% de daño durante 5s (CD 7s). 4000 kills → Réquiem Radiante: clics mejores + R: REGRESO A CERO — 30s inmune; todo enemigo que te ataque cae en un bucle de muerte infinito que se contagia al contacto y, al acabar, todos mueren (los bosses reciben mucho daño).', color: '#fd0' },
   { id: 'rewind',      name: '18. Carmesí Inmortal', cost: 4800,
     desc: 'Puños carmesí brutales que golpean en área. T: 10s inmortal + tiempo borrado, los enemigos del futuro aparecen en el centro (CD 90s).', color: '#d02' },
   { id: 'vortex',      name: '19. Uña Espiral',                   cost: 2200,
-    desc: 'Poder evolutivo de el Jinete. Act 1: par de uñas en V que perforan 1 + U: TORNADO DE UÑAS (16 uñas en 360°). 50 kills → Act 2 (uñas más fuertes + Y: NAIL STORM). 100 kills → Act 3 (uñas-wormhole que perforan dimensiones + Z: WORMHOLE PUNCH). 150 kills → Act 4: G alterna PUÑOS dorados (daño + empuje) y BALAS hiper-veloces (doradas, casi invisibles, con orbes y estela); ambos dejan al enemigo en GIRO INFINITO recibiendo daño hasta morir. V: GOLDEN RATIO. T: cicla entre Actos desbloqueados.', color: '#fd6' },
+    desc: 'Poder evolutivo del Jinete Fantasma. Fase 1: par de uñas en V que perforan 1 + U: TORNADO DE UÑAS (16 uñas en 360°). 50 kills → Fase 2 (uñas más fuertes + Y: TORMENTA DE UÑAS). 100 kills → Fase 3 (uñas-túnel que perforan dimensiones + Z: PUÑO-AGUJERO). 150 kills → Fase 4: G alterna PUÑOS dorados (daño + empuje) y BALAS hiper-veloces (doradas, casi invisibles, con orbes y estela); ambos dejan al enemigo en GIRO INFINITO recibiendo daño hasta morir. V: PROPORCIÓN ÁUREA. T: cicla entre Fases desbloqueadas.', color: '#fd6' },
   { id: 'd4c',         name: '20. Copias Dimensionales',                    cost: 1200,
-    desc: 'Lanza copias dimensionales en paralelo: 3 estrellas que atraviesan enemigos desde universos alternos. L: BARRERA DORADA — cutscene + 10s de barrera de rayos dorados que te cubre: refleja balas enemigas (×4 daño) y daña/empuja a todo enemigo que toca el halo (CD 90s).', color: '#f06' },
+    desc: 'Salta entre dimensiones. Cada click abre GRIETAS dimensionales — 3 estrellas rojo/blanco/azul salen hacia adelante y, además, COPIAS de universos paralelos emergen junto a los enemigos más cercanos y los golpean por el flanco. C: cambia los clicks a BANDERA EXPLOSIVA — un puño saca una bandera y la dispara al enemigo; estalla en BLANCO Y NEGRO (daño en área). L: BARRERA DORADA — cutscene + 10s de barrera de rayos dorados que te cubre: refleja balas enemigas (×4 daño) y daña/empuja a todo enemigo que toca el halo (CD 90s).', color: '#f06' },
   { id: 'starplatinum', name: '21. Puño Estelar',         cost: 1800,
-    desc: 'Ráfaga GOLPE GOLPE GOLPE — 8 puños ultra rápidos en línea con golpe final masivo. R: cutscene "MUNDO DETENIDO" — paraliza el tiempo 12s (CD 25s).', color: '#93f' },
+    desc: 'Ráfaga GOLPE GOLPE GOLPE — 8 puños ultra rápidos en línea con golpe final masivo. C: cambia los clicks a TORBELLINO ESTELAR — un cono de succión corto que sale hacia el cursor (como si aspiraras con la boca); mantén el click y ARRASTRA hacia ti a los enemigos de enfrente, dañándolos (no disparas mientras chupa). R: cutscene "MUNDO DETENIDO" — paraliza el tiempo 12s (CD 25s).', color: '#93f' },
   { id: 'theworld',    name: '22. Mundo Detenido',        cost: 1800,
-    desc: 'Lanza cuchillos voladores. Durante la parada de tiempo, los cuchillos se quedan flotando y al terminar salen disparados a toda velocidad. Z: cutscene "ALTO TEMPORAL!" — paraliza el tiempo 12s (CD 25s).', color: '#fd2' },
+    desc: 'Lanza cuchillos voladores. Durante la parada de tiempo, los cuchillos se quedan flotando y al terminar salen disparados a toda velocidad. C: cambia los clicks a PUÑOS ANULADORES — la misma ráfaga del Puño Estelar pero amarilla y gritando ¡NULO NULO!. Z: cutscene "ALTO TEMPORAL!" — paraliza el tiempo 12s (CD 25s).', color: '#fd2' },
   { id: 'detonate',    name: '23. Reina Explosiva',           cost: 1000,
     desc: 'Touch Bombs rosadas teledirigidas que se pegan al enemigo y detonan tras 1.5s (daño en área). G: Vuelta Mortal — cutscene + onda final que mata todo en pantalla, invulnerable durante el ritual + cura 30% HP (CD 2min).', color: '#f48' },
   { id: 'smoke',       name: '24. Cortina de Humo',        cost: 1010,
@@ -438,15 +440,17 @@ const ABILITIES = [
   { id: 'wonder',      name: '26. Calamidad',            cost: 3000,
     desc: 'Rocas teledirigidas que se pegan (+daño con el tiempo). N: tira carros. X: calamidad mata todo (CD 2min).', color: '#c30' },
   { id: 'pucci',       name: '27. Disco del Alma → Gravedad Lunar → Cielo Acelerado', cost: 4500,
-    desc: 'Poder evolutivo del el Sacerdote. Empieza como Disco del Alma (disco blanco DISC + K: ONCE DISCOS). 500 kills desbloquea Gravedad Lunar (discos lunares teledirigidos que aturden + M: GRAVITY INVERSION). 2000 kills más desbloquea Cielo Acelerado (velocidad sobrehumana + H: HEAVEN ASCENSION). L: cicla entre las poderes desbloqueados.', color: '#ddd' },
+    desc: 'Poder evolutivo del Sacerdote Oscuro. Empieza como Disco del Alma (disco blanco DISCO + K: ONCE DISCOS). 500 kills desbloquea Gravedad Lunar (discos lunares teledirigidos que aturden + M: INVERSIÓN GRAVITATORIA). 2000 kills más desbloquea Cielo Acelerado (velocidad sobrehumana + H: ASCENSIÓN CELESTE). L: cicla entre los poderes desbloqueados.', color: '#ddd' },
   { id: 'paintblack',  name: '28. Mancha Negra',         cost: 4500,
-    desc: 'Dispara 5 balas negras que dejan charcos: enemigo tocado muere, sobrevivientes quedan MANCHADOS (paralizados y dañados al salir según tiempo en charco). De noche: balas y charcos con contorno arcoíris neón, velocidad y daño aumentados. P: DÍA → bala gigante de pintura, cutscene "BLACK, EVERYTHING MUST BE BLACK" + X negra en el corazón = muerte instantánea por presión. NOCHE → dash de hitbox total mientras grita BLACK en ráfaga (CD 35s).', color: '#000' },
+    desc: 'Dispara 5 balas negras que dejan charcos: enemigo tocado muere, sobrevivientes quedan MANCHADOS (paralizados y dañados al salir según tiempo en charco). De noche: balas y charcos con contorno arcoíris neón, velocidad y daño aumentados. P: DÍA → bala gigante de pintura, cutscene "TODO DEBE VOLVERSE NEGRO" + X negra en el corazón = muerte instantánea por presión. NOCHE → dash de hitbox total mientras grita ¡NEGRO! en ráfaga (CD 35s).', color: '#000' },
   { id: 'michael',     name: '29. Rey del Pop',           cost: 8000,
     desc: 'El nuevo mejor poder: tres estilos que ciclas con M. THRILLER (puños) — combo de golpes ENORMES; cada enemigo que matas se levanta como un ZOMBIE bailarín aliado que ataca a los demás. PASO LUNAR (dash) — embestida hacia adelante con daño devastador, invulnerable y dejando estela de imágenes. CRIMINAL (balazos) — ráfaga densa de 7 disparos dorados súper rápidos y perforantes. Pulsa M para rotar entre los tres estilos.', color: '#e33' },
   { id: 'lonesome', name: 'Oh! Lonesome Me (Cuerda)', cost: 250,
     desc: 'Lanza una cuerda hacia el cursor: se engancha donde cae y te jala hasta ahi como un dash, danando a los enemigos en el camino. Quien sobreviva al tiron queda AMARRADO 5s sin poder moverse.', color: '#cb6' },
   { id: 'pistols', name: 'Balas Vivientes', cost: 300,
-    desc: 'Sex Pistols (Mista). Los 6 Pistols numerados Nº1, 2, 3, 5, 6 y 7 (sin el 4, que Mista odia) flotan a tu alrededor. CLICK dispara: si la bala pasa por un Pistol, este la PATEA hacia el enemigo mas cercano (banco canon) y rebota entre enemigos con daño creciente. V: recolocar los 6 Pistols.', color: '#fd0' },
+    desc: 'Seis balas-duende vivientes numeradas Nº1, 2, 3, 5, 6 y 7 (sin el 4, que el pistolero odia) flotan a tu alrededor. CLICK dispara: si la bala pasa por una de ellas, la PATEA hacia el enemigo más cercano (rebote calculado) y rebota entre enemigos con daño creciente. V: recolocar las 6 balas.', color: '#fd0' },
+  { id: 'zipper', name: 'Cierre Relámpago', cost: 650,
+    desc: 'Click: PUÑOS. A cada enemigo que MATAS con el puño se lo traga tu BOLSILLO (máx 100). Z: LIBERAS a todos de golpe, muertos, saliendo volando y dañando a los enemigos — cuantos más tengas guardados, más daño. Si el bolsillo se llena, los siguientes salen disparados muertos solos (y eso NO gasta el cooldown de Z). CD 6s.', color: '#2fb8e6' },
 ];
 
 // Orden de la TIENDA (y de la cadena de compra), desacoplado del indice de juego.
@@ -470,6 +474,7 @@ const SHOP_ORDER = [
   10,  // Furia Eléctrica
   12,  // Eco Temporal
   13,  // Calor Cinético
+  31,  // Cierre Relámpago
   11,  // Don del Milagro
   15,  // Plaga Primigenia (requiere Pelota de Acero antes)
   22,  // Reina Explosiva
@@ -631,6 +636,7 @@ let flurryAngle = 0;
 
 let smokeFogTimer = 0;
 let smokeFogCD = 0;
+let zipperCD = 0;   // CD de CIERRE TOTAL (Cierre Relámpago)
 const smokeClouds = [];
 
 let webModeTimer = 0;
@@ -691,7 +697,7 @@ let mihSpeedBoost = 0;   // frames remaining of x3 speed buff from H ult
 let tuskAct = 1;                              // 1, 2, 3 o 4
 let tuskForm = 0;                             // Acto 4: 0 = puños dorados, 1 = balas hiper-veloces (G alterna)
 const tuskUnlocked = new Set([1]);            // arranca solo Act 1
-const ESPIRAL_LABELS = ['', 'Espiral Acto 1', 'Espiral Acto 2', 'Espiral Acto 3', 'Espiral Acto 4'];
+const ESPIRAL_LABELS = ['', 'Espiral Fase 1', 'Espiral Fase 2', 'Espiral Fase 3', 'Espiral Fase 4'];
 const ESPIRAL_COLORS = ['', '#fea', '#fd9', '#fc7', '#fd6'];
 let tuskA1Kills = 0;
 let tuskA2Kills = 0;
@@ -714,9 +720,14 @@ let lesson3CD = 0;
 
 let starPlatinumPhase = 0; // 0 idle, 1 ALTO TEMPORAL charge, 2 MUNDO DETENIDO flash, 3 time stopped
 let starPlatinumTimer = 0;
+let starVortexMode = false; // C: los clicks pasan a ser un TORBELLINO ESTELAR (chupa + daña, no dispara)
+let theWorldFistMode = false; // C (Mundo Detenido): cambia cuchillos por ráfaga de puños MUDA amarillos
+let d4cFlagMode = false;      // C (D4C): cambia clicks por puños que disparan una BANDERA que explota en blanco y negro
 let oraQueue = 0;
 let oraTimer = 0;
 let oraAngle = 0;
+let oraColor = '#b07bff';   // estilo del barrage (morado ORA / amarillo MUDA)
+let oraWord = 'TOMA';
 
 let dioPhase = 0;
 let dioTimer = 0;
@@ -1204,6 +1215,8 @@ function spawnZombieHorde(n) {
 function startWave() {
   wave++;
   waveActive = true;
+  // Oleada 100 — DUELO FINAL (solo un jugador; en co-op sigue el flujo normal).
+  if (wave === 100 && !(net.active && net.mode === 'normal')) { startFinalDuel(); return; }
   // poder: guardia — escudo de invulnerabilidad al empezar la oleada
   if (permaStacks.ward > 0) player.iframe = Math.max(player.iframe, 40 + permaStacks.ward * 35);
   // poder: barrera — recarga el escudo que absorbe daño
@@ -1273,7 +1286,10 @@ function updateWave() {
     const r = Math.random();
     if (wave % 5 === 0 && enemiesToSpawn === waveInitialSpawn) {
       const bIdx = Math.floor(wave / 5) - 1;
-      type = BOSS_CYCLE[bIdx % BOSS_CYCLE.length];
+      // Primera vuelta (olas 5..65): jefes en ORDEN. Al agotarse el ciclo: jefe ALEATORIO cada 5 olas.
+      type = bIdx < BOSS_CYCLE.length
+        ? BOSS_CYCLE[bIdx]
+        : BOSS_CYCLE[Math.floor(Math.random() * BOSS_CYCLE.length)];
     }
     else if (wave > 8 && r < 0.07) type = 'brute';
     else if (wave > 9 && r < 0.12) type = 'sniper';
@@ -1393,6 +1409,7 @@ function updatePlayer() {
   processThreadCombo();
   updateSfWeb();
   processOraBarrage();
+  updateStarVortex();
   processMjPunch();
   processMjDash();
   processLasso();
@@ -1544,6 +1561,17 @@ function updatePlayer() {
     timeStopCD = 60 * 25;
     shake = 14;
   }
+  if (active === 20 && keyPressed['c']) {
+    // Puño Estelar — cambiar clicks: ráfaga ORA ↔ TORBELLINO ESTELAR (chupa y daña)
+    starVortexMode = !starVortexMode;
+    oraQueue = 0; oraTimer = 0; // corta cualquier ráfaga en curso al cambiar
+    shockwave(player.x, player.y, starVortexMode ? '#c8f' : '#93f', 22);
+    for (let k = 0; k < 6; k++) {
+      const ka = k * Math.PI / 3;
+      effects.push({ type: 'sfstar', x: player.x + Math.cos(ka) * 26, y: player.y + Math.sin(ka) * 26,
+        r: 14, rot: ka, life: 20, max: 20, color: SP_PURPLE });
+    }
+  }
   if (active === 15 && keyPressed['r'] && apexCD <= 0) {
     // Plaga Primigenia: APEX PREDATOR — cutscene
     apexPhase = 1;
@@ -1557,6 +1585,17 @@ function updatePlayer() {
     dioTimer = 90;
     timeStopCD = 60 * 25;
     shake = 14;
+  }
+  if (active === 21 && keyPressed['c']) {
+    // Mundo Detenido — cambiar clicks: cuchillos ↔ ráfaga de puños MUDA (amarilla)
+    theWorldFistMode = !theWorldFistMode;
+    oraQueue = 0; oraTimer = 0; // corta cualquier ráfaga en curso al cambiar
+    shockwave(player.x, player.y, theWorldFistMode ? TW_YELLOW : '#fd2', 22);
+    for (let k = 0; k < 6; k++) {
+      const ka = k * Math.PI / 3;
+      effects.push({ type: 'sfstar', x: player.x + Math.cos(ka) * 26, y: player.y + Math.sin(ka) * 26,
+        r: 14, rot: ka, life: 20, max: 20, color: TW_YELLOW });
+    }
   }
   if (active === 17 && keyPressed['t'] && rewindCD <= 0) {
     activateRedMode();
@@ -1630,6 +1669,21 @@ function updatePlayer() {
     ltTimer = 80;
     ltCD = 60 * 90;
     shake = 18;
+  }
+  if (active === 31 && keyPressed['z'] && zipperCD <= 0 && zipperPocket > 0) {
+    // Cierre Relámpago — LIBERAR el bolsillo (todos los cadáveres, muertos y dañinos)
+    zipperRelease();
+    zipperCD = 60 * 6;
+  }
+  if (active === 19 && keyPressed['c']) {
+    // Copias Dimensionales — cambiar clicks: estrellas ↔ BANDERA explosiva (blanco y negro)
+    d4cFlagMode = !d4cFlagMode;
+    shockwave(player.x, player.y, d4cFlagMode ? '#fff' : '#f06', 22);
+    for (let k = 0; k < 6; k++) {
+      const ka = k * Math.PI / 3;
+      effects.push({ type: 'sfstar', x: player.x + Math.cos(ka) * 26, y: player.y + Math.sin(ka) * 26,
+        r: 14, rot: ka, life: 20, max: 20, color: k % 2 ? '#fff' : '#222' });
+    }
   }
   if (active === 24 && keyPressed['l'] && bubbleUltCD <= 0) {
     bubbleUltCD = 60 * 120;
@@ -1871,6 +1925,7 @@ function updatePlayer() {
   if (ltCD > 0) ltCD--;
   if (apexCD > 0) apexCD--;
   if (smokeFogCD > 0) smokeFogCD--;
+  if (zipperCD > 0) zipperCD--;
   if (webModeCD > 0) webModeCD--;
   if (mirageCD > 0) mirageCD--;
   if (vortexUltCD > 0) vortexUltCD--;
@@ -1879,7 +1934,7 @@ function updatePlayer() {
   if (noCooldowns) {
     timeStopCD = 0; rewindCD = 0; shortRewindCD = 0; detonateAllCD = 0;
     lesson3CD = 0; skCD = 0; rhcpCD = 0; sfCD = 0; nrCD = 0; mmCD = 0;
-    nkcCD = 0; ltCD = 0; apexCD = 0; smokeFogCD = 0; webModeCD = 0;
+    nkcCD = 0; ltCD = 0; apexCD = 0; smokeFogCD = 0; webModeCD = 0; zipperCD = 0;
     mirageCD = 0; vortexUltCD = 0; pibLetterCD = 0;
     shieldCD = 0; shieldCharge = SHIELD_MAX;
     tuskA1UltCD = 0; tuskNailStormCD = 0; tuskWormholeCD = 0;
@@ -2456,6 +2511,7 @@ function updatePlayer() {
 }
 
 function getAttackCD() {
+  if (active === 31) return 300;   // Cierre Relámpago
   if (active === 0) return whipForm === 1 ? 400 : 340;   // forma 1 (látigo-cuerda) más lenta
   if (active === 3) return 240;   // Tormenta: relámpago dirigido con click
   if (active === 26) return [280, 200, 90][standForm];
@@ -2489,9 +2545,9 @@ function doAttack() {
     case 16: mirageAttack(a); break;
     case 17: rewindFistsAttack(a); break;
     case 18: vortexAttack(a); break;
-    case 19: d4cAttack(a); break;
-    case 20: starPlatinumAttack(a); break;
-    case 21: theWorldAttack(a); break;
+    case 19: d4cFlagMode ? d4cFlagAttack(a) : d4cAttack(a); break;
+    case 20: if (!starVortexMode) starPlatinumAttack(a); break; // en torbellino no dispara (ver updateStarVortex)
+    case 21: theWorldFistMode ? theWorldFistAttack(a) : theWorldAttack(a); break;
     case 22: detonateAttack(a); break;
     case 23: smokeAttack(a); break;
     case 24: bubbleAttack(a); break;
@@ -2505,6 +2561,7 @@ function doAttack() {
     case 28: michaelAttack(a); break;
     case 29: lassoAttack(a); break;
     case 30: sexPistolsAttack(a); break;
+    case 31: zipperAttack(a); break;
   }
 }
 
@@ -2769,7 +2826,7 @@ function processBreakerCombo() {
     const ty = player.y + Math.sin(a) * 48;
     // efecto limpio: destello de impacto + grito DORA
     effects.push({ type: 'cdpunch', x: tx, y: ty, angle: a, life: 9, max: 9 });
-    if (breakerCombo % 2 === 0) effects.push({ type: 'ora', x: tx, y: ty - 8, life: 12, max: 12, color: CD_PINK, word: 'DORA' });
+    if (breakerCombo % 2 === 0) effects.push({ type: 'ora', x: tx, y: ty - 8, life: 12, max: 12, color: CD_PINK, word: 'PUM' });
     // el jugador también rompe piedras al golpear
     damageStonesAt(tx, ty, 46, 34);
     breakerCombo--;
@@ -3118,21 +3175,113 @@ function rainLightning() {
 }
 
 // 19. Copias Dimensionales — 3 copias dimensionales en paralelo (atraviesan enemigos)
+// Estrella de 5 puntas rellena, radio exterior R, centrada en el origen del transform.
+function drawStar5(ctx, R) {
+  ctx.beginPath();
+  for (let s = 0; s < 10; s++) {
+    const ang = (s / 10) * Math.PI * 2 - Math.PI / 2;
+    const rr = s % 2 === 0 ? R : R * 0.42;
+    const xx = Math.cos(ang) * rr, yy = Math.sin(ang) * rr;
+    if (s === 0) ctx.moveTo(xx, yy); else ctx.lineTo(xx, yy);
+  }
+  ctx.closePath(); ctx.fill();
+}
+
+// Colores de Funny Valentine (bandera): rojo / blanco / azul.
+const D4C_FLAG = ['#e6353b', '#ffffff', '#3a7bff'];
 function d4cAttack(angle) {
   const perpA = angle + Math.PI / 2;
+  // Volley directo: 3 estrellas en paralelo; cada una EMERGE de una grieta dimensional.
   for (let k = -1; k <= 1; k++) {
-    const ox = Math.cos(perpA) * k * 22;
-    const oy = Math.sin(perpA) * k * 22;
+    const ox = Math.cos(perpA) * k * 20, oy = Math.sin(perpA) * k * 20;
+    const sx = player.x + Math.cos(angle) * 18 + ox, sy = player.y + Math.sin(angle) * 18 + oy;
+    effects.push({ type: 'rift', x: sx, y: sy, angle, life: 12, max: 12, color: '#f0d' });
     projectiles.push({
-      x: player.x + Math.cos(angle) * 18 + ox,
-      y: player.y + Math.sin(angle) * 18 + oy,
-      vx: Math.cos(angle) * 13, vy: Math.sin(angle) * 13,
+      x: sx, y: sy, vx: Math.cos(angle) * 13, vy: Math.sin(angle) * 13,
       r: 8, dmg: k === 0 ? 130 : 90, life: 95,
-      type: 'd4c',
-      color: k === 0 ? '#f06' : '#fc8',
-      angle, hits: new Set(), pierce: 4, trail: [], spin: rand(0, 6.28)
+      type: 'd4c', color: D4C_FLAG[k + 1], angle, hits: new Set(), pierce: 4, trail: [], spin: rand(0, 6.28)
     });
   }
+  // COPIAS DIMENSIONALES: de universos paralelos emergen copias junto a los 2 enemigos
+  // más cercanos y los golpean por un flanco imposible (lo característico de D4C).
+  const picked = [];
+  const maxSq = 520 * 520;
+  for (let n = 0; n < 2; n++) {
+    let best = null, bestSq = maxSq;
+    for (let j = 0; j < enemies.length; j++) {
+      const e = enemies[j];
+      if (e.ally || picked.includes(e)) continue;
+      const dSq = distSq(player, e);
+      if (dSq < bestSq) { bestSq = dSq; best = e; }
+    }
+    if (!best) break;
+    picked.push(best);
+    const ra = rand(0, Math.PI * 2);                 // el rift abre en un ángulo aleatorio del universo paralelo
+    const rx = best.x + Math.cos(ra) * 48, ry = best.y + Math.sin(ra) * 48;
+    const fire = Math.atan2(best.y - ry, best.x - rx);
+    effects.push({ type: 'rift', x: rx, y: ry, angle: fire, life: 18, max: 18, color: '#f0d', big: true });
+    projectiles.push({
+      x: rx, y: ry, vx: Math.cos(fire) * 15, vy: Math.sin(fire) * 15,
+      r: 8, dmg: 110, life: 55,
+      type: 'd4c', color: D4C_FLAG[Math.floor(rand(0, 3))], angle: fire, hits: new Set(), pierce: 3, trail: [], spin: rand(0, 6.28)
+    });
+  }
+}
+
+// D4C (modo C): un puño produce una BANDERA y la dispara al enemigo; explota en blanco y negro.
+function d4cFlagAttack(angle) {
+  // busca el enemigo más cercano para dirigir la bandera; si no hay, va hacia el cursor
+  let target = null, bestSq = 640 * 640;
+  for (let j = 0; j < enemies.length; j++) {
+    const e = enemies[j];
+    if (e.ally) continue;
+    const dSq = distSq(player, e);
+    if (dSq < bestSq) { bestSq = dSq; target = e; }
+  }
+  const fire = target ? Math.atan2(target.y - player.y, target.x - player.x) : angle;
+  // el puño aparece y empuja la bandera
+  effects.push({ type: 'thrust', x: player.x, y: player.y, angle: fire, len: 46, color: '#e6353b', w: 6, life: 8, max: 8 });
+  effects.push({ type: 'punch', x: player.x + Math.cos(fire) * 30, y: player.y + Math.sin(fire) * 30, life: 9, max: 9, color: '#fff', r: 26 });
+  burst(player.x + Math.cos(fire) * 26, player.y + Math.sin(fire) * 26, 6, () => rand(0, 1) > 0.5 ? '#fff' : '#3a7bff', { jitter: 6 });
+  // la BANDERA (proyectil que ondea y persigue suavemente al objetivo)
+  projectiles.push({
+    x: player.x + Math.cos(fire) * 24, y: player.y + Math.sin(fire) * 24,
+    vx: Math.cos(fire) * 10.5, vy: Math.sin(fire) * 10.5,
+    r: 15, dmg: 70, life: 80,
+    type: 'd4cflag', color: '#fff', angle: fire, wav: rand(0, 6.28), homing: target
+  });
+}
+
+// Explosión en BLANCO Y NEGRO de la bandera (daño en área + VFX monocromo).
+function d4cFlagExplode(x, y) {
+  const R = 125, Rsq = R * R;
+  for (let j = 0; j < enemies.length; j++) {
+    const e = enemies[j];
+    if (e.ally) continue;
+    if (distSq(e, { x, y }) < Rsq + e.r * e.r) {
+      damageEnemy(e, 230, '#fff');
+      const a = Math.atan2(e.y - y, e.x - x);
+      e.vx += Math.cos(a) * 9; e.vy += Math.sin(a) * 9;
+    }
+  }
+  // ondas blanco / negro / blanco
+  effects.push({ type: 'shockwave', x, y, life: 30, max: 30, r: 0, color: '#fff' });
+  effects.push({ type: 'shockwave', x, y, life: 24, max: 24, r: 0, color: '#111' });
+  effects.push({ type: 'shockwave', x, y, life: 16, max: 16, r: 0, color: '#fff' });
+  effects.push({ type: 'punch', x, y, life: 12, max: 12, color: '#fff', r: R * 0.55 });
+  // metralla monocroma
+  for (let i = 0; i < 30; i++) {
+    const a = rand(0, Math.PI * 2), sp = rand(2, 8.5);
+    particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+      life: rand(16, 30), max: 30, color: rand(0, 1) > 0.5 ? '#fff' : '#111', r: rand(2, 4) });
+  }
+  // corona de estrellas blanco/negro
+  for (let k = 0; k < 8; k++) {
+    const ka = k * Math.PI / 4;
+    effects.push({ type: 'sfstar', x: x + Math.cos(ka) * 30, y: y + Math.sin(ka) * 30,
+      r: 16, rot: ka, life: 22, max: 22, color: k % 2 ? '#fff' : '#222' });
+  }
+  shake = Math.max(shake, 15);
 }
 
 // 16. Plaga Primigenia — POUNCE (salto depredador): muerde, infecta y desata la manada
@@ -3361,6 +3510,114 @@ function arrowAttack(angle) {
     r: 7, dmg: 160, life: 80, type: 'arrow', color: '#cf8',
     angle: angle, hits: new Set(), pushed: new Set(), pierce: 6, trail: []
   });
+}
+
+// Cierre Relámpago — poder de CREMALLERAS. Click: lanza una cremallera que atraviesa
+// y DESCOSE a los enemigos (daño directo + sangrado continuo). Z: CIERRE TOTAL en área.
+const ZIP_CYAN = '#2fb8e6';
+let zipperPocket = 0; // cadáveres absorbidos en el bolsillo (máx 100)
+// Click: PUÑOS. A los enemigos que MATAS con el puño se los traga tu bolsillo.
+function zipperAttack(angle) {
+  const range = 40, hitR = 44, dmg = 95, knock = 8;
+  const px = player.x + Math.cos(angle) * range;
+  const py = player.y + Math.sin(angle) * range;
+  for (let j = 0; j < enemies.length; j++) {
+    const e = enemies[j];
+    if (e.ally) continue;
+    const rr = hitR + e.r;
+    const dx = e.x - px, dy = e.y - py;
+    if (dx * dx + dy * dy < rr * rr) {
+      const wasAlive = e.hp > 0;
+      damageEnemy(e, dmg, ZIP_CYAN);
+      e.vx += Math.cos(angle) * knock;
+      e.vy += Math.sin(angle) * knock;
+      if (wasAlive && e.hp <= 0) absorbCorpse(e); // lo mató el puño → al bolsillo
+    }
+  }
+  // VFX del puño
+  effects.push({ type: 'thrust', x: player.x, y: player.y, angle, len: range + hitR * 0.5, color: ZIP_CYAN, w: 5, life: 8, max: 8 });
+  effects.push({ type: 'punch', x: px, y: py, life: 10, max: 10, color: ZIP_CYAN, r: hitR });
+  effects.push({ type: 'sfstar', x: px, y: py, r: 16, rot: rand(0, 6.28), life: 12, max: 12, color: '#fff' });
+  effects.push({ type: 'ora', x: px, y: py - 12, life: 16, max: 16, color: ZIP_CYAN, word: rand(0, 1) > 0.5 ? 'ZIP' : 'ZIP!' });
+  for (let s = 0; s < 8; s++) {
+    const sa = angle + rand(-0.6, 0.6), sp = rand(3, 7);
+    particles.push({ x: px, y: py, vx: Math.cos(sa) * sp, vy: Math.sin(sa) * sp, life: 14, max: 14, color: rand(0, 1) > 0.5 ? ZIP_CYAN : '#fff', r: 2.4 });
+  }
+}
+// Absorbe un cadáver: si hay hueco va al bolsillo; si está lleno (100), sale volando muerto.
+function absorbCorpse(e) {
+  if (zipperPocket < 100) {
+    zipperPocket++;
+    // trayectoria curva hacia el bolsillo (punto de control perpendicular)
+    const mx = (e.x + player.x) / 2, my = (e.y + player.y) / 2;
+    const perp = Math.atan2(player.y - e.y, player.x - e.x) + Math.PI / 2;
+    const bend = rand(-1, 1) * 40;
+    effects.push({ type: 'suck', x: e.x, y: e.y, tx: player.x, ty: player.y,
+      cx: mx + Math.cos(perp) * bend, cy: my + Math.sin(perp) * bend, life: 18, max: 18, color: ZIP_CYAN });
+  } else {
+    // bolsillo lleno: overflow — sale volando muerto y daña (NO gasta el CD de Z)
+    flingCorpse(e.x, e.y, rand(0, Math.PI * 2), 60);
+  }
+}
+// Lanza un cadáver volador que daña a los enemigos que toca.
+function flingCorpse(x, y, angle, dmg) {
+  projectiles.push({
+    x, y, vx: Math.cos(angle) * rand(7, 11), vy: Math.sin(angle) * rand(7, 11),
+    r: 12, dmg, life: 55, type: 'corpse', color: ZIP_CYAN,
+    angle, hits: new Set(), pierce: 2, spin: rand(0, 6.28), trail: []
+  });
+}
+// Z: LIBERAR — suelta todos los cadáveres del bolsillo, muertos y dañinos.
+// Cuantos más absorbidos, más daño total (más cadáveres volando).
+function zipperRelease() {
+  const n = zipperPocket;
+  shake = Math.max(shake, Math.min(28, 8 + n * 0.15));
+  shockwave(player.x, player.y, ZIP_CYAN, 30);
+  shockwave(player.x, player.y, '#fff', 22);
+  shockwave(player.x, player.y, ZIP_CYAN, 14);
+  effects.push({ type: 'ora', x: player.x, y: player.y - 40, life: 34, max: 34, big: true, color: ZIP_CYAN, word: '¡FUERA!' });
+  // corona de estrellas + estallido de partículas, escalado por cantidad absorbida
+  const stars = Math.min(16, 6 + Math.floor(n / 8));
+  for (let k = 0; k < stars; k++) {
+    const a = k * (Math.PI * 2 / stars);
+    effects.push({ type: 'sfstar', x: player.x + Math.cos(a) * 34, y: player.y + Math.sin(a) * 34,
+      r: 15, rot: a, life: 22, max: 22, color: k % 2 ? '#fff' : ZIP_CYAN });
+  }
+  burst(player.x, player.y, Math.min(40, 12 + n), () => rand(0, 1) > 0.5 ? ZIP_CYAN : '#fff', { spread: 7, jitter: 14, life: 22 });
+  for (let k = 0; k < n; k++) {
+    const a = (k / Math.max(1, n)) * Math.PI * 2 + rand(-0.12, 0.12);
+    flingCorpse(player.x, player.y, a, 65);
+  }
+  zipperPocket = 0;
+}
+// Aura del BOLSILLO alrededor del personaje: crece y orbitan wisps según cuánto llevas.
+function drawZipperPocket() {
+  if (active !== 31 || zipperPocket <= 0) return;
+  const fill = zipperPocket / 100;
+  const full = zipperPocket >= 100;
+  const wisps = Math.min(12, 2 + Math.floor(zipperPocket / 9));
+  const R = player.r + 14 + fill * 10;
+  const pulse = 0.5 + 0.5 * Math.sin(frame * (full ? 0.4 : 0.15));
+  ctx.save();
+  ctx.translate(player.x, player.y);
+  // halo
+  ctx.globalAlpha = 0.12 + fill * 0.20 + (full ? 0.15 * pulse : 0);
+  const grad = ctx.createRadialGradient(0, 0, R * 0.3, 0, 0, R + 8);
+  grad.addColorStop(0, full ? 'rgba(255,255,255,0.5)' : 'rgba(47,184,230,0.4)');
+  grad.addColorStop(1, 'rgba(47,184,230,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.arc(0, 0, R + 8, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = 1;
+  // wisps de cadáveres orbitando (órbita elíptica)
+  ctx.shadowColor = full ? '#fff' : ZIP_CYAN; ctx.shadowBlur = 8;
+  for (let i = 0; i < wisps; i++) {
+    const a = frame * 0.05 + i * (Math.PI * 2 / wisps);
+    const rr = R + Math.sin(frame * 0.1 + i) * 3;
+    ctx.fillStyle = full ? '#fff' : ZIP_CYAN;
+    ctx.beginPath(); ctx.arc(Math.cos(a) * rr, Math.sin(a) * rr * 0.7, 2.4, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+  ctx.restore();
 }
 
 // 7. Frenesí de Estocadas — combo rápido de 5 estocadas, +60% velocidad pasiva
@@ -4507,11 +4764,134 @@ function theWorldAttack(angle) {
 }
 
 // 17. Puño Estelar — GOLPE GOLPE barrage (8 puños rápidos en línea + golpe final)
+const SP_PURPLE = '#b07bff';      // morado estelar (VFX de Puño Estelar)
+const TW_YELLOW = '#ffd21e';      // amarillo DIO (VFX de la ráfaga MUDA de Mundo Detenido)
+const STAR_VORTEX_R = 118;        // alcance corto del TORBELLINO ESTELAR (cono)
+const STAR_VORTEX_CONE = 0.72;    // medio ángulo del cono de succión (~41° por lado)
 function starPlatinumAttack(angle) {
   if (oraQueue > 0) return;
+  oraColor = SP_PURPLE; oraWord = 'TOMA';
   oraQueue = 8;
   oraTimer = 0;
   oraAngle = angle;
+}
+
+// Mundo Detenido (modo C): misma ráfaga que el Puño Estelar pero amarilla y gritando MUDA
+function theWorldFistAttack(angle) {
+  if (oraQueue > 0) return;
+  oraColor = TW_YELLOW; oraWord = 'NULO';
+  oraQueue = 8;
+  oraTimer = 0;
+  oraAngle = angle;
+}
+
+// C-mode: TORBELLINO ESTELAR — mientras mantienes el click, sale un vórtice corto
+// del personaje que ARRASTRA a los enemigos hacia ti (con giro) y les hace daño.
+// No dispara la ráfaga ORA mientras está activo.
+function updateStarVortex() {
+  if (active !== 20 || !starVortexMode || starPlatinumPhase > 0) return;
+  if (!mouse.down) return; // el torbellino sólo actúa mientras mantienes el click (soltar = para)
+  const aim = aimAngle();
+  const R = STAR_VORTEX_R, Rsq = R * R;
+  const cone = STAR_VORTEX_CONE;
+  // "boca": punto de succión desplazado del centro hacia el cursor (sale de un lado)
+  const mx = player.x + Math.cos(aim) * player.r;
+  const my = player.y + Math.sin(aim) * player.r;
+  const dealDmg = frame % 2 === 0; // daño continuo (~2 veces cada 4 frames)
+  let hitAny = false;
+  for (let j = 0; j < enemies.length; j++) {
+    const e = enemies[j];
+    if (e.ally) continue;
+    const dx = mx - e.x, dy = my - e.y;   // enemigo -> boca
+    const dSq = dx * dx + dy * dy;
+    if (dSq > Rsq) continue;
+    // sólo enemigos dentro del cono frontal (hacia el cursor)
+    let diff = Math.atan2(-dy, -dx) - aim; // ángulo boca -> enemigo, relativo al aim
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    if (Math.abs(diff) > cone) continue;
+    const d = Math.sqrt(dSq) || 1;
+    // TRACTOR: arrastra la posición del enemigo directamente hacia la boca (el update
+    // de enemigos sobreescribe e.vx, así que mover la posición garantiza la succión).
+    const stop = player.r + e.r + 4;
+    if (d > stop) {
+      const heavy = (e.bossKind || e.raid) ? 0.28 : 1; // jefes pesan más
+      const pullPx = Math.min(d - stop, (3.4 + 5.0 * (1 - d / R)) * heavy);
+      e.x += (dx / d) * pullPx;
+      e.y += (dy / d) * pullPx;
+      e.vx += (dx / d) * 1.2 - (dy / d) * 0.8; // remolino leve
+      e.vy += (dy / d) * 1.2 + (dx / d) * 0.8;
+    }
+    if (dealDmg) damageEnemy(e, 26, SP_PURPLE);
+    hitAny = true;
+    if (frame % 4 === 0) {
+      effects.push({ type: 'sfstar', x: e.x, y: e.y, r: 9, rot: rand(0, 6.28), life: 8, max: 8, color: SP_PURPLE });
+    }
+  }
+  // partículas: entran desde el borde del cono y son chupadas hacia la boca
+  for (let p = 0; p < 2; p++) {
+    const spa = aim + rand(-cone, cone);
+    const rr = R * rand(0.5, 1.0);
+    particles.push({
+      x: mx + Math.cos(spa) * rr, y: my + Math.sin(spa) * rr,
+      vx: -Math.cos(spa) * rand(5, 9), vy: -Math.sin(spa) * rand(5, 9),
+      life: 11, max: 11, color: rand(0, 1) > 0.5 ? SP_PURPLE : '#fff', r: rand(1.5, 2.8)
+    });
+  }
+  if (hitAny && frame % 6 === 0) shake = Math.max(shake, 3);
+}
+
+// Dibuja el vórtice del TORBELLINO ESTELAR alrededor del personaje.
+function drawStarVortex() {
+  // sólo se dibuja mientras chupas (mantienes click); al soltar desaparece por completo
+  if (active !== 20 || !starVortexMode || starPlatinumPhase > 0 || !mouse.down) return;
+  const aim = aimAngle();
+  const R = STAR_VORTEX_R;
+  const cone = STAR_VORTEX_CONE;
+  const pulse = 0.5 + 0.5 * Math.sin(frame * 0.2);
+  // boca: origen del cono, a un lado del personaje mirando al cursor
+  const mx = player.x + Math.cos(aim) * player.r;
+  const my = player.y + Math.sin(aim) * player.r;
+  ctx.save();
+  ctx.translate(mx, my);
+  ctx.rotate(aim); // +X = hacia el cursor
+  // contorno del cono de succión (vértice en la boca, se abre hacia afuera)
+  ctx.globalAlpha = 0.30 + 0.22 * pulse;
+  ctx.strokeStyle = SP_PURPLE;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(Math.cos(cone) * R, Math.sin(cone) * R);
+  ctx.lineTo(0, 0);
+  ctx.lineTo(Math.cos(-cone) * R, Math.sin(-cone) * R);
+  ctx.arc(0, 0, R, -cone, cone);
+  ctx.stroke();
+  ctx.shadowColor = SP_PURPLE; ctx.shadowBlur = 12;
+  // líneas de succión: nacen abiertas en el borde y convergen a la boca (con giro)
+  const arms = 5;
+  for (let s = 0; s < arms; s++) {
+    const off = (s / (arms - 1) - 0.5) * 2 * cone; // reparte por el cono
+    ctx.globalAlpha = 0.7;
+    ctx.strokeStyle = s % 2 ? '#fff' : SP_PURPLE;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let t = 0; t <= 1.0001; t += 0.1) {
+      const rad = R * t;                                  // 0 en la boca → R en el borde
+      const ang = off * t + Math.sin(frame * 0.25 + s) * 0.18 * t; // recto en la boca, abierto y ondulando fuera
+      const xx = Math.cos(ang) * rad, yy = Math.sin(ang) * rad;
+      if (t === 0) ctx.moveTo(xx, yy); else ctx.lineTo(xx, yy);
+    }
+    ctx.stroke();
+  }
+  // brillo en la boca (succión)
+  ctx.globalAlpha = 0.5 + 0.3 * pulse;
+  const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 0.45);
+  grad.addColorStop(0, 'rgba(200,160,255,0.6)');
+  grad.addColorStop(1, 'rgba(160,110,255,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.arc(0, 0, R * 0.45, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.restore();
+  ctx.globalAlpha = 1;
 }
 
 function processOraBarrage() {
@@ -4528,25 +4908,46 @@ function processOraBarrage() {
     const range = isFinal ? 56 : 44;
     const knock = isFinal ? 24 : 6;
     const radius = isFinal ? 68 : 38;
-    punchAttack(a, range, dmg, knock, '#c8f', radius);
+    punchAttack(a, range, dmg, knock, oraColor, radius);
     const tx = player.x + Math.cos(a) * range;
     const ty = player.y + Math.sin(a) * range;
-    // texto "ORA" en cada puño
-    effects.push({ type: 'ora', x: tx, y: ty - 12 + rand(-8, 8), life: isFinal ? 36 : 18, max: isFinal ? 36 : 18, big: isFinal });
-    // partículas
-    const pCount = isFinal ? 18 : 5;
-    for (let p = 0; p < pCount; p++) {
+    // línea de empuje: motion-blur del puño veloz desde el jugador hasta el impacto
+    effects.push({ type: 'thrust', x: player.x, y: player.y, angle: a,
+      len: range + radius * 0.5, color: oraColor, w: isFinal ? 6 : 3,
+      life: isFinal ? 12 : 7, max: isFinal ? 12 : 7 });
+    // destello nítido del núcleo del impacto
+    effects.push({ type: 'punch', x: tx, y: ty, life: isFinal ? 12 : 7, max: isFinal ? 12 : 7,
+      color: oraColor, r: radius * 0.8 });
+    // texto en cada puño (alterna PALABRA / PALABRA!) según el estilo activo
+    effects.push({ type: 'ora', x: tx, y: ty - 12 + rand(-8, 8), life: isFinal ? 40 : 18, max: isFinal ? 40 : 18,
+      big: isFinal, color: oraColor, word: isFinal ? oraWord + 'AAA!!' : (oraQueue % 2 ? oraWord : oraWord + '!') });
+    // estrella de impacto en cada golpe
+    effects.push({ type: 'sfstar', x: tx, y: ty, r: isFinal ? 34 : 15, rot: rand(0, 6.28),
+      life: isFinal ? 26 : 14, max: isFinal ? 26 : 14, color: rand(0, 1) > 0.5 ? oraColor : '#fff' });
+    // estela de velocidad: chispas que salen disparadas en la dirección del puño
+    const streaks = isFinal ? 16 : 7;
+    for (let p = 0; p < streaks; p++) {
+      const sa = a + rand(-0.5, 0.5);
+      const sp = rand(3, isFinal ? 10 : 6.5);
       particles.push({
-        x: tx + rand(-12, 12), y: ty + rand(-12, 12),
-        vx: rand(-3, 3), vy: rand(-3, 3),
-        life: isFinal ? 30 : 14, max: isFinal ? 30 : 14,
-        color: rand(0,1) > 0.5 ? '#c8f' : '#fff', r: isFinal ? 4 : 2
+        x: tx + rand(-6, 6), y: ty + rand(-6, 6),
+        vx: Math.cos(sa) * sp, vy: Math.sin(sa) * sp,
+        life: isFinal ? 26 : 14, max: isFinal ? 26 : 14,
+        color: rand(0, 1) > 0.5 ? oraColor : '#fff', r: isFinal ? 4 : 2.2
       });
     }
     if (isFinal) {
-      effects.push({ type: 'shockwave', x: tx, y: ty, life: 28, max: 28, r: 0, color: '#c8f' });
-      effects.push({ type: 'shockwave', x: tx, y: ty, life: 18, max: 18, r: 0, color: '#fff' });
-      shake = Math.max(shake, 14);
+      // GOLPE FINAL: triple onda + corona de estrellas que explotan hacia afuera
+      effects.push({ type: 'shockwave', x: tx, y: ty, life: 32, max: 32, r: 0, color: oraColor });
+      effects.push({ type: 'shockwave', x: tx, y: ty, life: 22, max: 22, r: 0, color: '#fff' });
+      effects.push({ type: 'shockwave', x: tx, y: ty, life: 16, max: 16, r: 0, color: oraColor });
+      for (let k = 0; k < 10; k++) {
+        const ka = k * Math.PI / 5 + rand(-0.1, 0.1);
+        const rr2 = 26 + rand(0, 14);
+        effects.push({ type: 'sfstar', x: tx + Math.cos(ka) * rr2, y: ty + Math.sin(ka) * rr2,
+          r: 14 + rand(0, 6), rot: ka, life: 22, max: 22, color: k % 2 ? oraColor : '#fff' });
+      }
+      shake = Math.max(shake, 18);
     }
     oraQueue--;
     oraTimer = isFinal ? 0 : 3;
@@ -6084,7 +6485,7 @@ function updateProjectiles() {
           damageEnemy(e, p.dmg, '#fff');
           if (p.stun > 0) {
             e.frozen = Math.max(e.frozen || 0, p.stun);
-            effects.push({ type: 'debuff', x: e.x, y: e.y - 24, value: 'DISC', life: 30, max: 30 });
+            effects.push({ type: 'debuff', x: e.x, y: e.y - 24, value: 'DISCO', life: 30, max: 30 });
           }
           p.hits.add(e.id);
         }
@@ -6373,16 +6774,42 @@ function updateProjectiles() {
         if (p.hits.has(e.id)) continue;
         const rr = e.r + p.r;
         if (distSq(e, p) < rr * rr) {
-          damageEnemy(e, p.dmg, '#f0d');
+          damageEnemy(e, p.dmg, p.color);
           p.hits.add(e.id);
           p.pierce--;
-          // rasguño dimensional
-          for (let s = 0; s < 4; s++) {
-            particles.push({ x: p.x, y: p.y, vx: rand(-2, 2), vy: rand(-2, 2), life: 18, max: 18, color: '#f0d', r: 2 });
+          // impacto dimensional: chispas rojo/blanco/azul + mini estrella
+          for (let s = 0; s < 6; s++) {
+            particles.push({ x: p.x, y: p.y, vx: rand(-2.5, 2.5), vy: rand(-2.5, 2.5), life: 18, max: 18, color: D4C_FLAG[Math.floor(rand(0, 3))], r: 2 });
           }
+          effects.push({ type: 'sfstar', x: p.x, y: p.y, r: 10, rot: rand(0, 6.28), life: 10, max: 10, color: p.color });
         }
       }
       if (p.pierce <= 0) consumed = true;
+    } else if (p.type === 'd4cflag') {
+      // persecución suave hacia el objetivo (si sigue vivo)
+      if (p.homing && p.homing.hp > 0) {
+        const desired = Math.atan2(p.homing.y - p.y, p.homing.x - p.x);
+        let cur = Math.atan2(p.vy, p.vx);
+        let da = desired - cur;
+        while (da > Math.PI) da -= 2 * Math.PI;
+        while (da < -Math.PI) da += 2 * Math.PI;
+        cur += da * 0.14;
+        const sp = Math.hypot(p.vx, p.vy);
+        p.vx = Math.cos(cur) * sp; p.vy = Math.sin(cur) * sp;
+        p.angle = cur;
+      }
+      if (frame % 3 === 0) particles.push({ x: p.x, y: p.y, vx: rand(-1, 1), vy: rand(-1, 1),
+        life: 12, max: 12, color: rand(0, 1) > 0.5 ? '#fff' : '#e6353b', r: 2 });
+      // impacto → explota en blanco y negro (o al agotar su vuelo)
+      let boom = false;
+      for (let j = 0; j < enemies.length; j++) {
+        const e = enemies[j];
+        if (e.ally) continue;
+        const rr = e.r + p.r;
+        if (distSq(e, p) < rr * rr) { boom = true; break; }
+      }
+      if (p.life <= 0) boom = true;
+      if (boom) { d4cFlagExplode(p.x, p.y); consumed = true; }
     } else if (p.type === 'arrow') {
       const pushR = 150;
       const pushForce = 38;
@@ -6409,6 +6836,20 @@ function updateProjectiles() {
         }
       }
       if (p.pierce <= 0) consumed = true;
+    } else if (p.type === 'corpse') {
+      for (let j = 0; j < enemies.length; j++) {
+        const e = enemies[j];
+        if (e.ally) continue;
+        if (p.hits.has(e.id)) continue;
+        const rr = e.r + p.r;
+        if (distSq(e, p) < rr * rr) {
+          damageEnemy(e, p.dmg, ZIP_CYAN);
+          p.hits.add(e.id);
+          p.pierce--;
+          for (let s = 0; s < 4; s++) particles.push({ x: p.x, y: p.y, vx: rand(-2, 2), vy: rand(-2, 2), life: 14, max: 14, color: rand(0, 1) > 0.5 ? ZIP_CYAN : '#8a9aa0', r: 2 });
+          if (p.pierce <= 0) { consumed = true; break; }
+        }
+      }
     } else if (p.type === 'mjbullet') {
       // balazo dorado de Criminal: perfora hasta pierce enemigos
       for (let j = 0; j < enemies.length; j++) {
@@ -7863,7 +8304,7 @@ function draw() {
       ctx.font = `bold ${Math.round(p.r * 0.7)}px monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('DISC', 0, 1);
+      ctx.fillText('DISCO', 0, 1);
       ctx.textAlign = 'left';
       ctx.textBaseline = 'alphabetic';
       ctx.restore();
@@ -8089,68 +8530,177 @@ function draw() {
       ctx.beginPath(); ctx.arc(p.x - r * 0.35, p.y - r * 0.35, r * 0.25, 0, Math.PI * 2); ctx.fill();
     }
     if (p.type === 'd4c') {
-      // estela de copias dimensionales
+      // estela = copias dimensionales que se desvanecen (ecos de universos paralelos)
       if (p.trail) {
-        p.trail.forEach((t, i) => {
+        for (let i = 0; i < p.trail.length; i += 2) {
+          const t = p.trail[i];
           const a = (i + 1) / p.trail.length;
-          ctx.fillStyle = `rgba(240, 80, 200, ${a * 0.45})`;
-          ctx.beginPath(); ctx.arc(t.x, t.y, p.r * a * 0.7, 0, Math.PI * 2); ctx.fill();
-        });
+          ctx.save();
+          ctx.translate(t.x, t.y);
+          ctx.rotate(frame * 0.18 + p.spin + i * 0.35);
+          ctx.globalAlpha = a * 0.4;
+          ctx.fillStyle = p.color;
+          drawStar5(ctx, p.r * (0.6 + a * 0.5));
+          ctx.restore();
+        }
+        ctx.globalAlpha = 1;
       }
-      // estrella
+      // estrella principal: color de bandera + estrella blanca interior (star-spangled)
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(frame * 0.18 + p.spin);
+      ctx.shadowColor = p.color; ctx.shadowBlur = 12;
       ctx.fillStyle = p.color;
-      ctx.beginPath();
-      for (let s = 0; s < 10; s++) {
-        const ang = (s / 10) * Math.PI * 2 - Math.PI / 2;
-        const rr = s % 2 === 0 ? p.r * 1.4 : p.r * 0.55;
-        const xx = Math.cos(ang) * rr;
-        const yy = Math.sin(ang) * rr;
-        if (s === 0) ctx.moveTo(xx, yy);
-        else ctx.lineTo(xx, yy);
-      }
-      ctx.closePath(); ctx.fill();
-      // brillo central
+      drawStar5(ctx, p.r * 1.5);
+      ctx.shadowBlur = 0;
       ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.arc(0, 0, p.r * 0.35, 0, Math.PI * 2); ctx.fill();
+      drawStar5(ctx, p.r * 0.7);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
+    if (p.type === 'd4cflag') {
+      // bandera stars-and-stripes ondeando, montada en su asta
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle || 0);
+      const wav = Math.sin(frame * 0.5 + (p.wav || 0)) * 3;
+      // asta
+      ctx.strokeStyle = '#f5f5f5'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+      ctx.shadowColor = '#fff'; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.moveTo(-16, 0); ctx.lineTo(8, 0); ctx.stroke();
+      ctx.shadowBlur = 0;
+      // paño: franjas rojas/blancas que ondean
+      const FW = 22, FH = 15, x0 = -16, stripes = 5, sh = FH / stripes;
+      for (let s = 0; s < stripes; s++) {
+        ctx.fillStyle = s % 2 === 0 ? '#e6353b' : '#fff';
+        const yTop = -FH / 2 + s * sh;
+        ctx.beginPath();
+        ctx.moveTo(x0, yTop);
+        ctx.lineTo(x0 + FW * 0.5, yTop + wav * 0.5);
+        ctx.lineTo(x0 + FW, yTop + wav);
+        ctx.lineTo(x0 + FW, yTop + sh + wav);
+        ctx.lineTo(x0 + FW * 0.5, yTop + sh + wav * 0.5);
+        ctx.lineTo(x0, yTop + sh);
+        ctx.closePath(); ctx.fill();
+      }
+      // cantón azul con estrella blanca
+      ctx.fillStyle = '#3a7bff';
+      ctx.fillRect(x0, -FH / 2, FW * 0.42, FH * 0.55);
+      ctx.fillStyle = '#fff';
+      ctx.translate(x0 + FW * 0.2, -FH / 2 + FH * 0.28);
+      drawStar5(ctx, 3);
       ctx.restore();
     }
     if (p.type === 'arrow') {
-      // halo del empuje de área
-      const grd = ctx.createRadialGradient(p.x, p.y, 20, p.x, p.y, 130);
-      grd.addColorStop(0, 'rgba(180, 240, 130, 0.22)');
-      grd.addColorStop(1, 'rgba(180, 240, 130, 0)');
+      const pulse = 0.5 + 0.5 * Math.sin(frame * 0.25 + p.angle * 3);
+      // AURA DE EMPUJE (radio real ~150): gradiente suave + anillo pulsante
+      const grd = ctx.createRadialGradient(p.x, p.y, 24, p.x, p.y, 150);
+      grd.addColorStop(0, 'rgba(190, 245, 140, 0.20)');
+      grd.addColorStop(0.7, 'rgba(150, 230, 110, 0.09)');
+      grd.addColorStop(1, 'rgba(150, 230, 110, 0)');
       ctx.fillStyle = grd;
-      ctx.beginPath(); ctx.arc(p.x, p.y, 130, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x, p.y, 150, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = `rgba(190, 245, 140, ${0.08 + 0.12 * pulse})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 150, 0, Math.PI * 2); ctx.stroke();
+      // RACHAS DE VIENTO barriendo hacia la dirección de empuje (dentro del aura)
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(p.angle);
+      ctx.strokeStyle = '#d2fca0';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      for (let s = -1; s <= 1; s++) {
+        const ph = (frame * 6 + (s + 1) * 40) % 120; // barre de -40 a 80 y reinicia
+        const x1 = -40 + ph;
+        ctx.globalAlpha = Math.max(0, 1 - Math.abs((ph - 60) / 60)) * 0.5;
+        ctx.beginPath(); ctx.moveTo(x1, s * 22); ctx.lineTo(x1 + 26, s * 22); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
+      // ESTELA de flechas fantasma (afterimages)
+      if (p.trail) {
+        for (let i = 0; i < p.trail.length; i += 2) {
+          const t = p.trail[i];
+          const a = (i + 1) / p.trail.length;
+          ctx.save();
+          ctx.translate(t.x, t.y);
+          ctx.rotate(p.angle);
+          ctx.globalAlpha = a * 0.4;
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-18, -1.5, 20, 3);
+          ctx.restore();
+        }
+        ctx.globalAlpha = 1;
+      }
+      // FLECHA con brillo y punta luminosa
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle);
+      ctx.shadowColor = '#cf8'; ctx.shadowBlur = 10;
       // mango
       ctx.fillStyle = p.color;
-      ctx.fillRect(-24, -1.5, 22, 3);
-      // punta
+      ctx.fillRect(-24, -2, 24, 4);
+      // punta brillante
       ctx.fillStyle = '#fff';
       ctx.beginPath();
-      ctx.moveTo(10, 0);
-      ctx.lineTo(-2, -6);
-      ctx.lineTo(-2, 6);
+      ctx.moveTo(13, 0);
+      ctx.lineTo(-2, -7);
+      ctx.lineTo(-2, 7);
       ctx.closePath();
       ctx.fill();
+      ctx.shadowBlur = 0;
       ctx.strokeStyle = '#9c5';
       ctx.lineWidth = 1;
       ctx.stroke();
       // plumas
       ctx.fillStyle = '#9c5';
       ctx.beginPath();
-      ctx.moveTo(-24, -2);
-      ctx.lineTo(-30, -5);
+      ctx.moveTo(-24, -2.5);
+      ctx.lineTo(-31, -6);
       ctx.lineTo(-26, 0);
-      ctx.lineTo(-30, 5);
-      ctx.lineTo(-24, 2);
+      ctx.lineTo(-31, 6);
+      ctx.lineTo(-24, 2.5);
       ctx.closePath();
       ctx.fill();
+      ctx.restore();
+    }
+    if (p.type === 'corpse') {
+      // estela cian del cadáver volador
+      if (p.trail) {
+        for (let i = 0; i < p.trail.length; i += 2) {
+          const tp = p.trail[i];
+          const a = (i + 1) / p.trail.length;
+          ctx.fillStyle = `rgba(47, 184, 230, ${a * 0.3})`;
+          ctx.beginPath(); ctx.arc(tp.x, tp.y, p.r * a * 0.4, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      // cadáver volador (ragdoll) girando, con aura cian
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate((p.spin || 0) + frame * 0.2);
+      ctx.shadowColor = ZIP_CYAN; ctx.shadowBlur = 8;
+      // extremidades en X
+      ctx.strokeStyle = '#5a6a70'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-p.r * 0.7, -p.r * 0.5); ctx.lineTo(p.r * 0.7, p.r * 0.5);
+      ctx.moveTo(-p.r * 0.7, p.r * 0.5); ctx.lineTo(p.r * 0.7, -p.r * 0.5);
+      ctx.stroke();
+      // cuerpo
+      ctx.fillStyle = '#7a8a90';
+      ctx.beginPath(); ctx.arc(0, 0, p.r * 0.55, 0, Math.PI * 2); ctx.fill();
+      // cabeza
+      ctx.fillStyle = '#96a6ac';
+      ctx.beginPath(); ctx.arc(0, -p.r * 0.6, p.r * 0.34, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      // ojos en X (muerto)
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-3.5, -p.r * 0.6 - 2); ctx.lineTo(-1.5, -p.r * 0.6 + 2);
+      ctx.moveTo(-1.5, -p.r * 0.6 - 2); ctx.lineTo(-3.5, -p.r * 0.6 + 2);
+      ctx.moveTo(1.5, -p.r * 0.6 - 2); ctx.lineTo(3.5, -p.r * 0.6 + 2);
+      ctx.moveTo(3.5, -p.r * 0.6 - 2); ctx.lineTo(1.5, -p.r * 0.6 + 2);
+      ctx.stroke();
       ctx.restore();
     }
     if (p.type === 'starfinger') {
@@ -8252,7 +8802,7 @@ function draw() {
       ctx.fillStyle = '#f48';
       ctx.font = 'bold 11px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('EPITAPH', e.diaTargetX, e.diaTargetY - 105);
+      ctx.fillText('PRESAGIO', e.diaTargetX, e.diaTargetY - 105);
       ctx.textAlign = 'left';
     }
     if (e.bossKind === 'warlord' && e.phase === 1 && e.dashCharge !== undefined) {
@@ -9088,11 +9638,95 @@ function draw() {
       ctx.shadowBlur = f.big ? 18 : 8;
       ctx.fillStyle = f.big ? '#fff' : col;
       const yOff = (1 - f.life / f.max) * -14;
-      const word = f.word || (f.big ? 'ORAAA!!' : 'ORA');
+      const word = f.word || (f.big ? '¡TOMA!!' : 'TOMA');
       ctx.fillText(word, f.x, f.y + yOff);
       ctx.shadowBlur = 0;
       ctx.textAlign = 'left';
       ctx.globalAlpha = 1;
+    } else if (f.type === 'sfstar') {
+      // estrella estelar de 4 puntas: se expande, gira y se desvanece
+      const a = f.life / f.max;
+      const R = (f.r || 14) * (1.4 - a * 0.4);
+      ctx.save();
+      ctx.translate(f.x, f.y);
+      ctx.rotate((f.rot || 0) + (1 - a) * 2);
+      ctx.globalAlpha = a;
+      const col = f.color || SP_PURPLE;
+      ctx.shadowColor = col;
+      ctx.shadowBlur = 10;
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      for (let k = 0; k < 4; k++) {
+        const ang = k * Math.PI / 2;
+        ctx.moveTo(0, 0);
+        ctx.lineTo(Math.cos(ang) * R, Math.sin(ang) * R);
+      }
+      ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(0, 0, R * 0.22 + 1, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+    } else if (f.type === 'thrust') {
+      // línea de empuje del puño (motion-blur veloz): brillante en la punta
+      const a = f.life / f.max;
+      const ex = f.x + Math.cos(f.angle) * f.len, ey = f.y + Math.sin(f.angle) * f.len;
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.strokeStyle = f.color || '#fff';
+      ctx.shadowColor = f.color || '#fff';
+      ctx.shadowBlur = 10;
+      ctx.lineCap = 'round';
+      ctx.lineWidth = (f.w || 3) * a;
+      ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(ex, ey); ctx.stroke();
+      // núcleo blanco más fino
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = Math.max(1, (f.w || 3) * a * 0.4);
+      ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(ex, ey); ctx.stroke();
+      ctx.restore();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+    } else if (f.type === 'rift') {
+      // grieta dimensional: rendija que abre y cierra, perpendicular a la salida de la copia
+      const a = f.life / f.max;
+      const open = Math.sin(a * Math.PI); // 0 → 1 → 0 (abre y cierra)
+      const len = (f.big ? 36 : 24) * open;
+      ctx.save();
+      ctx.translate(f.x, f.y);
+      ctx.rotate((f.angle || 0) + Math.PI / 2);
+      ctx.shadowColor = f.color || '#f0d';
+      ctx.shadowBlur = 16;
+      // núcleo blanco brillante
+      const grad = ctx.createLinearGradient(0, -len, 0, len);
+      grad.addColorStop(0, 'rgba(255,255,255,0)');
+      grad.addColorStop(0.5, 'rgba(255,255,255,0.95)');
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(-2.5, -len, 5, len * 2);
+      // bordes magenta (frontera entre dimensiones)
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = f.color || '#f0d';
+      ctx.fillRect(-5.5, -len, 2.5, len * 2);
+      ctx.fillRect(3, -len, 2.5, len * 2);
+      ctx.restore();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+    } else if (f.type === 'suck') {
+      // cadáver succionado al bolsillo por una trayectoria CURVA (bezier), con estela
+      const t = 1 - f.life / f.max; // 0 → 1
+      const cx = f.cx !== undefined ? f.cx : (f.x + f.tx) / 2;
+      const cy = f.cy !== undefined ? f.cy : (f.y + f.ty) / 2;
+      ctx.shadowColor = f.color || ZIP_CYAN; ctx.shadowBlur = 8;
+      for (let k = 0; k < 3; k++) {
+        const tt = Math.max(0, t - k * 0.14), u = 1 - tt;
+        const x = u * u * f.x + 2 * u * tt * cx + tt * tt * f.tx;
+        const y = u * u * f.y + 2 * u * tt * cy + tt * tt * f.ty;
+        ctx.globalAlpha = (f.life / f.max) * (1 - k * 0.3);
+        ctx.fillStyle = f.color || ZIP_CYAN;
+        ctx.beginPath(); ctx.arc(x, y, (4 - k) * (1 - t) + 1.5, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.shadowBlur = 0; ctx.globalAlpha = 1;
     } else if (f.type === 'muda') {
       ctx.globalAlpha = f.life / f.max;
       ctx.font = 'bold 20px monospace';
@@ -9101,7 +9735,7 @@ function draw() {
       ctx.shadowBlur = 8;
       ctx.fillStyle = '#fd0';
       const yOff = (1 - f.life / f.max) * -14;
-      ctx.fillText('MUDA', f.x, f.y + yOff);
+      ctx.fillText('NULO', f.x, f.y + yOff);
       ctx.shadowBlur = 0;
       ctx.textAlign = 'left';
       ctx.globalAlpha = 1;
@@ -9134,6 +9768,11 @@ function draw() {
     ctx.fillText(`NIEBLA TOTAL — ${(smokeFogTimer / 60).toFixed(1)}s`, W / 2, 30);
     ctx.textAlign = 'left';
   }
+
+  // Puño Estelar: TORBELLINO ESTELAR (modo C) — vórtice que chupa alrededor del personaje
+  drawStarVortex();
+  // Cierre Relámpago: aura del bolsillo alrededor del personaje
+  drawZipperPocket();
 
   // Puño Estelar: MUNDO DETENIDO cutscene
   if (starPlatinumPhase === 1) {
@@ -9213,7 +9852,7 @@ function draw() {
     ctx.fillText('MUNDO DETENIDO', W / 2, H / 2 + 20);
     ctx.font = `bold 24px monospace`;
     ctx.fillStyle = `rgba(200, 160, 255, ${Math.min(1, t * 2)})`;
-    ctx.fillText('— TOKI WO TOMARE! —', W / 2, H / 2 + 70);
+    ctx.fillText('— ¡QUE EL TIEMPO SE DETENGA! —', W / 2, H / 2 + 70);
     ctx.shadowBlur = 0;
     ctx.textAlign = 'left';
   }
@@ -9331,7 +9970,7 @@ function draw() {
       ctx.shadowColor = '#c97';
       ctx.shadowBlur = 28;
       ctx.fillStyle = `rgba(255, 220, 140, ${Math.min(1, t * 2.5)})`;
-      ctx.fillText('DISASSEMBLE!', W / 2, H / 2 + 14);
+      ctx.fillText('¡DESENSAMBLAR!', W / 2, H / 2 + 14);
       ctx.shadowBlur = 0;
       ctx.textAlign = 'left';
     }
@@ -9429,10 +10068,10 @@ function draw() {
       ctx.shadowColor = '#f06';
       ctx.shadowBlur = 22;
       ctx.fillStyle = `rgba(255, 200, 230, ${Math.min(1, t * 2)})`;
-      ctx.fillText('DIRTY DEEDS DONE DIRT CHEAP', W / 2, 84);
+      ctx.fillText('SALTO DIMENSIONAL', W / 2, 84);
       ctx.font = `bold 16px monospace`;
       ctx.fillStyle = `rgba(255, 180, 220, ${Math.min(1, t * 1.8)})`;
-      ctx.fillText('— el bienestar nacional. —', W / 2, 114);
+      ctx.fillText('— por el bien de todos. —', W / 2, 114);
       ctx.shadowBlur = 0;
       ctx.textAlign = 'left';
     } else {
@@ -10367,7 +11006,7 @@ function draw() {
     ctx.fillText('MUNDO DETENIDO', W / 2, H / 2 + 20);
     ctx.font = `bold 24px monospace`;
     ctx.fillStyle = `rgba(255, 200, 60, ${Math.min(1, t * 2)})`;
-    ctx.fillText('— TOKI WO TOMARE! —', W / 2, H / 2 + 70);
+    ctx.fillText('— ¡QUE EL TIEMPO SE DETENGA! —', W / 2, H / 2 + 70);
     ctx.shadowBlur = 0;
     ctx.textAlign = 'left';
   }
@@ -10465,7 +11104,7 @@ function draw() {
     ctx.shadowBlur = 38;
     ctx.fillStyle = `rgba(255, 220, 90, ${pulse})`;
     ctx.fillText('ESPIRAL', W * 0.74, H * 0.34);
-    ctx.fillText('ACT 4', W * 0.74, H * 0.58);
+    ctx.fillText('FASE 4', W * 0.74, H * 0.58);
     ctx.shadowBlur = 0;
     ctx.strokeStyle = `rgba(0, 0, 0, 0.9)`;
     ctx.lineWidth = 6;
@@ -10482,8 +11121,8 @@ function draw() {
       ctx.fillStyle = `rgba(255, 230, 130, ${a})`;
       ctx.strokeStyle = `rgba(0, 0, 0, ${a})`;
       ctx.lineWidth = 4;
-      ctx.strokeText('— INFINITE ROTATION —', W / 2, H * 0.94);
-      ctx.fillText('— INFINITE ROTATION —', W / 2, H * 0.94);
+      ctx.strokeText('— ROTACIÓN INFINITA —', W / 2, H * 0.94);
+      ctx.fillText('— ROTACIÓN INFINITA —', W / 2, H * 0.94);
       ctx.restore();
       ctx.textAlign = 'left';
     }
@@ -10703,13 +11342,13 @@ function draw() {
     ctx.shadowColor = 'rgba(255, 60, 80, 1)';
     ctx.shadowBlur = 50;
     ctx.fillStyle = `rgba(225, 30, 55, ${pulse})`;
-    ctx.fillText('GO', tx, ty);
-    ctx.fillText('BEYOND', tx, ty + 180);
+    ctx.fillText('MÁS', tx, ty);
+    ctx.fillText('ALLÁ', tx, ty + 180);
     ctx.shadowBlur = 0;
     ctx.strokeStyle = `rgba(255, 255, 255, ${pulse})`;
     ctx.lineWidth = 7;
-    ctx.strokeText('GO', tx, ty);
-    ctx.strokeText('BEYOND', tx, ty + 180);
+    ctx.strokeText('MÁS', tx, ty);
+    ctx.strokeText('ALLÁ', tx, ty + 180);
     ctx.restore();
     ctx.textAlign = 'left';
 
@@ -10741,7 +11380,7 @@ function draw() {
     ctx.font = 'bold 22px monospace';
     ctx.textAlign = 'center';
     ctx.fillStyle = `rgba(255, 230, 130, ${t})`;
-    ctx.fillText('NAIL BARRAGE', player.x, player.y - 50);
+    ctx.fillText('RÁFAGA DE UÑAS', player.x, player.y - 50);
     ctx.restore();
     ctx.textAlign = 'left';
   }
@@ -10781,15 +11420,15 @@ function draw() {
     ctx.shadowColor = 'rgba(255, 180, 80, 1)';
     ctx.shadowBlur = 32;
     ctx.fillStyle = `rgba(255, 220, 150, ${pulse})`;
-    ctx.fillText('ESPIRAL ACTO 3', W / 2, H * 0.22);
+    ctx.fillText('ESPIRAL FASE 3', W / 2, H * 0.22);
     ctx.shadowBlur = 0;
     ctx.strokeStyle = 'rgba(50, 20, 0, 0.95)';
     ctx.lineWidth = 5;
-    ctx.strokeText('ESPIRAL ACTO 3', W / 2, H * 0.22);
+    ctx.strokeText('ESPIRAL FASE 3', W / 2, H * 0.22);
     ctx.font = 'bold 38px monospace';
     ctx.fillStyle = `rgba(255, 220, 150, ${pulse})`;
-    ctx.fillText('— WORMHOLE PUNCH —', W / 2, H * 0.92);
-    ctx.strokeText('— WORMHOLE PUNCH —', W / 2, H * 0.92);
+    ctx.fillText('— PUÑO-AGUJERO —', W / 2, H * 0.92);
+    ctx.strokeText('— PUÑO-AGUJERO —', W / 2, H * 0.92);
     ctx.restore();
     ctx.textAlign = 'left';
   }
@@ -10830,7 +11469,7 @@ function draw() {
       ctx.font = 'bold 14px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('DISC', 0, 1);
+      ctx.fillText('DISCO', 0, 1);
       ctx.textAlign = 'left';
       ctx.textBaseline = 'alphabetic';
       ctx.restore();
@@ -10921,8 +11560,8 @@ function draw() {
     ctx.strokeText('GRAVEDAD LUNAR', W / 2, H * 0.32);
     ctx.font = 'bold 44px monospace';
     ctx.fillStyle = `rgba(180, 220, 255, ${pulse})`;
-    ctx.fillText('— GRAVITY INVERSION —', W / 2, H * 0.92);
-    ctx.strokeText('— GRAVITY INVERSION —', W / 2, H * 0.92);
+    ctx.fillText('— INVERSIÓN GRAVITATORIA —', W / 2, H * 0.92);
+    ctx.strokeText('— INVERSIÓN GRAVITATORIA —', W / 2, H * 0.92);
     ctx.restore();
     ctx.textAlign = 'left';
   }
@@ -11028,18 +11667,18 @@ function draw() {
     ctx.shadowColor = 'rgba(255, 200, 60, 1)';
     ctx.shadowBlur = 36;
     ctx.fillStyle = `rgba(255, 240, 180, ${pulse})`;
-    ctx.fillText('MADE IN', W / 2, H * 0.22);
-    ctx.fillText('HEAVEN', W / 2, H * 0.86);
+    ctx.fillText('CIELO', W / 2, H * 0.22);
+    ctx.fillText('ACELERADO', W / 2, H * 0.86);
     ctx.shadowBlur = 0;
     ctx.strokeStyle = 'rgba(80, 30, 0, 0.95)';
     ctx.lineWidth = 6;
-    ctx.strokeText('MADE IN', W / 2, H * 0.22);
-    ctx.strokeText('HEAVEN', W / 2, H * 0.86);
+    ctx.strokeText('CIELO', W / 2, H * 0.22);
+    ctx.strokeText('ACELERADO', W / 2, H * 0.86);
     if (exploded) {
       ctx.font = 'bold 38px monospace';
       ctx.fillStyle = `rgba(255, 255, 230, ${pulse})`;
-      ctx.fillText('— HEAVEN ASCENSION —', W / 2, H * 0.5);
-      ctx.strokeText('— HEAVEN ASCENSION —', W / 2, H * 0.5);
+      ctx.fillText('— ASCENSIÓN CELESTE —', W / 2, H * 0.5);
+      ctx.strokeText('— ASCENSIÓN CELESTE —', W / 2, H * 0.5);
     }
     ctx.restore();
     ctx.textAlign = 'left';
@@ -11190,19 +11829,19 @@ function draw() {
       ctx.shadowColor = '#fff';
       ctx.shadowBlur = 22;
       ctx.fillStyle = `rgba(255, 255, 255, ${t1})`;
-      ctx.fillText('BLACK,', W * 0.50, H * 0.32);
+      ctx.fillText('TODO', W * 0.50, H * 0.32);
       // EVERYTHING MUST
       const t2 = Math.max(0, Math.min(1, (t - 0.35) * 3));
       ctx.font = `bold ${36 + t2 * 14}px monospace`;
       ctx.shadowBlur = 14;
       ctx.fillStyle = `rgba(255, 255, 255, ${t2})`;
-      ctx.fillText('EVERYTHING MUST', W * 0.50, H * 0.52);
+      ctx.fillText('DEBE VOLVERSE', W * 0.50, H * 0.52);
       // BE BLACK.
       const t3 = Math.max(0, Math.min(1, (t - 0.6) * 4));
       ctx.font = `900 ${56 + t3 * 30}px monospace`;
       ctx.shadowBlur = 26;
       ctx.fillStyle = `rgba(255, 255, 255, ${t3})`;
-      ctx.fillText('BE BLACK.', W * 0.50, H * 0.72);
+      ctx.fillText('NEGRO.', W * 0.50, H * 0.72);
       ctx.shadowBlur = 0;
       ctx.restore();
     }
@@ -11395,8 +12034,8 @@ function draw() {
         ctx.fillStyle = '#000';
         ctx.strokeStyle = `hsl(${hue}, 100%, 65%)`;
         ctx.lineWidth = 3;
-        ctx.strokeText('BLACK', x, y);
-        ctx.fillText('BLACK', x, y);
+        ctx.strokeText('NEGRO', x, y);
+        ctx.fillText('NEGRO', x, y);
       }
       // título central palpitante
       ctx.font = `900 ${88 + Math.sin(frame * 0.4) * 12}px monospace`;
@@ -11406,8 +12045,8 @@ function draw() {
       ctx.strokeStyle = `hsl(${(frame * 28) % 360}, 100%, 65%)`;
       ctx.lineWidth = 6;
       const titleY = H / 2 + Math.sin(frame * 0.5) * 6;
-      ctx.strokeText('BLACK!!', W / 2, titleY);
-      ctx.fillText('BLACK!!', W / 2, titleY);
+      ctx.strokeText('¡NEGRO!!', W / 2, titleY);
+      ctx.fillText('¡NEGRO!!', W / 2, titleY);
       ctx.shadowBlur = 0;
       ctx.restore();
       ctx.textAlign = 'left';
@@ -11543,6 +12182,35 @@ function drawUI() {
     ctx.font = 'bold 11px monospace';
     ctx.fillText(__isNight ? 'NOCHE' : 'DIA', 175, 78);
   }
+  // Recordatorio del modo C — pequeño, arriba al centro
+  if (active === 20) {
+    const sv = starVortexMode;
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillStyle = sv ? '#d8b6ff' : 'rgba(200,180,240,0.75)';
+    ctx.shadowColor = SP_PURPLE; ctx.shadowBlur = sv ? 6 : 0;
+    ctx.fillText(sv ? 'C · TORBELLINO ESTELAR — mantén CLICK para chupar' : 'C · cambia los clicks a TORBELLINO ESTELAR', W / 2, 30);
+    ctx.shadowBlur = 0;
+    ctx.textAlign = 'left';
+  } else if (active === 21) {
+    const fm = theWorldFistMode;
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillStyle = fm ? '#ffe37a' : 'rgba(240,225,150,0.75)';
+    ctx.shadowColor = TW_YELLOW; ctx.shadowBlur = fm ? 6 : 0;
+    ctx.fillText(fm ? 'C · PUÑOS ANULADORES (amarillos) — click para golpear' : 'C · cambia los clicks a PUÑOS ANULADORES', W / 2, 30);
+    ctx.shadowBlur = 0;
+    ctx.textAlign = 'left';
+  } else if (active === 19) {
+    const bm = d4cFlagMode;
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillStyle = bm ? '#fff' : 'rgba(240,160,200,0.8)';
+    ctx.shadowColor = bm ? '#fff' : '#f06'; ctx.shadowBlur = bm ? 6 : 0;
+    ctx.fillText(bm ? 'C · BANDERA EXPLOSIVA — dispara y estalla en blanco y negro' : 'C · cambia los clicks a BANDERA EXPLOSIVA', W / 2, 30);
+    ctx.shadowBlur = 0;
+    ctx.textAlign = 'left';
+  }
   // Power-ups activos (HUD compacto a la derecha)
   let puY = 50;
   const puList = [
@@ -11583,7 +12251,7 @@ function drawUI() {
     ctx.fillText(`19. ${ESPIRAL_LABELS[tuskAct]}`, 20, 98);
   } else if (active === 16 && geForm === 1) {
     ctx.fillStyle = '#fe6';
-    ctx.fillText(`17. Réquiem Dorado`, 20, 98);
+    ctx.fillText(`17. Réquiem Radiante`, 20, 98);
   } else if (active === 28) {
     ctx.fillStyle = MJ_FORM_COLORS[mjForm];
     ctx.fillText(`29. Rey del Pop — ${MJ_FORM_NAMES[mjForm]}`, 20, 98);
@@ -11595,16 +12263,22 @@ function drawUI() {
   // cooldowns
   ctx.fillStyle = '#fff';
   ctx.font = '12px monospace';
+  if (active === 31) {
+    const full = zipperPocket >= 100;
+    ctx.fillStyle = full ? '#fff' : ZIP_CYAN;
+    const zt = zipperPocket <= 0 ? '(vacío)' : (zipperCD > 0 ? `Z ${(zipperCD / 60).toFixed(1)}s` : 'Z: liberar');
+    ctx.fillText(`👝 Bolsillo ${zipperPocket}/100 · ${zt}${full ? ' ¡LLENO!' : ''}`, 280, 33);
+  }
   if (active === 9) {
     if (nkcPhase > 0) {
       ctx.fillStyle = '#c97';
-      ctx.fillText(`🔩 DISASSEMBLE!`, 280, 33);
+      ctx.fillText(`🔩 ¡DESENSAMBLAR!`, 280, 33);
     } else if (nkcCD > 0) {
       ctx.fillStyle = '#888';
-      ctx.fillText(`C Disassemble: ${(nkcCD / 60).toFixed(1)}s`, 280, 33);
+      ctx.fillText(`C Desensamblar: ${(nkcCD / 60).toFixed(1)}s`, 280, 33);
     } else {
       ctx.fillStyle = '#c97';
-      ctx.fillText(`C Disassemble: LISTO`, 280, 33);
+      ctx.fillText(`C Desensamblar: LISTO`, 280, 33);
     }
     let marked = 0, totalNuts = 0;
     for (let i = 0; i < enemies.length; i++) {
@@ -11662,7 +12336,7 @@ function drawUI() {
     }
     if (threadAwakened) {
       ctx.fillStyle = '#5fe';
-      ctx.fillText(`✦ Stone Free DESPIERTO`, 480, 33);
+      ctx.fillText(`✦ Tejedor DESPIERTO`, 480, 33);
     } else {
       ctx.fillStyle = '#fff';
       ctx.fillText(`☠ Despertar: ${Math.min(threadKills, 40)}/40`, 480, 33);
@@ -11889,19 +12563,19 @@ function drawUI() {
       ctx.fillStyle = tuskA1Kills >= 50 ? '#fd9' : '#fff';
       ctx.fillText(`☠ Kills Act 1: ${Math.min(tuskA1Kills, 50)}/50`, 480, 33);
     } else if (tuskAct === 2) {
-      if (tuskNailStormCD > 0) { ctx.fillStyle = '#888'; ctx.fillText(`Y Nail Barrage: ${(tuskNailStormCD / 60).toFixed(0)}s`, 280, 33); }
-      else { ctx.fillStyle = '#fd9'; ctx.fillText(`Y Nail Barrage: LISTO`, 280, 33); }
+      if (tuskNailStormCD > 0) { ctx.fillStyle = '#888'; ctx.fillText(`Y Ráfaga de Uñas: ${(tuskNailStormCD / 60).toFixed(0)}s`, 280, 33); }
+      else { ctx.fillStyle = '#fd9'; ctx.fillText(`Y Ráfaga de Uñas: LISTO`, 280, 33); }
       ctx.fillStyle = tuskA2Kills >= 100 ? '#fc7' : '#fff';
       ctx.fillText(`☠ Kills Act 2: ${Math.min(tuskA2Kills, 100)}/100`, 480, 33);
     } else if (tuskAct === 3) {
-      if (tuskWormholeCD > 0) { ctx.fillStyle = '#888'; ctx.fillText(`Z Wormhole: ${(tuskWormholeCD / 60).toFixed(0)}s`, 280, 33); }
-      else { ctx.fillStyle = '#fc7'; ctx.fillText(`Z Wormhole Punch: LISTO`, 280, 33); }
+      if (tuskWormholeCD > 0) { ctx.fillStyle = '#888'; ctx.fillText(`Z Puño-Agujero: ${(tuskWormholeCD / 60).toFixed(0)}s`, 280, 33); }
+      else { ctx.fillStyle = '#fc7'; ctx.fillText(`Z Puño-Agujero: LISTO`, 280, 33); }
       ctx.fillStyle = tuskA3Kills >= 150 ? '#fd6' : '#fff';
       ctx.fillText(`☠ Kills Act 3: ${Math.min(tuskA3Kills, 150)}/150`, 480, 33);
     } else if (tuskAct === 4) {
-      if (vortexUltPhase > 0) { ctx.fillStyle = '#fd6'; ctx.fillText(`✨ ESPIRAL ACTO 4`, 280, 33); }
-      else if (vortexUltCD > 0) { ctx.fillStyle = '#888'; ctx.fillText(`V Golden Ratio: ${(vortexUltCD / 60).toFixed(0)}s`, 280, 33); }
-      else { ctx.fillStyle = '#fd6'; ctx.fillText(`V Golden Ratio: LISTO`, 280, 33); }
+      if (vortexUltPhase > 0) { ctx.fillStyle = '#fd6'; ctx.fillText(`✨ ESPIRAL FASE 4`, 280, 33); }
+      else if (vortexUltCD > 0) { ctx.fillStyle = '#888'; ctx.fillText(`V Proporción Áurea: ${(vortexUltCD / 60).toFixed(0)}s`, 280, 33); }
+      else { ctx.fillStyle = '#fd6'; ctx.fillText(`V Proporción Áurea: LISTO`, 280, 33); }
       ctx.fillStyle = '#fe8';
       ctx.fillText(`G → ${tuskForm === 0 ? 'PUÑOS' : 'BALAS'} (cambiar a ${tuskForm === 0 ? 'Balas' : 'Puños'})`, 440, 33);
     }
@@ -11919,28 +12593,28 @@ function drawUI() {
   if (active === 16) {
     if (mudaPhase > 0) {
       ctx.fillStyle = '#fd0';
-      ctx.fillText(`👊 INÚTIL INÚTIL INÚTIL!`, 280, 33);
+      ctx.fillText(`👊 ¡LLUVIA RADIANTE!`, 280, 33);
     } else if (mirageCD > 0) {
       ctx.fillStyle = '#888';
-      ctx.fillText(`K Inútil: ${(mirageCD / 60).toFixed(0)}s`, 280, 33);
+      ctx.fillText(`K Lluvia: ${(mirageCD / 60).toFixed(0)}s`, 280, 33);
     } else {
       ctx.fillStyle = '#fd0';
-      ctx.fillText(`K Inútil: LISTO`, 280, 33);
+      ctx.fillText(`K Lluvia: LISTO`, 280, 33);
     }
     if (geForm === 1) {
       if (gerReturnTimer > 0) {
         ctx.fillStyle = '#fe6';
-        ctx.fillText(`☯ RETURN TO ZERO ${(gerReturnTimer / 60).toFixed(1)}s`, 480, 33);
+        ctx.fillText(`☯ REGRESO A CERO ${(gerReturnTimer / 60).toFixed(1)}s`, 480, 33);
       } else if (gerReturnCD > 0) {
         ctx.fillStyle = '#888';
-        ctx.fillText(`R Return to Zero: ${(gerReturnCD / 60).toFixed(0)}s`, 480, 33);
+        ctx.fillText(`R Regreso a Cero: ${(gerReturnCD / 60).toFixed(0)}s`, 480, 33);
       } else {
         ctx.fillStyle = '#fe6';
-        ctx.fillText(`R Return to Zero: LISTO`, 480, 33);
+        ctx.fillText(`R Regreso a Cero: LISTO`, 480, 33);
       }
     } else if (!gerUnlocked) {
       ctx.fillStyle = gerKills >= 4000 ? '#fe6' : '#fff';
-      ctx.fillText(`☠ Kills GER: ${Math.min(gerKills, 4000)}/4000`, 480, 33);
+      ctx.fillText(`☠ Bajas Réquiem: ${Math.min(gerKills, 4000)}/4000`, 480, 33);
     }
   }
   if (active === 23) {
@@ -12010,12 +12684,12 @@ function drawUI() {
       ctx.fillText(`☠ Kills Disco del Alma: ${Math.min(wsKills, 500)}/500`, 480, 33);
     } else if (standForm === 1) {
       if (cmUltCD > 0) { ctx.fillStyle = '#888'; ctx.fillText(`M Gravity: ${(cmUltCD / 60).toFixed(0)}s`, 280, 33); }
-      else { ctx.fillStyle = '#48f'; ctx.fillText(`M Gravity Inversion: LISTO`, 280, 33); }
+      else { ctx.fillStyle = '#48f'; ctx.fillText(`M Inversión Gravitatoria: LISTO`, 280, 33); }
       ctx.fillStyle = cmKills >= 2000 ? '#fc6' : '#9cf';
       ctx.fillText(`☠ Kills Gravedad Lunar: ${Math.min(cmKills, 2000)}/2000`, 480, 33);
     } else if (standForm === 2) {
-      if (mihUltCD > 0) { ctx.fillStyle = '#888'; ctx.fillText(`H Heaven: ${(mihUltCD / 60).toFixed(0)}s`, 280, 33); }
-      else { ctx.fillStyle = '#fc6'; ctx.fillText(`H Heaven Ascension: LISTO`, 280, 33); }
+      if (mihUltCD > 0) { ctx.fillStyle = '#888'; ctx.fillText(`H Cielo: ${(mihUltCD / 60).toFixed(0)}s`, 280, 33); }
+      else { ctx.fillStyle = '#fc6'; ctx.fillText(`H Ascensión Celeste: LISTO`, 280, 33); }
       if (mihSpeedBoost > 0) { ctx.fillStyle = '#fc6'; ctx.fillText(`✨ VELOCIDAD ×3 — ${(mihSpeedBoost / 60).toFixed(1)}s`, 480, 33); }
       else { ctx.fillStyle = '#fea'; ctx.fillText(`Tiempo ralentizado`, 480, 33); }
     }
@@ -12055,7 +12729,7 @@ function drawUI() {
     ctx.shadowColor = 'rgba(255, 220, 130, 1)';
     ctx.shadowBlur = 22;
     ctx.fillStyle = `rgba(255, 240, 170, ${a})`;
-    ctx.fillText('¡ESPIRAL ACTO 2 DESBLOQUEADO!', W / 2, 130);
+    ctx.fillText('¡ESPIRAL FASE 2 DESBLOQUEADA!', W / 2, 130);
     ctx.font = 'bold 16px monospace';
     ctx.fillStyle = `rgba(255, 240, 200, ${a})`;
     ctx.fillText('Pulsa T para cambiar entre Actos', W / 2, 158);
@@ -12070,10 +12744,10 @@ function drawUI() {
     ctx.shadowColor = 'rgba(255, 190, 100, 1)';
     ctx.shadowBlur = 24;
     ctx.fillStyle = `rgba(255, 220, 150, ${a})`;
-    ctx.fillText('¡ESPIRAL ACTO 3 DESBLOQUEADO!', W / 2, 130);
+    ctx.fillText('¡ESPIRAL FASE 3 DESBLOQUEADA!', W / 2, 130);
     ctx.font = 'bold 16px monospace';
     ctx.fillStyle = `rgba(255, 240, 200, ${a})`;
-    ctx.fillText('Z para Wormhole Punch · T para ciclar', W / 2, 158);
+    ctx.fillText('Z para Puño-Agujero · T para ciclar', W / 2, 158);
     ctx.restore();
     ctx.textAlign = 'left';
   }
@@ -12085,10 +12759,10 @@ function drawUI() {
     ctx.shadowColor = 'rgba(255, 200, 60, 1)';
     ctx.shadowBlur = 28;
     ctx.fillStyle = `rgba(255, 230, 130, ${a})`;
-    ctx.fillText('¡ESPIRAL ACTO 4 DESBLOQUEADO!', W / 2, 130);
+    ctx.fillText('¡ESPIRAL FASE 4 DESBLOQUEADA!', W / 2, 130);
     ctx.font = 'bold 16px monospace';
     ctx.fillStyle = `rgba(255, 240, 200, ${a})`;
-    ctx.fillText('Golden Rotation. V para el ultimate.', W / 2, 158);
+    ctx.fillText('Rotación Dorada. V para el definitivo.', W / 2, 158);
     ctx.restore();
     ctx.textAlign = 'left';
   }
@@ -12104,7 +12778,7 @@ function drawUI() {
     ctx.fillText('¡GRAVEDAD LUNAR DESBLOQUEADO!', W / 2, 130);
     ctx.font = 'bold 16px monospace';
     ctx.fillStyle = `rgba(220, 235, 255, ${a})`;
-    ctx.fillText('Pulsa L para cambiar entre stands', W / 2, 158);
+    ctx.fillText('Pulsa L para cambiar de forma', W / 2, 158);
     ctx.restore();
     ctx.textAlign = 'left';
   }
@@ -12146,7 +12820,7 @@ function drawUI() {
     ctx.shadowColor = 'rgba(85, 255, 238, 1)';
     ctx.shadowBlur = 22;
     ctx.fillStyle = `rgba(170, 255, 245, ${a})`;
-    ctx.fillText('¡STONE FREE DESPIERTA!', W / 2, 130);
+    ctx.fillText('¡EL TEJEDOR DESPIERTA!', W / 2, 130);
     ctx.font = 'bold 16px monospace';
     ctx.fillStyle = `rgba(220, 255, 250, ${a})`;
     ctx.fillText('Hilos que atraviesan más + telaraña que caza balas', W / 2, 158);
@@ -12161,7 +12835,7 @@ function drawUI() {
     ctx.shadowColor = 'rgba(244, 154, 194, 1)';
     ctx.shadowBlur = 22;
     ctx.fillStyle = `rgba(255, 200, 225, ${a})`;
-    ctx.fillText('¡CRAZY DIAMOND DESPIERTA!', W / 2, 130);
+    ctx.fillText('¡PUÑOS ROMPEDORES DESPIERTAN!', W / 2, 130);
     ctx.font = 'bold 16px monospace';
     ctx.fillStyle = `rgba(255, 225, 240, ${a})`;
     ctx.fillText('Pulsa C: RESTAURACIÓN (devuelve balas + cura aliados)', W / 2, 158);
@@ -12183,7 +12857,7 @@ function drawUI() {
     ctx.lineWidth = 1;
     ctx.fillStyle = isOwned ? '#fff' : '#555';
     ctx.font = 'bold 9px monospace';
-    const keyLabels = ['1','2','3','4','5','6','7','8','9','0','-','=','⇥',']','[','\\','/',';',"'",',','.','`','','','','','Pucci'];
+    const keyLabels = ['1','2','3','4','5','6','7','8','9','0','-','=','⇥',']','[','\\','/',';',"'",',','.','`','','','','',''];
     ctx.fillText(keyLabels[i] || '?', x + 2, hbY + 11);
     let pelletColor = ab.color;
     if (i === 26 && isOwned) pelletColor = STAND_COLORS[standForm];
@@ -12457,7 +13131,8 @@ function restart() {
   apexPhase = 0; apexTimer = 0; apexCD = 0;
   detonateAllCD = 0;
   lesson3CD = 0;
-  starPlatinumPhase = 0; starPlatinumTimer = 0;
+  starPlatinumPhase = 0; starPlatinumTimer = 0; starVortexMode = false;
+  theWorldFistMode = false; d4cFlagMode = false;
   oraQueue = 0; oraTimer = 0;
   dioPhase = 0; dioTimer = 0;
   kqPhase = 0; kqTimer = 0;
@@ -12475,6 +13150,7 @@ function restart() {
   breakerCombo = 0; breakerTimer = 0;
   smokeFogTimer = 0; smokeFogCD = 0; smokeClouds.length = 0;
   webModeTimer = 0; webModeCD = 0;
+  zipperCD = 0; zipperPocket = 0;
   redModeTimer = 0; preKillCredits = 0;
   mirageCD = 0; mudaPhase = 0; mudaTimer = 0;
   geForm = 0; gerUnlocked = false; gerKills = 0;
@@ -12507,6 +13183,533 @@ function restart() {
 }
 
 // ---------------- Main loop ----------------
+// ============================================================
+//  OLEADA 100 — DUELO FINAL (vista pseudo-3D tras el hombro)
+//  El jefe voltea la realidad: tus poderes no sirven, solo tu
+//  pistola. Te lanza los cadáveres de todos los jefes como balas.
+// ============================================================
+let finalDuel = null;
+const DUEL_BOSS_COLORS = BOSS_CYCLE.map(k => (ENEMY_TYPES[k] && ENEMY_TYPES[k].color) || '#f44');
+
+function startFinalDuel() {
+  finalDuel = {
+    phase: 'intro', t: 0, flip: 0,
+    playerLx: 0, aimShake: 0,
+    bossMaxHp: 4500, bossHp: 4500, bossLx: 0, bossHitFlash: 0,
+    corpses: [], reflects: [], volleyCd: 70,
+    parryWin: 0, parryCd: 0, parryFx: 0, parried: 0,
+    trainDone: false, rockT: 0, trainT: 0, trainPlayerY: 0, trainVY: 0, trainObstacles: [], trainSpawnCd: 45,
+    hurtFlash: 0, winT: 0, loseT: 0, killed: 0,
+  };
+  enemies.length = 0; projectiles.length = 0;   // sin enemigos ni balas normales
+  waveActive = true; enemiesToSpawn = 0;
+  // desactiva escudos/buffs para que el duelo sea realmente peligroso
+  shieldActive = false; ltActiveTimer = 0; barrierHp = 0;
+  smokeFogTimer = 0; timeStopTimer = 0; puInvulnTimer = 0;
+  player.iframe = 80;
+  shake = Math.max(shake, 22);
+}
+
+// Proyección pseudo-3D: lx en [-1,1] (lateral), z en [0=lejos .. 1=cerca de la cámara].
+function duelProject(lx, z) {
+  const hz = H * 0.40;
+  const y = hz + (H * 0.99 - hz) * z;
+  const spread = W * 0.05 + z * z * W * 0.62;
+  const x = W / 2 + lx * spread;
+  const scale = 0.10 + z * z * 2.0;
+  return { x, y, scale };
+}
+
+function duelSpawnShot(lx, kind) {
+  const d = finalDuel;
+  const rage = 1 - d.bossHp / d.bossMaxHp;
+  const lane = (lx !== undefined)
+    ? Math.max(-0.95, Math.min(0.95, lx))                                   // carril concreto (roca apuntada)
+    : Math.max(-0.95, Math.min(0.95, d.bossLx + rand(-0.6, 0.6)));          // disperso desde el jefe
+  d.corpses.push({
+    lx: lane, z: 0.06, vz: rand(0.0070, 0.0112) + rage * 0.006,
+    kind: kind || 'corpse',
+    colorIdx: Math.floor(rand(0, DUEL_BOSS_COLORS.length)), spin: rand(0, 6.28), seed: rand(0, 100),
+  });
+}
+
+// Para (rebota) el cadáver del índice i: se lo devuelves al jefe SIN recibir daño.
+function duelParryCorpse(i) {
+  const d = finalDuel;
+  const c = d.corpses[i];
+  d.reflects.push({ lx: c.lx, z: c.z, colorIdx: c.colorIdx, spin: c.spin });
+  d.corpses.splice(i, 1); d.parried++;
+  player.iframe = Math.max(player.iframe, 30); // ¡inmortal 0.5s al parar!
+  d.parryFx = Math.max(d.parryFx, 8);
+  const p = duelProject(d.playerLx, 0.95);
+  burst(p.x, p.y, 14, () => rand(0, 1) > 0.5 ? '#fe6' : '#fff', { spread: 6, jitter: 10, life: 18 });
+  effects.push({ type: 'flash', life: 5, max: 5, color: '#fe6' });
+  shake = Math.max(shake, 5);
+}
+
+function updateFinalDuel() {
+  const d = finalDuel;
+  d.t++;
+  if (player.iframe > 0) player.iframe--;   // updatePlayer no corre en el duelo: hay que bajar el iframe aquí
+  if (shake > 0.4) shake *= 0.9; else shake = 0;
+  if (d.bossHitFlash > 0) d.bossHitFlash--;
+  if (d.hurtFlash > 0) d.hurtFlash--;
+  if (d.parryWin > 0) d.parryWin--;
+  if (d.parryCd > 0) d.parryCd--;
+  if (d.parryFx > 0) d.parryFx--;
+
+  if (d.phase === 'intro') {
+    if (d.t >= 70 && d.t <= 110) d.flip = (d.t - 70) / 40;
+    else if (d.t > 110) d.flip = 1;
+    if (d.t === 74) { shake = 30; effects.push({ type: 'flash', life: 28, max: 28, color: '#fff' }); }
+    if (d.t >= 165) d.phase = 'duel';
+    return;
+  }
+  if (d.phase === 'rockKnock') {
+    d.rockT++;
+    if (d.rockT === 40) { shake = 30; effects.push({ type: 'flash', life: 20, max: 20, color: '#fff' }); }
+    if (d.rockT >= 80) { d.phase = 'train'; d.trainT = 0; d.trainPlayerY = H * 0.62; d.trainVY = 0; d.trainObstacles = []; d.trainSpawnCd = 40; }
+    return;
+  }
+  if (d.phase === 'train') { updateDuelTrain(); return; }
+  if (d.phase === 'win') { d.winT++; if (d.winT > 200) endFinalDuel(true); return; }
+  if (d.phase === 'lose') { d.loseT++; if (d.loseT > 120) { gameOver = true; finalDuel = null; } return; }
+
+  // ===== DUELO =====
+  const mv = 0.032;
+  if (keys['a'] || keys['arrowleft'])  d.playerLx -= mv;
+  if (keys['d'] || keys['arrowright']) d.playerLx += mv;
+  d.playerLx = Math.max(-1, Math.min(1, d.playerLx));
+
+  const rage = 1 - d.bossHp / d.bossMaxHp;
+  d.bossLx = Math.sin(d.t * (0.02 + rage * 0.016)) * (0.62 + rage * 0.16); // se mueve más al enfurecerse
+
+  // Volley: CADÁVERES (parryables, dispersos) + ROCAS (NO parryables, apuntadas a ti)
+  d.volleyCd--;
+  if (d.volleyCd <= 0) {
+    const nC = 2 + Math.floor(rage * 3) + (Math.random() < 0.5 ? 1 : 0);
+    for (let i = 0; i < nC; i++) duelSpawnShot(undefined, 'corpse');
+    const nR = 1 + Math.floor(rage * 2) + (Math.random() < 0.4 ? 1 : 0);
+    for (let i = 0; i < nR; i++) duelSpawnShot(d.playerLx + rand(-0.2, 0.2), 'rock');
+    d.volleyCd = Math.max(20, 66 - Math.floor(rage * 42));
+    effects.push({ type: 'flash', life: 6, max: 6, color: '#f44' });
+  }
+
+  // PARRY (click): ventana; mientras paras, los cadáveres en guardia se REBOTAN sin dañarte. Las rocas NO.
+  if (mouse.clicked && d.parryCd <= 0) { d.parryWin = 16; d.parryCd = 12; d.parryFx = 12; }
+  if (d.parryWin > 0) {
+    for (let i = d.corpses.length - 1; i >= 0; i--) {
+      const c = d.corpses[i];
+      if (c.kind !== 'corpse') continue;
+      if (c.z >= 0.70 && c.z <= 1.06 && Math.abs(c.lx - d.playerLx) < 0.45) duelParryCorpse(i);
+    }
+  }
+
+  const dmgCorpse = Math.max(28, player.maxHp * 0.11);
+  const dmgRock = Math.max(34, player.maxHp * 0.14);
+  for (let i = d.corpses.length - 1; i >= 0; i--) {
+    const c = d.corpses[i];
+    c.z += c.vz; c.spin += 0.12;
+    if (c.z >= 0.92 && Math.abs(c.lx - d.playerLx) < 0.30) {
+      if (c.kind === 'corpse' && d.parryWin > 0) { duelParryCorpse(i); continue; } // parando: se rebota, NO te daña
+      if (tryDamagePlayer(c.kind === 'rock' ? dmgRock : dmgCorpse, 22, 12)) d.hurtFlash = 14;
+      d.corpses.splice(i, 1); continue;
+    }
+    if (c.z > 1.08) d.corpses.splice(i, 1);
+  }
+
+  // Cadáveres rebotados que vuelven al jefe y lo dañan al llegar
+  for (let i = d.reflects.length - 1; i >= 0; i--) {
+    const r = d.reflects[i];
+    r.z -= 0.032; r.spin += 0.2;
+    if (r.z <= 0.08) {
+      d.bossHp = Math.max(0, d.bossHp - 175);
+      d.bossHitFlash = 6; shake = Math.max(shake, 6);
+      const bp = duelProject(d.bossLx, 0.06);
+      burst(bp.x, bp.y - 30, 10, () => '#fff', { spread: 5, jitter: 8, life: 16 });
+      d.reflects.splice(i, 1);
+      if (d.bossHp <= 0 && d.phase === 'duel') { d.phase = 'win'; d.winT = 0; shake = 26; }
+      else if (!d.trainDone && d.bossHp <= d.bossMaxHp * 0.5 && d.phase === 'duel') {
+        // ¡mitad de vida! ROCA GIGANTE → te manda volando al tren (sin daño)
+        d.trainDone = true; d.phase = 'rockKnock'; d.rockT = 0; shake = 24;
+        d.corpses = [];
+      }
+    }
+  }
+
+  if (player.hp <= 0 && d.phase === 'duel') { d.phase = 'lose'; d.loseT = 0; shake = 26; }
+}
+
+function drawRock(x, y, scale, seed) {
+  const r = 24 * scale;
+  ctx.save(); ctx.translate(x, y);
+  ctx.shadowColor = '#000'; ctx.shadowBlur = 6;
+  ctx.fillStyle = '#6b6b72'; ctx.strokeStyle = '#33333a'; ctx.lineWidth = Math.max(1, 2 * scale);
+  ctx.beginPath();
+  const N = 8;
+  for (let i = 0; i < N; i++) {
+    const ang = (i / N) * Math.PI * 2;
+    const rr = r * (0.74 + 0.30 * Math.abs(Math.sin(i * 2.1 + seed)));
+    const px = Math.cos(ang) * rr, py = Math.sin(ang) * rr;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#2a2a30'; ctx.lineWidth = Math.max(1, 1.4 * scale);
+  ctx.beginPath(); ctx.moveTo(-r * 0.4, -r * 0.15); ctx.lineTo(0, r * 0.12); ctx.lineTo(r * 0.34, -r * 0.18); ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
+function endFinalDuel(won) {
+  if (won) {
+    player.hp = player.maxHp; player.maxHp += 20; player.coins += 5000;
+    waveActive = false; waveTimer = 0;
+    raidAnnounceText = '★ VENCISTE EL DUELO FINAL ★';
+    raidAnnounceColor = '#fe6'; raidAnnounceTimer = 220;
+    effects.push({ type: 'heal', life: 60, max: 60, color: '#fe6' });
+  }
+  finalDuel = null;
+}
+
+function drawDuelBoss(x, y, scale, color, t) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale);
+  ctx.shadowColor = color; ctx.shadowBlur = 30;
+  ctx.fillStyle = '#140006';
+  ctx.beginPath();
+  ctx.moveTo(-70, 95); ctx.quadraticCurveTo(-92, -60, -40, -92);
+  ctx.lineTo(40, -92); ctx.quadraticCurveTo(92, -60, 70, 95); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#1a0208';
+  ctx.beginPath(); ctx.arc(0, -104, 34, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = color;
+  for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(i * 18 - 6, -130); ctx.lineTo(i * 18, -164); ctx.lineTo(i * 18 + 6, -130); ctx.closePath(); ctx.fill(); }
+  ctx.shadowBlur = 0;
+  const glow = 0.6 + 0.4 * Math.sin(t * 0.15);
+  ctx.fillStyle = `rgba(255,70,70,${glow})`;
+  ctx.beginPath(); ctx.arc(-13, -108, 7, 0, Math.PI * 2); ctx.arc(13, -108, 7, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+function drawDeadBoss(x, y, scale, color, spin) {
+  const r = 26 * scale;
+  ctx.save(); ctx.translate(x, y); ctx.rotate(spin);
+  ctx.shadowColor = color; ctx.shadowBlur = 8;
+  ctx.strokeStyle = color; ctx.lineWidth = Math.max(2, 4 * scale); ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.8, -r * 0.6); ctx.lineTo(r * 0.8, r * 0.6);
+  ctx.moveTo(-r * 0.8, r * 0.6); ctx.lineTo(r * 0.8, -r * 0.6); ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.6, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#eee';
+  ctx.beginPath(); ctx.arc(0, -r * 0.7, r * 0.4, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = '#400'; ctx.lineWidth = Math.max(1, 1.6 * scale);
+  const e = r * 0.15;
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.18 - e, -r * 0.7 - e); ctx.lineTo(-r * 0.18 + e, -r * 0.7 + e);
+  ctx.moveTo(-r * 0.18 + e, -r * 0.7 - e); ctx.lineTo(-r * 0.18 - e, -r * 0.7 + e);
+  ctx.moveTo(r * 0.18 - e, -r * 0.7 - e); ctx.lineTo(r * 0.18 + e, -r * 0.7 + e);
+  ctx.moveTo(r * 0.18 + e, -r * 0.7 - e); ctx.lineTo(r * 0.18 - e, -r * 0.7 + e); ctx.stroke();
+  ctx.restore();
+}
+
+function drawDuelPlayerBack(x, y, parryFx) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.fillStyle = '#243'; ctx.beginPath(); ctx.ellipse(0, 40, 62, 36, 0, Math.PI, 0); ctx.fill();
+  ctx.fillStyle = '#e8c9a0'; ctx.beginPath(); ctx.arc(0, 0, 26, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#3a2a1a'; ctx.beginPath(); ctx.arc(0, -4, 26, Math.PI * 1.02, Math.PI * 1.98); ctx.fill();
+  // brazos en guardia con una hoja/escudo entre las manos (postura de parry)
+  ctx.strokeStyle = '#243'; ctx.lineWidth = 13; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-24, 38); ctx.lineTo(-42, -12); ctx.moveTo(24, 38); ctx.lineTo(42, -12); ctx.stroke();
+  ctx.strokeStyle = parryFx > 0 ? '#fe6' : '#9df'; ctx.lineWidth = 6;
+  ctx.shadowColor = parryFx > 0 ? '#fe6' : '#9df'; ctx.shadowBlur = parryFx > 0 ? 16 : 6;
+  ctx.beginPath(); ctx.moveTo(-42, -12); ctx.lineTo(42, -12); ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.restore();
+  if (parryFx > 0) {
+    const a = parryFx / 12;
+    ctx.strokeStyle = `rgba(255,230,120,${a})`; ctx.lineWidth = 6;
+    ctx.shadowColor = '#fe6'; ctx.shadowBlur = 16;
+    ctx.beginPath(); ctx.arc(x, y - 8, 66 + (1 - a) * 34, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+}
+
+function drawDuelHud(d) {
+  const bw = W * 0.6, bx = (W - bw) / 2, by = 24;
+  ctx.fillStyle = '#300'; ctx.fillRect(bx, by, bw, 16);
+  ctx.fillStyle = '#e33'; ctx.fillRect(bx, by, bw * Math.max(0, d.bossHp / d.bossMaxHp), 16);
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(bx, by, bw, 16);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 13px monospace'; ctx.textAlign = 'center';
+  ctx.fillText('EL FINAL', W / 2, by + 13);
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#222'; ctx.fillRect(20, H - 40, 240, 18);
+  ctx.fillStyle = '#f44'; ctx.fillRect(20, H - 40, 240 * Math.max(0, player.hp) / player.maxHp, 18);
+  ctx.strokeStyle = '#fff'; ctx.strokeRect(20, H - 40, 240, 18);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 12px monospace';
+  ctx.fillText(`HP ${Math.max(0, Math.floor(player.hp))}/${player.maxHp}`, 28, H - 27);
+  ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,220,220,0.85)'; ctx.font = 'bold 12px monospace';
+  ctx.fillText('A/D moverse · CLICK = PARRY a los cadáveres · esquiva las ROCAS (no se paran)', W / 2, H - 14);
+  ctx.textAlign = 'left';
+}
+
+// ===== Interludio del TREN (vista lateral) al 50% de vida del jefe =====
+const TRAIN_GROUND_Y = () => H * 0.62;
+function updateDuelTrain() {
+  const d = finalDuel;
+  d.trainT++;
+  const groundY = TRAIN_GROUND_Y();
+  // SALTO con gravedad (nada de flotar): salta sólo estando en el techo
+  const jumpKey = keyPressed['w'] || keyPressed['arrowup'] || keyPressed[' '];
+  if (jumpKey && d.trainPlayerY >= groundY - 0.5) d.trainVY = -15.5;
+  d.trainVY += 0.85;                               // gravedad
+  d.trainPlayerY += d.trainVY;
+  if (d.trainPlayerY >= groundY) { d.trainPlayerY = groundY; d.trainVY = 0; } // aterriza en el techo
+
+  // spawn de obstáculos — MÁS FÁCIL: menos, más lentos, más pequeños, con huecos amplios
+  d.trainSpawnCd--;
+  if (d.trainSpawnCd <= 0) {
+    d.trainObstacles.push({ x: W + 50, r: rand(15, 23), vx: rand(6, 8.5), kind: Math.floor(rand(0, 3)), spin: rand(0, 6.28) });
+    d.trainSpawnCd = Math.max(34, 62 - Math.floor(d.trainT / 150) * 3); // apenas acelera
+  }
+
+  const px = W * 0.30, dmg = Math.max(18, player.maxHp * 0.07);
+  const airborne = groundY - d.trainPlayerY;       // altura sobre el techo
+  for (let i = d.trainObstacles.length - 1; i >= 0; i--) {
+    const o = d.trainObstacles[i];
+    o.x -= o.vx; o.spin += 0.08;
+    // sólo te pega si NO saltaste lo suficiente al pasar por tu posición
+    if (Math.abs(o.x - px) < o.r + 12 && airborne < o.r + 6) {
+      if (tryDamagePlayer(dmg, 40, 10)) { d.hurtFlash = 14; shake = Math.max(shake, 9); }
+      d.trainObstacles.splice(i, 1); continue;
+    }
+    if (o.x < -60) d.trainObstacles.splice(i, 1);
+  }
+
+  if (player.hp <= 0) { d.phase = 'lose'; d.loseT = 0; shake = 26; return; }
+  if (d.trainT >= 1200) { // 20s → de vuelta al duelo
+    d.corpses = []; d.reflects = [];
+    player.iframe = Math.max(player.iframe, 60); d.volleyCd = 60;
+    d.phase = d.bossHp <= 0 ? 'win' : 'duel';
+    if (d.phase === 'win') d.winT = 0;
+  }
+}
+
+function drawTinyRacer(x, y) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(25,15,25,0.72)';
+  ctx.fillRect(-11, -6, 22, 7);
+  ctx.fillRect(-9, 0, 3, 8); ctx.fillRect(7, 0, 3, 8);
+  ctx.beginPath(); ctx.moveTo(11, -6); ctx.lineTo(17, -11); ctx.lineTo(13, -2); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.arc(-3, -13, 3.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillRect(-5, -11, 5, 6);
+  ctx.restore();
+}
+
+function drawTrainObstacle(o, cy) {
+  ctx.save(); ctx.translate(o.x, cy); ctx.rotate(o.spin * 0.2);
+  ctx.shadowColor = '#000'; ctx.shadowBlur = 6;
+  if (o.kind === 0) {
+    ctx.fillStyle = '#96602a'; ctx.strokeStyle = '#5a3a18'; ctx.lineWidth = 3;
+    ctx.fillRect(-o.r, -o.r, o.r * 2, o.r * 2); ctx.strokeRect(-o.r, -o.r, o.r * 2, o.r * 2);
+    ctx.beginPath(); ctx.moveTo(-o.r, -o.r); ctx.lineTo(o.r, o.r); ctx.moveTo(o.r, -o.r); ctx.lineTo(-o.r, o.r); ctx.stroke();
+  } else if (o.kind === 1) {
+    ctx.fillStyle = '#7a4a2a'; ctx.strokeStyle = '#2a1a10'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(0, 0, o.r * 0.8, o.r, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-o.r * 0.8, -o.r * 0.35); ctx.lineTo(o.r * 0.8, -o.r * 0.35); ctx.moveTo(-o.r * 0.8, o.r * 0.35); ctx.lineTo(o.r * 0.8, o.r * 0.35); ctx.stroke();
+  } else {
+    ctx.fillStyle = '#6b6b72'; ctx.strokeStyle = '#33333a'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < 7; i++) { const a = (i / 7) * Math.PI * 2; const rr = o.r * (0.75 + 0.28 * Math.abs(Math.sin(i * 2.1))); const px = Math.cos(a) * rr, py = Math.sin(a) * rr; if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  ctx.shadowBlur = 0; ctx.restore();
+}
+
+function drawTrainPlayer(x, y, t, airborne) {
+  const jump = airborne > 5;
+  ctx.save(); ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  ctx.beginPath(); ctx.ellipse(0, 3, Math.max(5, 17 - airborne * 0.07), 4, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#2a5a3a'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  if (jump) { ctx.beginPath(); ctx.moveTo(-4, -18); ctx.lineTo(-8, -8); ctx.moveTo(4, -18); ctx.lineTo(8, -8); ctx.stroke(); }
+  else { const sw = Math.sin(t * 0.4) * 6; ctx.beginPath(); ctx.moveTo(-4, -18); ctx.lineTo(-6 - sw, 0); ctx.moveTo(4, -18); ctx.lineTo(6 + sw, 0); ctx.stroke(); }
+  ctx.fillStyle = '#2a5a3a'; ctx.fillRect(-8, -40, 16, 24);
+  ctx.fillStyle = '#e8c9a0'; ctx.beginPath(); ctx.arc(0, -48, 9, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#3a2a1a'; ctx.beginPath(); ctx.arc(0, -50, 9, Math.PI, 0); ctx.fill();
+  ctx.strokeStyle = '#2a5a3a'; ctx.lineWidth = 5;
+  const aw = jump ? -10 : Math.sin(t * 0.4) * 6;
+  ctx.beginPath(); ctx.moveTo(-6, -34); ctx.lineTo(-13, -28 + aw); ctx.moveTo(6, -34); ctx.lineTo(13, -28 - aw); ctx.stroke();
+  ctx.restore();
+}
+
+function drawDuelRockKnock() {
+  const d = finalDuel;
+  const hz = H * 0.40;
+  ctx.fillStyle = '#2a0610'; ctx.fillRect(0, 0, W, hz);
+  ctx.fillStyle = '#100305'; ctx.fillRect(0, hz, W, H - hz);
+  const bp = duelProject(d.bossLx, 0.06);
+  drawDuelBoss(bp.x, bp.y - 30, 1.5, '#c11', d.t);
+  const g = Math.min(1, d.rockT / 62);
+  const R = 30 + g * g * 430;
+  ctx.save(); ctx.translate(W / 2, H * 0.55); ctx.rotate(d.rockT * 0.05);
+  ctx.shadowColor = '#000'; ctx.shadowBlur = 30;
+  ctx.fillStyle = '#6b6b72'; ctx.strokeStyle = '#33333a'; ctx.lineWidth = 6;
+  ctx.beginPath();
+  for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2; const rr = R * (0.8 + 0.22 * Math.abs(Math.sin(i * 1.7))); const px = Math.cos(a) * rr, py = Math.sin(a) * rr; if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.restore(); ctx.shadowBlur = 0;
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.shadowColor = '#f00'; ctx.shadowBlur = 16; ctx.font = 'bold 34px monospace';
+  ctx.fillText('¡ROCA GIGANTE!', W / 2, H * 0.2);
+  if (d.rockT > 40) { ctx.font = 'bold 18px monospace'; ctx.fillText('¡SALES VOLANDO HACIA EL TREN!', W / 2, H * 0.28); }
+  ctx.shadowBlur = 0; ctx.textAlign = 'left';
+}
+
+function drawDuelTrain() {
+  const d = finalDuel;
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#3a2a5a'); sky.addColorStop(0.5, '#c8663a'); sky.addColorStop(1, '#e6a858');
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(255,222,150,0.85)'; ctx.beginPath(); ctx.arc(W * 0.72, H * 0.32, 58, 0, Math.PI * 2); ctx.fill();
+  const off1 = (d.trainT * 0.5) % 500;
+  ctx.fillStyle = '#6e4656';
+  for (let m = -1; m < 4; m++) { const bx = m * 480 - off1; ctx.beginPath(); ctx.moveTo(bx, H * 0.56); ctx.lineTo(bx + 230, H * 0.40); ctx.lineTo(bx + 460, H * 0.56); ctx.closePath(); ctx.fill(); }
+  // ===== la CARRERA a lo lejos =====
+  ctx.fillStyle = 'rgba(70,45,35,0.5)'; ctx.fillRect(0, H * 0.565, W, 4);
+  const raceOff = (d.trainT * 2.4) % (W + 260);
+  for (let i = 0; i < 7; i++) { const rx = ((i * 150 - raceOff) % (W + 260) + (W + 260)) % (W + 260) - 80; drawTinyRacer(rx, H * 0.55 + Math.sin(d.trainT * 0.25 + i) * 2); }
+  ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.font = 'bold 11px monospace'; ctx.textAlign = 'center';
+  ctx.fillText('· la Gran Carrera a lo lejos ·', W * 0.5, H * 0.50); ctx.textAlign = 'left';
+  // ===== el TREN =====
+  const trainTop = H * 0.66;
+  ctx.fillStyle = '#2a2320'; ctx.fillRect(0, trainTop, W, H - trainTop);
+  ctx.fillStyle = '#4a3a2e'; ctx.fillRect(0, trainTop, W, 8);
+  const panOff = (d.trainT * 13) % 130;
+  ctx.fillStyle = '#141010';
+  for (let x = -panOff; x < W; x += 130) ctx.fillRect(x + 22, trainTop + 22, 84, 40);
+  ctx.fillStyle = 'rgba(255,210,120,0.25)';
+  for (let x = -panOff; x < W; x += 130) ctx.fillRect(x + 30, trainTop + 28, 30, 26);
+  for (let x = -panOff; x < W; x += 130) {
+    ctx.save(); ctx.translate(x + 64, H - 22); ctx.rotate(d.trainT * 0.32);
+    ctx.fillStyle = '#0a0a0a'; ctx.beginPath(); ctx.arc(0, 0, 17, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#444'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-13, 0); ctx.lineTo(13, 0); ctx.moveTo(0, -13); ctx.lineTo(0, 13); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 2;
+  for (let i = 0; i < 9; i++) { const ly = trainTop - 30 - i * 16; const lx = W - ((d.trainT * 22 + i * 90) % (W + 140)); ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx + 46, ly); ctx.stroke(); }
+  // obstáculos (ruedan por el techo)
+  const groundY = H * 0.62;
+  for (const o of d.trainObstacles) drawTrainObstacle(o, groundY - o.r * 0.3);
+  // jugador lateral (salta)
+  const px = W * 0.30, airborne = groundY - d.trainPlayerY;
+  drawTrainPlayer(px, d.trainPlayerY, d.trainT, airborne);
+  if (player.iframe > 0) { const a = Math.min(1, player.iframe / 30); ctx.strokeStyle = `rgba(255,230,120,${0.25 + 0.4 * a})`; ctx.lineWidth = 3; ctx.shadowColor = '#fe6'; ctx.shadowBlur = 12; ctx.beginPath(); ctx.arc(px, d.trainPlayerY - 24, 30, 0, Math.PI * 2); ctx.stroke(); ctx.shadowBlur = 0; }
+  if (d.hurtFlash > 0) { ctx.fillStyle = `rgba(200,0,0,${d.hurtFlash / 14 * 0.5})`; ctx.fillRect(0, 0, W, H); }
+  // HUD
+  const secs = Math.max(0, Math.ceil((1200 - d.trainT) / 60));
+  ctx.textAlign = 'center'; ctx.shadowColor = '#000'; ctx.shadowBlur = 6;
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 22px monospace'; ctx.fillText(`¡ESQUIVA! — vuelves en ${secs}s`, W / 2, 40);
+  ctx.font = 'bold 12px monospace'; ctx.fillText('SALTA (W / ↑ / Espacio) para esquivar los objetos', W / 2, 62);
+  ctx.shadowBlur = 0; ctx.textAlign = 'left';
+  ctx.fillStyle = '#222'; ctx.fillRect(20, H - 30, 240, 16);
+  ctx.fillStyle = '#f44'; ctx.fillRect(20, H - 30, 240 * Math.max(0, player.hp) / player.maxHp, 16);
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(20, H - 30, 240, 16);
+}
+
+function drawFinalDuel() {
+  const d = finalDuel;
+  ctx.save();
+  if (shake > 0.4) ctx.translate(rand(-shake, shake), rand(-shake, shake));
+  if (d.phase === 'train') { drawDuelTrain(); ctx.restore(); return; }
+  if (d.phase === 'rockKnock') { drawDuelRockKnock(); ctx.restore(); return; }
+  const hz = H * 0.40;
+  const sky = ctx.createLinearGradient(0, 0, 0, hz);
+  sky.addColorStop(0, '#160008'); sky.addColorStop(1, '#3a0616');
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, W, hz);
+  const flr = ctx.createLinearGradient(0, hz, 0, H);
+  flr.addColorStop(0, '#20060c'); flr.addColorStop(1, '#050203');
+  ctx.fillStyle = flr; ctx.fillRect(0, hz, W, H - hz);
+
+  if (d.phase === 'intro') {
+    if (d.flip > 0) { ctx.translate(W / 2, H / 2); ctx.rotate(d.flip * Math.PI); ctx.translate(-W / 2, -H / 2); }
+    const app = Math.min(1, d.t / 70);
+    ctx.globalAlpha = app;
+    drawDuelBoss(W / 2, H * 0.52, 1.3 + app * 0.7, '#b00', d.t);
+    ctx.globalAlpha = 1;
+    ctx.restore();
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.shadowColor = '#f00'; ctx.shadowBlur = 16;
+    ctx.font = 'bold 30px monospace';
+    if (d.t < 70) ctx.fillText('EL FINAL TE MIRA...', W / 2, H * 0.2);
+    else ctx.fillText('¡LA REALIDAD SE VOLTEA!', W / 2, H * 0.2);
+    if (d.t > 120) { ctx.font = 'bold 15px monospace'; ctx.fillText('tus poderes ya no sirven — PARA sus ataques con CLICK', W / 2, H * 0.28); }
+    ctx.shadowBlur = 0; ctx.textAlign = 'left';
+    return;
+  }
+
+  ctx.strokeStyle = 'rgba(255,80,90,0.18)'; ctx.lineWidth = 1;
+  for (let gx = -1; gx <= 1.0001; gx += 0.2) { const a = duelProject(gx, 0), b = duelProject(gx, 1); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+  for (let gz = 0; gz <= 1.0001; gz += 0.1) { const a = duelProject(-1, gz), b = duelProject(1, gz); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+
+  const bp = duelProject(d.bossLx, 0.06);
+  drawDuelBoss(bp.x, bp.y - 30, 1.5, d.bossHitFlash > 0 ? '#fff' : '#c11', d.t);
+
+  const sorted = d.corpses.slice().sort((a, b) => a.z - b.z);
+  for (const c of sorted) {
+    const p = duelProject(c.lx, c.z);
+    const near = Math.abs(c.lx - d.playerLx) < 0.34;
+    if (c.kind === 'rock') {
+      drawRock(p.x, p.y, p.scale, c.seed);
+      if (c.z > 0.5 && near) { // aviso ROJO: esquiva (no se puede parar)
+        ctx.strokeStyle = `rgba(255,60,60,${0.4 + 0.4 * Math.sin(frame * 0.4)})`; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 28 * p.scale + 10, 0, Math.PI * 2); ctx.stroke();
+      }
+    } else {
+      drawDeadBoss(p.x, p.y, p.scale, DUEL_BOSS_COLORS[c.colorIdx], c.spin);
+      if (c.z > 0.72 && near) { // aviso DORADO: ¡PARA (click)!
+        ctx.strokeStyle = `rgba(255,220,110,${0.5 + 0.4 * Math.sin(frame * 0.5)})`; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 30 * p.scale + 10, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+  }
+
+  // cadáveres rebotados que vuelven al jefe
+  for (const r of d.reflects) {
+    const p = duelProject(r.lx, r.z);
+    drawDeadBoss(p.x, p.y, p.scale, DUEL_BOSS_COLORS[r.colorIdx], r.spin);
+    ctx.strokeStyle = 'rgba(255,230,120,0.5)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 20 * p.scale + 6, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  drawDuelPlayerBack(W / 2 + d.playerLx * W * 0.30, H * 0.86, d.parryFx);
+  if (player.iframe > 0) { // escudo dorado: inmortal tras un parry
+    const px = W / 2 + d.playerLx * W * 0.30, py = H * 0.84;
+    const a = Math.min(1, player.iframe / 30);
+    ctx.strokeStyle = `rgba(255,230,120,${0.25 + 0.45 * a})`; ctx.lineWidth = 3;
+    ctx.shadowColor = '#fe6'; ctx.shadowBlur = 14;
+    ctx.beginPath(); ctx.arc(px, py, 58, 0, Math.PI * 2); ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  if (d.hurtFlash > 0) { ctx.fillStyle = `rgba(200,0,0,${d.hurtFlash / 14 * 0.5})`; ctx.fillRect(0, 0, W, H); }
+  drawDuelHud(d);
+
+  if (d.phase === 'win') {
+    ctx.fillStyle = `rgba(0,0,0,${Math.min(0.55, d.winT / 60 * 0.55)})`; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#fe6'; ctx.textAlign = 'center'; ctx.font = 'bold 42px monospace'; ctx.shadowColor = '#fa0'; ctx.shadowBlur = 20;
+    ctx.fillText('¡DERROTADO!', W / 2, H / 2);
+    ctx.font = 'bold 16px monospace'; ctx.fillStyle = '#fff';
+    ctx.fillText('Sobreviviste al duelo final.', W / 2, H / 2 + 38);
+    ctx.shadowBlur = 0; ctx.textAlign = 'left';
+  } else if (d.phase === 'lose') {
+    ctx.fillStyle = `rgba(60,0,0,${Math.min(0.7, d.loseT / 60 * 0.7)})`; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#f55'; ctx.textAlign = 'center'; ctx.font = 'bold 40px monospace'; ctx.shadowColor = '#800'; ctx.shadowBlur = 18;
+    ctx.fillText('HAS CAÍDO', W / 2, H / 2); ctx.shadowBlur = 0; ctx.textAlign = 'left';
+  }
+
+  if (paused) { ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, W, H); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.font = 'bold 30px monospace'; ctx.fillText('PAUSA', W / 2, H / 2); ctx.textAlign = 'left'; }
+
+  ctx.restore();
+}
+
 function loop() {
   frame++;
 
@@ -12529,6 +13732,16 @@ function loop() {
     : (gameStarted && !shopOpen && !paused && !gameOver && !perkSelectOpen);
 
   if (perkSelectOpen && !coop) handlePerkInput();
+
+  // Oleada 100 — DUELO FINAL toma el control total (mundo + render).
+  if (finalDuel && !gameOver) {
+    if (!paused && gameStarted) updateFinalDuel();
+    if (finalDuel) drawFinalDuel(); else draw();
+    mouse.clicked = false;
+    consumeKeyPresses();
+    requestAnimationFrame(loop);
+    return;
+  }
 
   if (worldRunning) {
     if (!(coop && player.hp <= 0)) updatePlayer();   // el jugador caído no actúa
@@ -12685,6 +13898,9 @@ document.getElementById('sb-bloodmoon').addEventListener('change', e => {
 });
 document.getElementById('sb-coin-rain').addEventListener('click', () => spawnCoinRain(20));
 document.getElementById('sb-boss-rush').addEventListener('click', () => spawnBossRush());
+document.getElementById('sb-final-duel').addEventListener('click', () => {
+  if (!finalDuel && !gameOver) { startFinalDuel(); sandboxOpen = false; sandboxPanel.style.display = 'none'; }
+});
 document.getElementById('sb-raid-brutal').addEventListener('click', () => spawnRaidBoss('brutal'));
 document.getElementById('sb-raid-nightmare').addEventListener('click', () => spawnRaidBoss('nightmare'));
 document.getElementById('sb-darkness').addEventListener('click', () => {
@@ -12708,7 +13924,7 @@ const raceTut = {
 };
 const RACE_STAGES = 9;
 let raceWeapon = null;            // 'fists' | 'gun' | 'steelballs'
-const raceCollectedParts = [];    // partes del Santo Cadáver halladas
+const raceCollectedParts = [];    // partes del Reliquia Sagrada halladas
 let raceNightsDone = 0;           // cuántas noches han terminado (0..9)
 let raceNightFound = null;        // parte hallada esta noche (string o null)
 let raceNightSpot = 0;            // qué pista se está investigando
@@ -12728,15 +13944,15 @@ const RACE_BODY_PARTS = [
 ];
 
 const RACE_STAGE_NAMES = [
-  'Bajo Beach a Rocky Mountain Village',
-  'Rocky Mountain Village a Cannon City',
-  'Cannon City a Big Rock Place',
-  'Big Rock Place a Sand Town',
-  'Sand Town a Kansas City',
-  'Kansas City a Top of the Cliffs',
-  'Top of the Cliffs a Lake Forest',
-  'Lake Forest a Mountain Pass',
-  'Mountain Pass a Sugar Mountain — FINAL'
+  'Playa Sur a Villa de la Montaña',
+  'Villa de la Montaña a Ciudad Cañón',
+  'Ciudad Cañón a Peñascal',
+  'Peñascal a Pueblo de Arena',
+  'Pueblo de Arena a Ciudad Central',
+  'Ciudad Central a los Acantilados',
+  'los Acantilados a Bosque del Lago',
+  'Bosque del Lago a el Desfiladero',
+  'el Desfiladero a Monte del Azúcar — FINAL'
 ];
 
 // Participantes numerados (#1, #2, ...) — sin nombres de la serie.
@@ -12745,14 +13961,14 @@ const NPC_PALETTE = ['#a33','#dd9','#fc4','#f8a','#cb6','#8cf','#6cf','#f6c','#c
 // Habilidades cíclicas (cada participante recibe una según su número):
 // scratch / sand / luck / cream / lasso / steelball
 const NPC_ABIL_CYCLE = ['scratch', 'sand', 'luck', 'cream', 'lasso', 'steelball'];
-// Rivales canónicos de Steel Ball Run por habilidad (con nombres extra si se repite).
+// Rivales ficticios por habilidad (con nombres extra si se repite).
 const NPC_RIVAL_NAMES = {
-  scratch:   ['Diego Brando', 'Dr. Ferdinand', 'Diego (D4C)'],
-  sand:      ['Sandman', 'Soundman', 'Sand Runner'],
-  luck:      ['Pocoloco', 'Andre Boom', 'Fortune'],
-  cream:     ['Hot Pants', 'Sor. Blackmore', 'Cream Jinete'],
-  lasso:     ['Mountain Tim', 'Mrs. Robinson', 'Lazo Errante'],
-  steelball: ['Wekapipo', 'Magenta Magenta', 'Bola Rival'],
+  scratch:   ['Jinete Verde', 'Doctor Rival', 'Sombra Veloz'],
+  sand:      ['Corredor de Arena', 'Eco Sónico', 'Duna Errante'],
+  luck:      ['Fortuna', 'Andrés Trueno', 'Suertudo'],
+  cream:     ['Enmascarada', 'Jinete Oscuro', 'Bruma Rival'],
+  lasso:     ['Vaquero Tim', 'La Viuda', 'Lazo Errante'],
+  steelball: ['Girador', 'Doble Magenta', 'Bola Rival'],
 };
 // Color e identidad de cada rival según su habilidad.
 const NPC_ABIL_COLOR = {
@@ -12837,7 +14053,7 @@ const RACE_STAND_POOL = [
   { id: 'starplatinum',name: 'Puño Estelar',      weight:  5, attack: 'ora',     dmg: 18, cd: 22, color: '#93f', timestop: true },
   { id: 'theworld',    name: 'Mundo Detenido',          weight:  5, attack: 'knives',  dmg: 20, cd: 20, color: '#fd2', timestop: true },
   // --- épicos ---
-  { id: 'vortex',      name: 'Espiral Acto 4',         weight:  3, attack: 'wormhole', dmg: 26, cd: 18, color: '#fd6', timestop: true },
+  { id: 'vortex',      name: 'Espiral Fase 4',         weight:  3, attack: 'wormhole', dmg: 26, cd: 18, color: '#fd6', timestop: true },
   { id: 'd4c',         name: 'Copias Dimensionales',                weight:  3, attack: 'clone',   dmg: 20, cd: 18, color: '#f06' },
   { id: 'smoke',       name: 'Cortina de Humo',    weight:  3, attack: 'smoke',   dmg: 14, cd: 20, color: '#bbb' },
   // --- legendarios ---
@@ -14991,7 +16207,7 @@ function finishRaceStage(success) {
 
 // ---------- NOCHE / MAPA DE HABITACIONES ----------
 // Pequeño mapa cenital con varias salas; una es el campamento (descansas),
-// las demás se pueden registrar buscando partes del Santo Cadáver.
+// las demás se pueden registrar buscando partes del Reliquia Sagrada.
 // 30% de probabilidad por sala. Cada hallazgo otorga un Stand aleatorio (por rareza).
 const raceMapPlayer = { x: 0, y: 0, vx: 0, vy: 0, facing: -Math.PI / 2, iframe: 0, attackCD: 0, swing: 0, bulletCD: 0 };
 let raceRooms = [];           // {x, y, w, h, kind, spot, label, searched, found, part, stand, guards, cleared}
@@ -15078,7 +16294,7 @@ function startRaceNight() {
     kind: 'exit', spot: 'exit', label: '🚪 SIGUIENTE ETAPA', searched: false, found: null,
   });
 
-  // pre-asignar qué salas esconden un trozo del Santo Cadáver (con guardias)
+  // pre-asignar qué salas esconden un trozo del Reliquia Sagrada (con guardias)
   nightEnemies = [];
   nightCombat = null;
   nightFx = [];
@@ -16317,13 +17533,13 @@ function drawRacePreStage() {
   ctx.fillText(RACE_STAGE_NAMES[raceStage - 1], W / 2, H / 2 - 10);
   ctx.fillStyle = '#aaa';
   ctx.font = '14px monospace';
-  ctx.fillText('WASD mover · Click atacar · Q tiempo detenido (solo Stands evolutivos / SP / TW)', W / 2, H / 2 + 30);
+  ctx.fillText('WASD mover · Click atacar · Q tiempo detenido (solo poderes evolutivos con parada de tiempo)', W / 2, H / 2 + 30);
   ctx.fillText('SPACE = dash en la dirección que te mueves (WASD) — CD 3s · flechas dash · rebufo atrás de rival', W / 2, H / 2 + 54);
   ctx.fillText(`${NPC_COUNT} participantes numerados — derribar uno lo elimina de la carrera`, W / 2, H / 2 + 78);
   if (racePlayer.stand) {
     ctx.fillStyle = racePlayer.stand.color;
     ctx.font = 'bold 16px monospace';
-    ctx.fillText(`🎴 Stand activo: ${racePlayer.stand.name}${racePlayer.stand.timestop ? ' · Q = TIEMPO DETENIDO 1.5s' : ''}`, W / 2, H / 2 + 108);
+    ctx.fillText(`🎴 Poder activo: ${racePlayer.stand.name}${racePlayer.stand.timestop ? ' · Q = TIEMPO DETENIDO 1.5s' : ''}`, W / 2, H / 2 + 108);
   }
   ctx.fillStyle = '#888';
   ctx.font = '14px monospace';
@@ -16401,7 +17617,7 @@ function drawRaceNight() {
   ctx.fillText(`NOCHE ${raceNightsDone + 1} — DESIERTO`, W / 2, 44);
   ctx.fillStyle = '#cbb';
   ctx.font = '12px monospace';
-  ctx.fillText('Explora con WASD. E/ESPACIO para entrar. Donde hay un trozo del Santo Cadáver hay GUARDIAS: derrótalos (click).', W / 2, 70);
+  ctx.fillText('Explora con WASD. E/ESPACIO para entrar. Donde hay un trozo del Reliquia Sagrada hay GUARDIAS: derrótalos (click).', W / 2, 70);
 
   // construcciones del desierto
   for (const r of raceRooms) {
@@ -16658,7 +17874,7 @@ function drawRaceWeaponSelect() {
   ctx.fillText('LA CARRERA', W / 2, 120);
   ctx.fillStyle = '#fff';
   ctx.font = '18px monospace';
-  ctx.fillText('La gran carrera transcontinental — 9 etapas, partes del Santo Cadáver en juego', W / 2, 160);
+  ctx.fillText('La gran carrera transcontinental — 9 etapas, partes del Reliquia Sagrada en juego', W / 2, 160);
 
   ctx.fillStyle = '#fec';
   ctx.font = 'bold 22px monospace';
@@ -16825,7 +18041,7 @@ function drawRaceFinale() {
 
   ctx.fillStyle = '#fec';
   ctx.font = 'bold 22px monospace';
-  ctx.fillText('Partes del Santo Cadáver recuperadas:', W / 2, 210);
+  ctx.fillText('Partes del Reliquia Sagrada recuperadas:', W / 2, 210);
 
   // dibujar lista de partes
   ctx.font = '20px monospace';
@@ -17010,7 +18226,7 @@ function drawRaceHud() {
     ctx.textAlign = 'right';
     ctx.fillStyle = '#fd6';
     ctx.font = 'bold 12px monospace';
-    ctx.fillText(`Santo Cadáver: ${raceCollectedParts.length}/${RACE_STAGES}`, W - 20, 56);
+    ctx.fillText(`Reliquia Sagrada: ${raceCollectedParts.length}/${RACE_STAGES}`, W - 20, 56);
     for (let i = 0; i < raceCollectedParts.length; i++) {
       ctx.fillStyle = '#fec';
       ctx.font = '11px monospace';
