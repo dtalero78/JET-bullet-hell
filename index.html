@@ -13195,10 +13195,11 @@ function startFinalDuel() {
   finalDuel = {
     phase: 'intro', t: 0, flip: 0,
     playerLx: 0, aimShake: 0,
-    bossMaxHp: 4500, bossHp: 4500, bossLx: 0, bossHitFlash: 0,
+    bossMaxHp: 7000, bossHp: 7000, bossLx: 0, bossHitFlash: 0,
     corpses: [], reflects: [], volleyCd: 70,
     parryWin: 0, parryCd: 0, parryFx: 0, parried: 0,
     trainDone: false, rockT: 0, trainT: 0, trainPlayerY: 0, trainVY: 0, trainObstacles: [], trainSpawnCd: 45,
+    arenaDone: false, arenaKills: 0, arenaT: 0, arenaPlayer: null, arenaEnemies: [], arenaBalls: [], arenaSpawnCd: 0, arenaFireCd: 0,
     hurtFlash: 0, winT: 0, loseT: 0, killed: 0,
   };
   enemies.length = 0; projectiles.length = 0;   // sin enemigos ni balas normales
@@ -13206,6 +13207,7 @@ function startFinalDuel() {
   // desactiva escudos/buffs para que el duelo sea realmente peligroso
   shieldActive = false; ltActiveTimer = 0; barrierHp = 0;
   smokeFogTimer = 0; timeStopTimer = 0; puInvulnTimer = 0;
+  player.maxHp = Math.max(player.maxHp, 700); player.hp = player.maxHp; // más vida para el duelo final
   player.iframe = 80;
   shake = Math.max(shake, 22);
 }
@@ -13272,6 +13274,7 @@ function updateFinalDuel() {
     return;
   }
   if (d.phase === 'train') { updateDuelTrain(); return; }
+  if (d.phase === 'arena') { updateDuelArena(); return; }
   if (d.phase === 'win') { d.winT++; if (d.winT > 200) endFinalDuel(true); return; }
   if (d.phase === 'lose') { d.loseT++; if (d.loseT > 120) { gameOver = true; finalDuel = null; } return; }
 
@@ -13323,7 +13326,7 @@ function updateFinalDuel() {
     const r = d.reflects[i];
     r.z -= 0.032; r.spin += 0.2;
     if (r.z <= 0.08) {
-      d.bossHp = Math.max(0, d.bossHp - 175);
+      d.bossHp = Math.max(0, d.bossHp - 250);
       d.bossHitFlash = 6; shake = Math.max(shake, 6);
       const bp = duelProject(d.bossLx, 0.06);
       burst(bp.x, bp.y - 30, 10, () => '#fff', { spread: 5, jitter: 8, life: 16 });
@@ -13333,6 +13336,10 @@ function updateFinalDuel() {
         // ¡mitad de vida! ROCA GIGANTE → te manda volando al tren (sin daño)
         d.trainDone = true; d.phase = 'rockKnock'; d.rockT = 0; shake = 24;
         d.corpses = [];
+      }
+      else if (!d.arenaDone && d.bossHp <= d.bossMaxHp * 0.25 && d.phase === 'duel') {
+        // ¡un cuarto de vida! te manda a un mini-mapa: mata 100 enemigos con bolas de energía
+        d.arenaDone = true; startDuelArena(); shake = 24; d.corpses = [];
       }
     }
   }
@@ -13615,11 +13622,152 @@ function drawDuelTrain() {
   ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(20, H - 30, 240, 16);
 }
 
+// ===== Mini-arena (modo normal) al 25% de vida: mata 100 enemigos con bolas de energía morada =====
+function startDuelArena() {
+  const d = finalDuel;
+  d.phase = 'arena';
+  d.arenaKills = 0; d.arenaT = 0;
+  d.arenaPlayer = { x: W / 2, y: H / 2, r: 14 };
+  d.arenaEnemies = []; d.arenaBalls = [];
+  d.arenaSpawnCd = 24; d.arenaFireCd = 0;
+  player.iframe = 70;
+}
+function updateDuelArena() {
+  const d = finalDuel;
+  d.arenaT++;
+  const ap = d.arenaPlayer;
+  const bx0 = W * 0.12, bx1 = W * 0.88, by0 = H * 0.12, by1 = H * 0.88;
+  const spd = 4.4;
+  if (keys['w'] || keys['arrowup']) ap.y -= spd;
+  if (keys['s'] || keys['arrowdown']) ap.y += spd;
+  if (keys['a'] || keys['arrowleft']) ap.x -= spd;
+  if (keys['d'] || keys['arrowright']) ap.x += spd;
+  ap.x = Math.max(bx0 + ap.r, Math.min(bx1 - ap.r, ap.x));
+  ap.y = Math.max(by0 + ap.r, Math.min(by1 - ap.r, ap.y));
+
+  // disparar BOLA DE ENERGÍA MORADA gigante (3× el jugador)
+  if (d.arenaFireCd > 0) d.arenaFireCd--;
+  if (mouse.down && d.arenaFireCd <= 0) {
+    const a = Math.atan2(mouse.y - ap.y, mouse.x - ap.x);
+    d.arenaBalls.push({ x: ap.x + Math.cos(a) * 34, y: ap.y + Math.sin(a) * 34, vx: Math.cos(a) * 8, vy: Math.sin(a) * 8, r: 42, life: 120, trail: [] });
+    d.arenaFireCd = 20; shake = Math.max(shake, 4);
+    effects.push({ type: 'flash', life: 4, max: 4, color: '#93f' });
+  }
+
+  // spawn de enemigos desde los bordes
+  d.arenaSpawnCd--;
+  if (d.arenaSpawnCd <= 0 && d.arenaEnemies.length < 28) {
+    const n = 2 + Math.floor(d.arenaT / 300);
+    for (let i = 0; i < n; i++) {
+      const edge = Math.floor(rand(0, 4)); let x, y;
+      if (edge === 0) { x = rand(bx0, bx1); y = by0 + 6; }
+      else if (edge === 1) { x = rand(bx0, bx1); y = by1 - 6; }
+      else if (edge === 2) { x = bx0 + 6; y = rand(by0, by1); }
+      else { x = bx1 - 6; y = rand(by0, by1); }
+      d.arenaEnemies.push({ x, y, r: rand(11, 15), spd: rand(1.3, 2.0) });
+    }
+    d.arenaSpawnCd = Math.max(20, 44 - Math.floor(d.arenaKills / 12));
+  }
+
+  // bolas: viajan y atraviesan, matando a todo lo que tocan
+  for (let i = d.arenaBalls.length - 1; i >= 0; i--) {
+    const b = d.arenaBalls[i];
+    b.x += b.vx; b.y += b.vy; b.life--;
+    if (b.trail) { b.trail.push({ x: b.x, y: b.y }); if (b.trail.length > 8) b.trail.shift(); }
+    for (let j = d.arenaEnemies.length - 1; j >= 0; j--) {
+      const e = d.arenaEnemies[j];
+      const rr = b.r + e.r;
+      if ((b.x - e.x) ** 2 + (b.y - e.y) ** 2 < rr * rr) {
+        d.arenaEnemies.splice(j, 1); d.arenaKills++;
+        burst(e.x, e.y, 10, () => rand(0, 1) > 0.5 ? '#a6f' : '#e6ccff', { spread: 4, jitter: 6, life: 16 });
+      }
+    }
+    if (b.life <= 0 || b.x < bx0 - 70 || b.x > bx1 + 70 || b.y < by0 - 70 || b.y > by1 + 70) d.arenaBalls.splice(i, 1);
+  }
+
+  // enemigos persiguen y hacen daño por contacto
+  const dmg = Math.max(16, player.maxHp * 0.06);
+  for (let j = 0; j < d.arenaEnemies.length; j++) {
+    const e = d.arenaEnemies[j];
+    const a = Math.atan2(ap.y - e.y, ap.x - e.x);
+    e.x += Math.cos(a) * e.spd; e.y += Math.sin(a) * e.spd;
+    const rr = ap.r + e.r;
+    if ((ap.x - e.x) ** 2 + (ap.y - e.y) ** 2 < rr * rr) {
+      if (tryDamagePlayer(dmg, 40, 8)) d.hurtFlash = 14;
+      e.x -= Math.cos(a) * 18; e.y -= Math.sin(a) * 18;
+    }
+  }
+
+  if (player.hp <= 0) { d.phase = 'lose'; d.loseT = 0; shake = 26; return; }
+  if (d.arenaKills >= 100) { // objetivo cumplido → de vuelta al jefe
+    d.corpses = []; d.reflects = [];
+    player.iframe = Math.max(player.iframe, 80); d.volleyCd = 60;
+    d.phase = d.bossHp <= 0 ? 'win' : 'duel';
+    if (d.phase === 'win') d.winT = 0;
+  }
+}
+function drawArenaEnemy(e) {
+  ctx.save(); ctx.translate(e.x, e.y);
+  ctx.shadowColor = '#600'; ctx.shadowBlur = 6;
+  ctx.fillStyle = '#c23'; ctx.beginPath(); ctx.arc(0, 0, e.r, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-e.r * 0.3, -e.r * 0.2, e.r * 0.2, 0, Math.PI * 2); ctx.arc(e.r * 0.3, -e.r * 0.2, e.r * 0.2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#300'; ctx.beginPath(); ctx.arc(-e.r * 0.3, -e.r * 0.2, e.r * 0.09, 0, Math.PI * 2); ctx.arc(e.r * 0.3, -e.r * 0.2, e.r * 0.09, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+function drawPurpleBall(b, t) {
+  if (b.trail) { for (let i = 0; i < b.trail.length; i++) { const tp = b.trail[i]; const a = (i + 1) / b.trail.length; ctx.globalAlpha = a * 0.3; ctx.fillStyle = '#93f'; ctx.beginPath(); ctx.arc(tp.x, tp.y, b.r * a * 0.7, 0, Math.PI * 2); ctx.fill(); } ctx.globalAlpha = 1; }
+  ctx.save(); ctx.translate(b.x, b.y);
+  const pulse = 1 + 0.08 * Math.sin(t * 0.4);
+  const grad = ctx.createRadialGradient(0, 0, b.r * 0.2, 0, 0, b.r * pulse);
+  grad.addColorStop(0, '#e6ccff'); grad.addColorStop(0.4, '#a64dff'); grad.addColorStop(1, 'rgba(120,40,220,0.08)');
+  ctx.shadowColor = '#93f'; ctx.shadowBlur = 24;
+  ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 0, b.r * pulse, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0; ctx.globalAlpha = 0.85; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, 0, b.r * 0.3, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+  ctx.strokeStyle = 'rgba(220,180,255,0.7)'; ctx.lineWidth = 2;
+  for (let k = 0; k < 5; k++) { const a = t * 0.1 + k * 1.256; ctx.beginPath(); ctx.moveTo(Math.cos(a) * b.r * 0.4, Math.sin(a) * b.r * 0.4); ctx.lineTo(Math.cos(a) * b.r * 0.95, Math.sin(a) * b.r * 0.95); ctx.stroke(); }
+  ctx.restore();
+}
+function drawArenaPlayer(ap) {
+  const a = Math.atan2(mouse.y - ap.y, mouse.x - ap.x);
+  ctx.save(); ctx.translate(ap.x, ap.y);
+  ctx.fillStyle = '#8cf'; ctx.beginPath(); ctx.arc(0, 0, ap.r, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.rotate(a); ctx.fillStyle = '#93f'; ctx.fillRect(ap.r - 2, -4, 15, 8);
+  ctx.restore();
+}
+function drawDuelArena() {
+  const d = finalDuel;
+  const bx0 = W * 0.12, bx1 = W * 0.88, by0 = H * 0.12, by1 = H * 0.88;
+  ctx.fillStyle = '#0a0a18'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#12122a'; ctx.fillRect(bx0, by0, bx1 - bx0, by1 - by0);
+  ctx.strokeStyle = 'rgba(120,90,220,0.10)'; ctx.lineWidth = 1;
+  for (let x = bx0; x <= bx1; x += 48) { ctx.beginPath(); ctx.moveTo(x, by0); ctx.lineTo(x, by1); ctx.stroke(); }
+  for (let y = by0; y <= by1; y += 48) { ctx.beginPath(); ctx.moveTo(bx0, y); ctx.lineTo(bx1, y); ctx.stroke(); }
+  ctx.strokeStyle = 'rgba(150,110,240,0.6)'; ctx.lineWidth = 3; ctx.strokeRect(bx0, by0, bx1 - bx0, by1 - by0);
+  for (const e of d.arenaEnemies) drawArenaEnemy(e);
+  for (const b of d.arenaBalls) drawPurpleBall(b, d.arenaT);
+  const ap = d.arenaPlayer;
+  drawArenaPlayer(ap);
+  if (player.iframe > 0) { ctx.strokeStyle = `rgba(200,160,255,${0.3 + 0.4 * Math.min(1, player.iframe / 30)})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ap.x, ap.y, ap.r + 6, 0, Math.PI * 2); ctx.stroke(); }
+  if (d.hurtFlash > 0) { ctx.fillStyle = `rgba(200,0,0,${d.hurtFlash / 14 * 0.5})`; ctx.fillRect(0, 0, W, H); }
+  // HUD
+  ctx.textAlign = 'center'; ctx.shadowColor = '#000'; ctx.shadowBlur = 6;
+  ctx.fillStyle = '#c9f'; ctx.font = 'bold 24px monospace'; ctx.fillText(`ENEMIGOS: ${d.arenaKills}/100`, W / 2, 40);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 12px monospace'; ctx.fillText('WASD moverse · CLICK = bola de energía morada', W / 2, 62);
+  ctx.shadowBlur = 0; ctx.textAlign = 'left';
+  if (d.arenaT < 120) { const a = d.arenaT < 90 ? 1 : (120 - d.arenaT) / 30; ctx.globalAlpha = a; ctx.fillStyle = '#c9f'; ctx.textAlign = 'center'; ctx.font = 'bold 34px monospace'; ctx.shadowColor = '#93f'; ctx.shadowBlur = 16; ctx.fillText('¡MATA 100 ENEMIGOS!', W / 2, H * 0.5); ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.textAlign = 'left'; }
+  ctx.fillStyle = '#222'; ctx.fillRect(20, H - 30, 240, 16);
+  ctx.fillStyle = '#f44'; ctx.fillRect(20, H - 30, 240 * Math.max(0, player.hp) / player.maxHp, 16);
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(20, H - 30, 240, 16);
+}
+
 function drawFinalDuel() {
   const d = finalDuel;
   ctx.save();
   if (shake > 0.4) ctx.translate(rand(-shake, shake), rand(-shake, shake));
   if (d.phase === 'train') { drawDuelTrain(); ctx.restore(); return; }
+  if (d.phase === 'arena') { drawDuelArena(); ctx.restore(); return; }
   if (d.phase === 'rockKnock') { drawDuelRockKnock(); ctx.restore(); return; }
   const hz = H * 0.40;
   const sky = ctx.createLinearGradient(0, 0, 0, hz);
@@ -13636,12 +13784,6 @@ function drawFinalDuel() {
     drawDuelBoss(W / 2, H * 0.52, 1.3 + app * 0.7, '#b00', d.t);
     ctx.globalAlpha = 1;
     ctx.restore();
-    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.shadowColor = '#f00'; ctx.shadowBlur = 16;
-    ctx.font = 'bold 30px monospace';
-    if (d.t < 70) ctx.fillText('EL FINAL TE MIRA...', W / 2, H * 0.2);
-    else ctx.fillText('¡LA REALIDAD SE VOLTEA!', W / 2, H * 0.2);
-    if (d.t > 120) { ctx.font = 'bold 15px monospace'; ctx.fillText('tus poderes ya no sirven — PARA sus ataques con CLICK', W / 2, H * 0.28); }
-    ctx.shadowBlur = 0; ctx.textAlign = 'left';
     return;
   }
 
