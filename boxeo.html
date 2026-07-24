@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KO ROYAL — Boxeo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: #0a0a14; color: #eee; font-family: 'Trebuchet MS', system-ui, sans-serif; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; }
+  #wrap { position: relative; }
+  canvas { display: block; background: #12121f; border-radius: 10px; box-shadow: 0 0 60px rgba(0,0,0,0.7); }
+
+  .screen {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background: radial-gradient(ellipse at center, rgba(30,20,50,0.92), rgba(6,6,16,0.98));
+    border-radius: 10px; z-index: 5;
+  }
+  h1 { font-size: 62px; letter-spacing: 4px; text-shadow: 0 0 24px #f52, 0 4px 0 #700; color: #ffcf3f; }
+  h1 .sub { display: block; font-size: 18px; letter-spacing: 8px; color: #9ad; margin-top: 6px; text-shadow: none; }
+  .hint { color: #8a90b0; font-size: 15px; margin-top: 8px; line-height: 1.7; }
+  .keys b { color: #ffcf3f; }
+
+  .fighters { display: flex; gap: 22px; margin: 30px 0 18px; }
+  .card {
+    width: 210px; background: linear-gradient(160deg, rgba(40,30,70,0.85), rgba(12,12,28,0.9));
+    border: 2px solid #3a3a5a; border-radius: 14px; padding: 16px 14px; cursor: pointer;
+    transition: transform .12s, border-color .15s, box-shadow .15s;
+  }
+  .card:hover { transform: translateY(-6px); border-color: #ffcf3f; box-shadow: 0 10px 30px rgba(255,180,40,0.25); }
+  .card.sel { border-color: #ffcf3f; box-shadow: 0 0 30px rgba(255,180,40,0.4); }
+  .card .avatar { width: 90px; height: 90px; margin: 0 auto 10px; border-radius: 50%; display:flex; align-items:center; justify-content:center; font-size: 46px; }
+  .card h3 { font-size: 22px; margin-bottom: 2px; }
+  .card .tag { font-size: 12px; color: #9ad; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+  .stat { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: 4px 0; color: #bcd; }
+  .stat span { width: 62px; text-align: left; }
+  .bar { flex: 1; height: 7px; background: #23233a; border-radius: 4px; overflow: hidden; }
+  .bar i { display: block; height: 100%; border-radius: 4px; }
+  .btn {
+    margin-top: 8px; padding: 13px 40px; font-size: 20px; font-weight: bold; letter-spacing: 2px;
+    background: linear-gradient(#ff6a2b, #d33); color: #fff; border: none; border-radius: 30px; cursor: pointer;
+    box-shadow: 0 6px 0 #822, 0 8px 20px rgba(255,80,40,0.4); transition: transform .08s;
+  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #822; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; filter: grayscale(1); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="900" height="540"></canvas>
+
+  <!-- SELECCIÓN -->
+  <div id="selectScreen" class="screen">
+    <h1>KO ROYAL<span class="sub">B O X E O</span></h1>
+    <p class="hint">Elige tu boxeador</p>
+    <div class="fighters" id="cards"></div>
+    <button class="btn" id="startBtn" disabled>PELEAR</button>
+    <p class="hint keys">
+      <b>CLIC</b> puños rápidos · <b>ESPACIO</b> (mantén) puño cargado · <b>Q</b> bloqueo · <b>↓</b> agacharse · <b>← →</b> moverse
+    </p>
+  </div>
+
+  <!-- FIN -->
+  <div id="endScreen" class="screen hidden">
+    <h1 id="endTitle">¡GANASTE!</h1>
+    <p class="hint" id="endSub"></p>
+    <button class="btn" id="againBtn">REVANCHA</button>
+  </div>
+</div>
+
+<script>
+const cv = document.getElementById('game');
+const ctx = cv.getContext('2d');
+const W = cv.width, H = cv.height;
+const FLOOR = 470;
+
+// ---------- BOXEADORES ----------
+const ROSTER = [
+  { id:'rayo',  name:'RELÁMPAGO', tag:'Velocista', color:'#3fd1ff', trunks:'#0a6cff', emoji:'⚡',
+    hp:90,  speed:4.2, jabDmg:5,  jabCd:14, chargeDmgMax:22, reach:112, desc:'Rápido y ágil, pero frágil.' },
+  { id:'titan', name:'TITÁN',     tag:'Potencia',  color:'#ff7a3f', trunks:'#c02020', emoji:'🔥',
+    hp:140, speed:2.6, jabDmg:8,  jabCd:22, chargeDmgMax:38, reach:120, desc:'Lento pero demoledor.' },
+  { id:'roca',  name:'ÁGUILA',    tag:'Equilibrado', color:'#9d7dff', trunks:'#5a2ea6', emoji:'🦅',
+    hp:115, speed:3.4, jabDmg:6,  jabCd:18, chargeDmgMax:28, reach:116, desc:'Todo en balance.' },
+];
+
+let chosen = null;
+
+// ---------- UI SELECCIÓN ----------
+const cardsEl = document.getElementById('cards');
+const startBtn = document.getElementById('startBtn');
+ROSTER.forEach((f, i) => {
+  const el = document.createElement('div');
+  el.className = 'card';
+  const pct = v => Math.round(v);
+  el.innerHTML = `
+    <div class="avatar" style="background:radial-gradient(circle at 35% 30%, ${f.color}, ${f.trunks})">${f.emoji}</div>
+    <h3 style="color:${f.color}">${f.name}</h3>
+    <div class="tag">${f.tag}</div>
+    <div class="stat"><span>Vida</span><div class="bar"><i style="width:${(f.hp/140)*100}%;background:#4caf50"></i></div></div>
+    <div class="stat"><span>Velocidad</span><div class="bar"><i style="width:${(f.speed/4.2)*100}%;background:#3fd1ff"></i></div></div>
+    <div class="stat"><span>Fuerza</span><div class="bar"><i style="width:${(f.chargeDmgMax/38)*100}%;background:#ff7a3f"></i></div></div>
+    <p class="hint" style="margin-top:10px;font-size:12px">${f.desc}</p>`;
+  el.onclick = () => {
+    document.querySelectorAll('.card').forEach(c => c.classList.remove('sel'));
+    el.classList.add('sel');
+    chosen = i;
+    startBtn.disabled = false;
+  };
+  cardsEl.appendChild(el);
+});
+
+// ---------- ESTADO DE PELEA ----------
+let keys = {};
+addEventListener('keydown', e => {
+  if (['Space','ArrowLeft','ArrowRight','KeyQ'].includes(e.code)) e.preventDefault();
+  keys[e.code] = true;
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+
+// clic izquierdo = puño rápido
+let mouseClick = false;
+cv.addEventListener('mousedown', e => { if (e.button === 0) mouseClick = true; });
+cv.addEventListener('contextmenu', e => e.preventDefault());
+
+function makeFighter(def, x, facing, isPlayer) {
+  return {
+    def, x, y: FLOOR, facing, isPlayer,
+    hp: def.hp, maxHp: def.hp,
+    stamina: 100, maxStamina: 100,
+    vx: 0,
+    state: 'idle',      // idle, jab, charge, heavy, block, hurt, ko
+    stateT: 0,          // timer del estado (frames)
+    cd: 0,              // cooldown de golpe
+    charge: 0,          // 0..1
+    crouch: false,      // agachado (esquiva golpes altos)
+    armExt: 0,          // extensión de brazo para animación 0..1
+    armWhich: 0,        // 0 izq, 1 der (alterna jabs)
+    hitFlash: 0,
+    landed: false,      // ya conectó este golpe
+    aiTimer: 0, aiAction: 'approach',
+  };
+}
+
+let player, enemy, roundState, msg, msgT, shake, particles, gameRunning;
+let roundsWon = 0, roundsLost = 0;
+
+function startFight() {
+  const pdef = ROSTER[chosen];
+  // rival: elige uno distinto al azar
+  const others = ROSTER.filter((_,i)=>i!==chosen);
+  const edef = others[Math.floor(Math.random()*others.length)];
+  player = makeFighter(pdef, 300, 1, true);
+  enemy  = makeFighter(edef, 600, -1, false);
+  roundState = 'fight';
+  roundStartCountdown = 90;
+  msg = ''; msgT = 0; shake = 0; particles = [];
+  gameRunning = true;
+  document.getElementById('selectScreen').classList.add('hidden');
+  document.getElementById('endScreen').classList.add('hidden');
+}
+
+let roundStartCountdown = 90;
+
+startBtn.onclick = () => { roundsWon = 0; roundsLost = 0; startFight(); };
+document.getElementById('againBtn').onclick = () => {
+  document.getElementById('endScreen').classList.add('hidden');
+  document.getElementById('selectScreen').classList.remove('hidden');
+  gameRunning = false;
+};
+
+// ---------- LÓGICA ----------
+function dist(a,b){ return Math.abs(a.x - b.x); }
+
+function tryHit(attacker, defender, dmg, knock, kind) {
+  if (attacker.landed) return;
+  const range = attacker.def.reach;
+  if (dist(attacker, defender) <= range && defender.state !== 'ko') {
+    attacker.landed = true;
+    // agacharse esquiva los golpes altos (jab y cargado pasan por encima)
+    if (defender.crouch) {
+      spawnParticles(defender.x + defender.facing*20, FLOOR-150, '#9ff', 5, 'block');
+      msgBox('¡ESQUIVÓ!');
+      return;
+    }
+    let dealt = dmg;
+    let blocked = defender.state === 'block' &&
+                  Math.sign(defender.x - attacker.x) !== defender.facing * -1 // frente al golpe
+                  ? true : defender.state === 'block';
+    // bloqueo válido si defensor mira hacia el atacante
+    const facingAttacker = Math.sign(attacker.x - defender.x) === defender.facing;
+    if (defender.state === 'block' && facingAttacker) {
+      dealt = Math.round(dmg * 0.18);
+      defender.stamina = Math.max(0, defender.stamina - dmg * 0.8);
+      spawnParticles(defender.x + defender.facing*40, FLOOR-120, '#8cf', 6, 'block');
+      shake = Math.max(shake, 3);
+      if (defender.stamina <= 0) { // guardia rota
+        defender.state = 'hurt'; defender.stateT = 40;
+        dealt = Math.round(dmg * 0.5);
+        msgBox('¡GUARDIA ROTA!');
+      }
+    } else {
+      spawnParticles(defender.x + defender.facing*30, FLOOR-130, kind==='heavy'?'#ffcf3f':'#fff', kind==='heavy'?16:8, 'hit');
+      shake = Math.max(shake, kind==='heavy'?12:5);
+      defender.state = 'hurt';
+      defender.stateT = kind==='heavy'?32:16;
+      defender.vx = attacker.facing * knock;
+    }
+    defender.hp = Math.max(0, defender.hp - dealt);
+    defender.hitFlash = 8;
+    if (defender.hp <= 0) knockout(defender);
+  }
+}
+
+function knockout(f) {
+  f.state = 'ko'; f.stateT = 0;
+  roundState = 'ko';
+  const playerWon = (f === enemy);
+  if (playerWon) roundsWon++; else roundsLost++;
+  msgBox(playerWon ? '¡K.O.! Ganaste el asalto' : 'K.O. — Perdiste el asalto');
+  roundEndTimer = 150;
+}
+let roundEndTimer = 0;
+
+function msgBox(t){ msg = t; msgT = 100; }
+
+function spawnParticles(x,y,color,n,type){
+  for(let i=0;i<n;i++){
+    particles.push({
+      x,y, vx:(Math.random()-0.5)*(type==='hit'?9:5),
+      vy:-Math.random()*6-1, life: 30, color, type,
+      size: type==='hit'? 2+Math.random()*4 : 2+Math.random()*3
+    });
+  }
+}
+
+function updateFighter(f, foe){
+  if (f.cd > 0) f.cd--;
+  if (f.hitFlash > 0) f.hitFlash--;
+  f.facing = foe.x > f.x ? 1 : -1;
+
+  // regen stamina
+  if (f.state !== 'block' && f.state !== 'charge')
+    f.stamina = Math.min(f.maxStamina, f.stamina + 0.35);
+
+  // física knockback
+  f.x += f.vx;
+  f.vx *= 0.8;
+  f.x = Math.max(70, Math.min(W-70, f.x));
+
+  // control por estado temporizado
+  if (f.stateT > 0) {
+    f.stateT--;
+    if (f.stateT === 0 && (f.state === 'hurt' || f.state === 'jab' || f.state === 'heavy')) {
+      f.state = 'idle';
+      f.armExt = 0;
+    }
+  }
+
+  // animación de brazo
+  if (f.state === 'jab') {
+    const p = 1 - f.stateT/8;
+    f.armExt = Math.sin(p*Math.PI);
+    if (f.stateT <= 5) tryHit(f, foe, f.def.jabDmg, 6, 'jab');
+  } else if (f.state === 'heavy') {
+    const p = 1 - f.stateT/18;
+    f.armExt = Math.sin(Math.min(p,0.5)*Math.PI);
+    if (f.stateT <= 12) tryHit(f, foe, f.heavyDmg, 16, 'heavy');
+  } else if (f.state === 'charge') {
+    f.charge = Math.min(1, f.charge + 0.02);
+    f.armExt = 0.25 + 0.1*Math.sin(Date.now()/60);
+    f.stamina = Math.max(0, f.stamina - 0.4);
+  } else if (f.state === 'block') {
+    f.armExt = 0.35;
+  } else if (f.state === 'ko') {
+    // caído
+  } else {
+    if (f.armExt > 0) f.armExt *= 0.6;
+  }
+}
+
+function handlePlayer() {
+  const f = player;
+  if (f.state === 'ko' || roundState !== 'fight' || roundStartCountdown > 0) return;
+  const busy = ['jab','heavy','hurt'].includes(f.state);
+
+  // Bloqueo (Q)
+  if (keys['KeyQ'] && !busy && f.stamina > 5) {
+    f.state = 'block';
+  } else if (f.state === 'block') {
+    f.state = 'idle';
+  }
+
+  // Agacharse (flecha ↓): esquiva golpes altos, pero no puedes atacar ni moverte
+  f.crouch = keys['ArrowDown'] && !busy && f.state !== 'block';
+  if (f.crouch && f.state === 'charge') f.state = 'idle'; // cancela carga al agacharse
+
+  // Movimiento
+  if (!busy && !f.crouch && f.state !== 'block' && f.state !== 'charge') {
+    if (keys['ArrowLeft'])  f.x -= f.def.speed;
+    if (keys['ArrowRight']) f.x += f.def.speed;
+    f.x = Math.max(70, Math.min(W-70, f.x));
+  }
+
+  // Puño rápido (CLIC)
+  if (mouseClick && !busy && !f.crouch && f.state !== 'charge' && f.cd === 0 && f.stamina > 8) {
+    f.state = 'jab'; f.stateT = 8; f.cd = f.def.jabCd; f.landed = false;
+    f.armWhich ^= 1; f.stamina -= 8;
+  }
+
+  // Puño cargado (ESPACIO mantenido)
+  if (keys['Space'] && !busy && !f.crouch && f.state !== 'block') {
+    if (f.state !== 'charge') { f.state = 'charge'; f.charge = 0; }
+  } else if (f.state === 'charge') {
+    // soltó ESPACIO -> lanza
+    f.heavyDmg = Math.round(f.def.jabDmg + f.charge * (f.def.chargeDmgMax - f.def.jabDmg));
+    f.state = 'heavy'; f.stateT = 18; f.landed = false; f.cd = f.def.jabCd + 10;
+  }
+}
+
+function handleAI() {
+  const f = enemy, foe = player;
+  if (f.state === 'ko' || roundState !== 'fight' || roundStartCountdown > 0) return;
+  const busy = ['jab','heavy','hurt','charge'].includes(f.state);
+  f.aiTimer--;
+
+  const d = dist(f, foe);
+  const inRange = d <= f.def.reach - 6;
+
+  // reacciona: si el jugador está cargando o pegando de cerca, a veces bloquea
+  const foeThreat = (foe.state === 'heavy' || foe.state === 'jab' || foe.state==='charge') && d < f.def.reach + 40;
+
+  if (f.aiTimer <= 0) {
+    const r = Math.random();
+    if (foeThreat && r < 0.28) f.aiAction = 'block';
+    else if (foeThreat && r < 0.50) f.aiAction = 'crouch';
+    else if (inRange && r < 0.60) f.aiAction = 'jab';
+    else if (inRange && r < 0.72) f.aiAction = 'heavy';
+    else if (d > f.def.reach) f.aiAction = 'approach';
+    else f.aiAction = (r < 0.5) ? 'retreat' : 'approach';
+    f.aiTimer = 20 + Math.random()*35;
+  }
+
+  // ejecutar
+  if (f.state === 'block' && f.aiAction !== 'block') f.state = 'idle';
+  f.crouch = false;
+
+  if (!busy) {
+    if (f.aiAction === 'approach') {
+      if (f.state === 'block') f.state='idle';
+      f.x += Math.sign(foe.x - f.x) * f.def.speed;
+    } else if (f.aiAction === 'retreat') {
+      if (f.state === 'block') f.state='idle';
+      f.x -= Math.sign(foe.x - f.x) * f.def.speed * 0.8;
+    } else if (f.aiAction === 'block') {
+      if (f.stamina > 8) f.state = 'block'; else f.aiAction='retreat';
+    } else if (f.aiAction === 'crouch') {
+      if (f.state === 'block') f.state = 'idle';
+      f.crouch = true;
+    } else if (f.aiAction === 'jab' && f.cd === 0 && f.stamina > 8) {
+      f.state='jab'; f.stateT=8; f.cd=f.def.jabCd+6; f.landed=false; f.stamina-=8; f.aiTimer=25;
+    } else if (f.aiAction === 'heavy' && f.cd === 0 && f.stamina > 20) {
+      f.heavyDmg = Math.round(f.def.jabDmg + 0.7*(f.def.chargeDmgMax - f.def.jabDmg));
+      f.state='heavy'; f.stateT=18; f.landed=false; f.cd=f.def.jabCd+16; f.stamina-=18; f.aiTimer=35;
+    }
+  }
+  f.x = Math.max(70, Math.min(W-70, f.x));
+
+  // evita solaparse
+  if (dist(f,foe) < 70) { f.x += Math.sign(f.x-foe.x)*2; }
+}
+
+function update() {
+  if (!gameRunning) return;
+  if (msgT > 0) msgT--;
+  if (shake > 0) shake *= 0.85;
+  if (roundStartCountdown > 0) roundStartCountdown--;
+
+  if (roundState === 'fight') {
+    handlePlayer();
+    handleAI();
+  }
+  updateFighter(player, enemy);
+  updateFighter(enemy, player);
+
+  // los boxeadores nunca cruzan de lado: jugador siempre a la izquierda
+  const MINGAP = 74;
+  if (enemy.x - player.x < MINGAP) {
+    const mid = (player.x + enemy.x) / 2;
+    player.x = mid - MINGAP/2;
+    enemy.x  = mid + MINGAP/2;
+    if (player.x < 70)   { player.x = 70;      enemy.x  = 70 + MINGAP; }
+    if (enemy.x > W-70)  { enemy.x  = W-70;    player.x = W-70-MINGAP; }
+  }
+
+  // el clic se consume una vez por frame
+  mouseClick = false;
+
+  // partículas
+  particles.forEach(p => { p.x+=p.vx; p.y+=p.vy; p.vy+=0.35; p.life--; });
+  particles = particles.filter(p => p.life>0);
+
+  // fin de asalto
+  if (roundState === 'ko') {
+    roundEndTimer--;
+    if (roundEndTimer <= 0) {
+      if (roundsWon >= 2 || roundsLost >= 2) {
+        endMatch(roundsWon >= 2);
+      } else {
+        // siguiente asalto
+        startFight_keepScore();
+      }
+    }
+  }
+}
+
+function startFight_keepScore() {
+  const pdef = player.def, edef = enemy.def;
+  const px = player.x, ex = enemy.x;
+  player = makeFighter(pdef, 300, 1, true);
+  enemy  = makeFighter(edef, 600, -1, false);
+  roundState = 'fight';
+  roundStartCountdown = 90;
+  particles = [];
+}
+
+function endMatch(won) {
+  gameRunning = false;
+  document.getElementById('endTitle').textContent = won ? '¡GANASTE!' : 'DERROTA';
+  document.getElementById('endTitle').style.color = won ? '#ffcf3f' : '#ff5a5a';
+  document.getElementById('endSub').textContent = `Asaltos ${roundsWon} — ${roundsLost}`;
+  document.getElementById('endScreen').classList.remove('hidden');
+}
+
+// ---------- RENDER ----------
+function drawFighter(f) {
+  const flip = f.facing;
+  const flash = f.hitFlash > 0 && Math.floor(f.hitFlash/2)%2===0;
+  const ko = f.state === 'ko';
+  ctx.save();
+  ctx.translate(f.x, f.y);
+  ctx.scale(flip, 1);
+
+  const bob = ko ? 0 : Math.sin(Date.now()/200 + (f.isPlayer?0:2))*2;
+  const cr = (f.crouch && !ko) ? 32 : 0;
+  const koRot = ko ? -1.35 : 0;
+  ctx.rotate(koRot);
+  if (ko) ctx.translate(-20, 20);
+
+  const skin = flash ? '#fff' : '#e8b98a';
+  const body = flash ? '#fff' : f.def.color;
+  const trunks = f.def.trunks;
+
+  // sombra
+  ctx.save(); ctx.rotate(-koRot); if(ko) ctx.translate(20,-20);
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath(); ctx.ellipse(0, 4, 46, 12, 0, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  const guard = f.state === 'block';
+
+  // piernas (al agacharse se flexionan: la cadera baja y las rodillas se abren)
+  ctx.strokeStyle = skin; ctx.lineWidth = 13; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(-8,-70+bob+cr); ctx.lineTo(-24-cr*0.3,-2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(10,-70+bob+cr); ctx.lineTo(26+cr*0.3,-2); ctx.stroke();
+
+  // el resto del cuerpo baja al agacharse
+  if (cr) ctx.translate(0, cr);
+
+  // torso (trunks)
+  ctx.fillStyle = trunks;
+  ctx.beginPath(); ctx.roundRect(-20,-98+bob,40,34,6); ctx.fill();
+  // cinturón
+  ctx.fillStyle = '#ffcf3f'; ctx.fillRect(-20,-100+bob,40,6);
+  // pecho
+  ctx.fillStyle = body;
+  ctx.beginPath(); ctx.roundRect(-19,-138+bob,38,44,10); ctx.fill();
+
+  // cabeza
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(4,-158+bob,15,0,Math.PI*2); ctx.fill();
+  // cara detalle
+  if(!ko){ ctx.fillStyle='#222'; ctx.fillRect(9,-162+bob,3,3); }
+
+  // brazos + guantes
+  const shoulderY = -132+bob;
+  const ext = f.armExt;
+  // brazo trasero (guardia)
+  ctx.strokeStyle = skin; ctx.lineWidth = 11;
+  const backHandX = guard ? 6 : -4, backHandY = guard ? -150+bob : -128+bob;
+  ctx.beginPath(); ctx.moveTo(-10,shoulderY); ctx.lineTo(backHandX,backHandY); ctx.stroke();
+  drawGlove(backHandX, backHandY, trunks);
+
+  // brazo delantero (golpe)
+  const punchX = 8 + ext*(f.def.reach*0.62);
+  const punchY = shoulderY + (guard? -14 : 6) - ext*4;
+  ctx.strokeStyle = skin; ctx.lineWidth = 11;
+  ctx.beginPath(); ctx.moveTo(10,shoulderY); ctx.lineTo(punchX,punchY); ctx.stroke();
+  drawGlove(punchX, punchY, f.def.color, ext>0.5);
+
+  // aura de carga
+  if (f.state === 'charge') {
+    ctx.globalAlpha = 0.4 + 0.3*Math.sin(Date.now()/50);
+    ctx.strokeStyle = '#ffcf3f'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(0,-100+bob, 60+f.charge*10, 0, Math.PI*2); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
+function drawGlove(x,y,color,big){
+  ctx.fillStyle = color;
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(x,y, big?13:11, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+}
+
+function drawHUD() {
+  // barras superiores
+  drawBar(30, 30, 360, player, false);
+  drawBar(W-30-360, 30, 360, enemy, true);
+
+  // nombres
+  ctx.font = 'bold 18px Trebuchet MS';
+  ctx.textAlign='left'; ctx.fillStyle='#fff';
+  ctx.fillText(player.def.name, 32, 24);
+  ctx.textAlign='right';
+  ctx.fillText(enemy.def.name, W-32, 24);
+
+  // marcador asaltos
+  ctx.textAlign='center'; ctx.font='bold 15px Trebuchet MS'; ctx.fillStyle='#ffcf3f';
+  ctx.fillText('ASALTO ' + (roundsWon+roundsLost+1) + '  ·  ' + roundsWon + ' - ' + roundsLost, W/2, 34);
+
+  // marcadores de asaltos ganados (puntos)
+  for(let i=0;i<2;i++){
+    ctx.fillStyle = i<roundsWon ? '#4caf50':'#334';
+    ctx.beginPath(); ctx.arc(W/2-24+i*14, 48, 5,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = i<roundsLost ? '#e05050':'#334';
+    ctx.beginPath(); ctx.arc(W/2+10+i*14, 48, 5,0,Math.PI*2); ctx.fill();
+  }
+}
+
+function drawBar(x,y,w,f,mirror){
+  const hpPct = f.hp/f.maxHp;
+  const stPct = f.stamina/f.maxStamina;
+  // fondo vida
+  ctx.fillStyle='#000'; ctx.fillRect(x-2,y-2,w+4,22);
+  ctx.fillStyle='#3a1010'; ctx.fillRect(x,y,w,18);
+  ctx.fillStyle = hpPct>0.3? '#e33':'#f66';
+  if(mirror){ ctx.fillStyle = hpPct>0.3?'#e33':'#f66'; ctx.fillRect(x+w*(1-hpPct),y,w*hpPct,18); }
+  else ctx.fillRect(x,y,w*hpPct,18);
+  ctx.strokeStyle='#fff5'; ctx.lineWidth=1; ctx.strokeRect(x,y,w,18);
+  // stamina
+  ctx.fillStyle='#111'; ctx.fillRect(x, y+21, w, 7);
+  ctx.fillStyle='#ffcf3f';
+  if(mirror) ctx.fillRect(x+w*(1-stPct), y+21, w*stPct, 7);
+  else ctx.fillRect(x, y+21, w*stPct, 7);
+
+  // barra de carga si aplica (jugador)
+  if(f.state==='charge'){
+    ctx.fillStyle='#0a0a14'; ctx.fillRect(x, y+31, w, 6);
+    ctx.fillStyle='#ff6a2b';
+    if(mirror) ctx.fillRect(x+w*(1-f.charge), y+31, w*f.charge,6);
+    else ctx.fillRect(x, y+31, w*f.charge, 6);
+  }
+}
+
+function drawRing() {
+  // fondo público
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#1a1030'); g.addColorStop(1,'#0a0a16');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  // luces
+  for(let i=0;i<3;i++){
+    const lg = ctx.createRadialGradient(200+i*250,-40,10,200+i*250,-40,220);
+    lg.addColorStop(0,'rgba(255,240,200,0.15)'); lg.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=lg; ctx.fillRect(0,0,W,300);
+  }
+  // lona
+  ctx.fillStyle='#243b6b';
+  ctx.beginPath(); ctx.moveTo(60,FLOOR); ctx.lineTo(W-60,FLOOR); ctx.lineTo(W-10,H); ctx.lineTo(10,H); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#1b2c52';
+  ctx.beginPath(); ctx.moveTo(60,FLOOR); ctx.lineTo(W-60,FLOOR); ctx.lineTo(W-60,FLOOR+8); ctx.lineTo(60,FLOOR+8); ctx.closePath(); ctx.fill();
+  // logo centro
+  ctx.fillStyle='rgba(255,255,255,0.05)'; ctx.textAlign='center';
+  ctx.font='bold 60px Trebuchet MS'; ctx.fillText('KO', W/2, 430);
+  // postes y cuerdas
+  ctx.strokeStyle='#c0392b'; ctx.lineWidth=4;
+  for(let cy of [FLOOR-70, FLOOR-40, FLOOR-14]){
+    ctx.beginPath(); ctx.moveTo(60,cy); ctx.lineTo(W-60,cy); ctx.stroke();
+  }
+  ctx.fillStyle='#888';
+  ctx.fillRect(52,FLOOR-90,8,90); ctx.fillRect(W-60,FLOOR-90,8,90);
+}
+
+function render() {
+  ctx.save();
+  const sh = shake;
+  if (sh>0.5) ctx.translate((Math.random()-0.5)*sh,(Math.random()-0.5)*sh);
+
+  drawRing();
+
+  // dibuja el de atrás primero
+  const order = player.x < enemy.x ? [player,enemy] : [enemy,player];
+  order.forEach(drawFighter);
+
+  // partículas
+  particles.forEach(p=>{
+    ctx.globalAlpha = Math.max(0,p.life/30);
+    ctx.fillStyle = p.color;
+    if(p.type==='hit'){ ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill(); }
+    else { ctx.fillRect(p.x,p.y,p.size,p.size); }
+  });
+  ctx.globalAlpha=1;
+
+  ctx.restore();
+
+  drawHUD();
+
+  // countdown de inicio
+  if (roundStartCountdown > 0 && roundState==='fight') {
+    ctx.textAlign='center';
+    let t = Math.ceil(roundStartCountdown/30);
+    let txt = t>0 ? t : '';
+    if (roundStartCountdown < 30) txt = '¡PELEA!';
+    ctx.font='bold 80px Trebuchet MS';
+    ctx.fillStyle='#ffcf3f'; ctx.strokeStyle='#000'; ctx.lineWidth=6;
+    ctx.strokeText(txt, W/2, H/2); ctx.fillText(txt, W/2, H/2);
+  }
+
+  // mensaje central
+  if (msgT > 0 && msg) {
+    ctx.textAlign='center';
+    ctx.globalAlpha = Math.min(1, msgT/30);
+    ctx.font='bold 46px Trebuchet MS';
+    ctx.fillStyle='#fff'; ctx.strokeStyle='#c02020'; ctx.lineWidth=6;
+    ctx.strokeText(msg, W/2, 150); ctx.fillText(msg, W/2, 150);
+    ctx.globalAlpha=1;
+  }
+}
+
+function loop() {
+  update();
+  if (gameRunning) render();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>A Bizarre Bullet Hell</title>
+<title>Ball Killer</title>
 <style>
   html, body { margin: 0; padding: 0; background: #07071a; color: #eee; font-family: monospace; overflow: hidden; height: 100%; }
   body { display: flex; align-items: center; justify-content: center; }
@@ -152,7 +152,7 @@
 <div id="help">WASD · Click · 1-9, 0, -, =, Tab, ], [, \, /, ;, ', , · Q/E/rueda/hotbar · B tienda · R/T/F/G/H/J poderes · ESC</div>
 
 <div id="title">
-  <h1>A BIZARRE<br>BULLET HELL</h1>
+  <h1>BALL<br>KILLER</h1>
   <p class="tagline">Sobrevive a las hordas · Compra armas · Cada arma supera a la anterior</p>
   <div id="modes">
     <div class="sep">— DIFICULTAD —</div>
@@ -356,10 +356,11 @@ canvas.addEventListener('click', e => {
   }
   // hotbar click
   const hbY = H - 70;
-  for (let i = 0; i < ABILITIES.length; i++) {
-    const x = 20 + i * 31;
+  for (let pos = 0; pos < HOTBAR_ORDER.length; pos++) {
+    const x = 20 + pos * 31;
     if (p.x >= x && p.x <= x + 26 && p.y >= hbY && p.y <= hbY + 56) {
-      if (owned.has(i)) active = i;
+      const idx = HOTBAR_ORDER[pos];
+      if (owned.has(idx)) active = idx;
       return;
     }
   }
@@ -387,7 +388,7 @@ const player = {
 };
 
 const ABILITIES = [
-  { id: 'whip',     name: '1. Látigo Eléctrico Morado', cost: 0,
+  { id: 'whip',     name: '1. Látigo Eléctrico Morado', cost: 20,
     desc: 'Latigazo eléctrico que restalla en línea y encadena daño entre enemigos. Con 50 kills desbloqueas una 2ª forma: pulsa C para cambiar los clicks a un LÁTIGO-CUERDA eléctrico (un latigazo-cuerda morado): te jala hasta el punto dañando en el camino, y a quien sobreviva lo deja PARALIZADO 5s.', color: '#c4f' },
   { id: 'threads',  name: '2. Hilo Liberado',              cost: 120,
     desc: 'Tejedora de hilos. Click: RÁFAGA de puños a corta distancia + un tendón de hilo que ATRAVIESA y ENREDA (inmoviliza + daño continuo), tejiendo telaraña entre los atrapados. DESPERTAR a los 40 kills: los hilos atraviesan más, la telaraña CAZA balas enemigas (las corta) y la Ruptura crece. Y: RUPTURA DE HILOS — cutscene + hilos en 360° que enredan alrededor (CD 15s).', color: '#2cb' },
@@ -451,14 +452,18 @@ const ABILITIES = [
     desc: 'Seis balas-duende vivientes numeradas Nº1, 2, 3, 5, 6 y 7 (sin el 4, que el pistolero odia) flotan a tu alrededor. CLICK dispara: si la bala pasa por una de ellas, la PATEA hacia el enemigo más cercano (rebote calculado) y rebota entre enemigos con daño creciente. V: recolocar las 6 balas.', color: '#fd0' },
   { id: 'zipper', name: 'Cierre Relámpago', cost: 650,
     desc: 'Click: PUÑOS. A cada enemigo que MATAS con el puño se lo traga tu BOLSILLO (máx 100). Z: LIBERAS a todos de golpe, muertos, saliendo volando y dañando a los enemigos — cuantos más tengas guardados, más daño. Si el bolsillo se llena, los siguientes salen disparados muertos solos (y eso NO gasta el cooldown de Z). CD 6s.', color: '#2fb8e6' },
+  { id: 'sword', name: '0. Espada Espectral', cost: 0,
+    desc: 'La hoja SIGUE TU MOUSE — no hay que hacer click nunca. Corta todo lo que roza y cuanto MÁS RÁPIDO la muevas, MÁS daño hace: los barridos largos rematan, los toques apenas rascan. Arma inicial.', color: '#cfe4ff' },
 ];
+const SWORD_SLOT = ABILITIES.length - 1;   // índice de juego de la Espada Espectral
 
 // Orden de la TIENDA (y de la cadena de compra), desacoplado del indice de juego.
 // Progresión por PODER: de las armas básicas a las más ROTAS al final. Debes comprar
 // cada una para desbloquear la siguiente (ver renderShop/buyAbility). Los precios de
 // ABILITIES ya están ordenados ascendentes según este mismo orden.
 const SHOP_ORDER = [
-  0,   // Látigo Eléctrico (inicio)
+  32,  // Espada Espectral (inicio — va ANTES del látigo)
+  0,   // Látigo Eléctrico
   4,   // Flechas Perforantes
   1,   // Hilo Liberado
   2,   // Puños Rompedores
@@ -492,8 +497,12 @@ const SHOP_ORDER = [
   28,  // Rey del Pop (la más rota, al final)
 ];
 
-const owned = new Set([0]); // start with whip
-let active = 0;
+// Orden VISUAL de la hotbar (y de las teclas 1-9,0,-,=,…): la espada inicial va
+// primero, luego el resto por índice de juego. La tecla N = la casilla N.
+const HOTBAR_ORDER = [SWORD_SLOT, ...ABILITIES.map((_, i) => i).filter(i => i !== SWORD_SLOT)];
+
+const owned = new Set([SWORD_SLOT]); // se empieza con la Espada Espectral
+let active = SWORD_SLOT;
 
 const enemies = [];
 const projectiles = [];
@@ -605,6 +614,13 @@ let rewindCD = 0;
 let shortRewindCD = 0;
 let rewindBuffer = [];
 let rewindFrame = 0;
+
+// --- Espada Espectral: hoja que sigue el mouse (sin click) ---
+let swordX = 0, swordY = 0;        // punta actual de la hoja
+let swordPX = 0, swordPY = 0;      // punta del frame anterior
+let swordSwing = 0;                // velocidad de barrido suavizada
+let swordTrail = [];               // estela del filo
+const swordHitCD = new Map();      // id enemigo -> frames de espera
 
 let dashTimer = 0;
 let dashAngle = 0;
@@ -1347,6 +1363,8 @@ function updatePlayer() {
     player.y += (dy / m) * sp;
   }
   if (player.slowed > 0) player.slowed--;
+  // Espada Espectral: la hoja sigue el mouse y corta sola (sin click)
+  if (active === SWORD_SLOT) updateSword();
   // poder permanente: regeneración (+1 HP/s por stack)
   if (permaStacks.regen > 0 && player.hp > 0 && player.hp < player.maxHp && frame % 60 === 0) {
     player.hp = Math.min(player.maxHp, player.hp + permaStacks.regen);
@@ -2511,6 +2529,7 @@ function updatePlayer() {
 }
 
 function getAttackCD() {
+  if (active === SWORD_SLOT) return Infinity;   // Espada: no se ataca con click, corta sola
   if (active === 31) return 300;   // Cierre Relámpago
   if (active === 0) return whipForm === 1 ? 400 : 340;   // forma 1 (látigo-cuerda) más lenta
   if (active === 3) return 240;   // Tormenta: relámpago dirigido con click
@@ -3282,6 +3301,110 @@ function d4cFlagExplode(x, y) {
       r: 16, rot: ka, life: 22, max: 22, color: k % 2 ? '#fff' : '#222' });
   }
   shake = Math.max(shake, 15);
+}
+
+// 0. Espada Espectral — la hoja SIGUE EL MOUSE (sin click). El daño escala con
+// la velocidad del barrido: rozar apenas rasca, un tajo largo revienta.
+function updateSword() {
+  const REACH = 82;      // alcance máximo desde el jugador
+  const BLADE_R = 13;    // grosor efectivo del filo
+  const dx = mouse.x - player.x, dy = mouse.y - player.y;
+  const d = Math.hypot(dx, dy) || 1;
+  const reach = Math.min(d, REACH);
+  const tx = player.x + (dx / d) * reach;
+  const ty = player.y + (dy / d) * reach;
+  swordPX = swordX; swordPY = swordY;
+  // inercia: la hoja pesa y persigue al cursor
+  swordX += (tx - swordX) * 0.35;
+  swordY += (ty - swordY) * 0.35;
+  const moved = Math.hypot(swordX - swordPX, swordY - swordPY);
+  swordSwing = swordSwing * 0.78 + moved * 0.22;
+
+  // estela del filo
+  swordTrail.push({ x: swordX, y: swordY });
+  if (swordTrail.length > 16) swordTrail.shift();
+
+  // enfriamiento por enemigo (evita DPS infinito por contacto continuo)
+  for (const [id, cd] of swordHitCD) {
+    if (cd <= 1) swordHitCD.delete(id); else swordHitCD.set(id, cd - 1);
+  }
+
+  // la hoja es el segmento jugador -> punta
+  const dmg = 22 + Math.min(150, swordSwing * 9);
+  const sx = player.x, sy = player.y;
+  const vx = swordX - sx, vy = swordY - sy;
+  const len2 = vx * vx + vy * vy || 1;
+  const fast = swordSwing > 6;
+  for (let j = 0; j < enemies.length; j++) {
+    const e = enemies[j];
+    if (e.ally || e.hp <= 0) continue;
+    if (swordHitCD.has(e.id)) continue;
+    let t = ((e.x - sx) * vx + (e.y - sy) * vy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const cx = sx + vx * t, cy = sy + vy * t;
+    const ddx = e.x - cx, ddy = e.y - cy;
+    const rr = e.r + BLADE_R;
+    if (ddx * ddx + ddy * ddy < rr * rr) {
+      damageEnemy(e, dmg, fast ? '#fff' : '#cfe4ff');
+      swordHitCD.set(e.id, 14);
+      // empuje en la dirección del barrido
+      e.vx += (swordX - swordPX) * 0.8;
+      e.vy += (swordY - swordPY) * 0.8;
+      effects.push({ type: 'punch', x: e.x, y: e.y, life: 6, max: 6, color: '#cfe4ff' });
+      if (fast) {
+        for (let p = 0; p < 5; p++) {
+          particles.push({ x: e.x, y: e.y, vx: rand(-3, 3), vy: rand(-3, 3), life: 14, max: 14, color: Math.random() > 0.5 ? '#fff' : '#9cf', r: 2 });
+        }
+      }
+    }
+  }
+}
+
+function drawSword() {
+  const hot = Math.min(1, swordSwing / 9);   // cuánto "arde" el filo por el barrido
+  // estela
+  if (swordTrail.length > 1) {
+    ctx.lineCap = 'round';
+    for (let i = 1; i < swordTrail.length; i++) {
+      const a = i / swordTrail.length;
+      ctx.strokeStyle = `rgba(180, 225, 255, ${a * 0.5 * (0.3 + hot)})`;
+      ctx.lineWidth = 1 + a * 7 * (0.4 + hot);
+      ctx.beginPath();
+      ctx.moveTo(swordTrail[i - 1].x, swordTrail[i - 1].y);
+      ctx.lineTo(swordTrail[i].x, swordTrail[i].y);
+      ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
+  }
+  const ang = Math.atan2(swordY - player.y, swordX - player.x);
+  const len = Math.max(34, Math.hypot(swordX - player.x, swordY - player.y));
+  ctx.save();
+  ctx.translate(player.x, player.y);
+  ctx.rotate(ang);
+  // resplandor al barrer fuerte
+  if (hot > 0.25) {
+    ctx.strokeStyle = `rgba(210, 240, 255, ${hot * 0.65})`;
+    ctx.lineWidth = 12;
+    ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(len, 0); ctx.stroke();
+  }
+  // guarda dorada
+  ctx.strokeStyle = '#e8c96a';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(16, -7); ctx.lineTo(16, 7); ctx.stroke();
+  // hoja
+  ctx.fillStyle = '#eaf4ff';
+  ctx.beginPath();
+  ctx.moveTo(16, -3.5);
+  ctx.lineTo(len - 10, -3.5);
+  ctx.lineTo(len, 0);
+  ctx.lineTo(len - 10, 3.5);
+  ctx.lineTo(16, 3.5);
+  ctx.closePath(); ctx.fill();
+  // filo brillante
+  ctx.strokeStyle = `rgba(255,255,255,${0.5 + hot * 0.5})`;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(16, -1); ctx.lineTo(len - 6, -1); ctx.stroke();
+  ctx.restore();
 }
 
 // 16. Plaga Primigenia — POUNCE (salto depredador): muerde, infecta y desata la manada
@@ -9387,6 +9510,8 @@ function draw() {
   ctx.strokeStyle = '#fff';
   ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2); ctx.stroke();
+  // Espada Espectral: hoja que sigue el mouse (encima del jugador)
+  if (active === SWORD_SLOT) drawSword();
   // Rey del Pop: fedora negra grande + guante brillante
   if (active === 28) {
     const bob = Math.sin(frame * 0.12) * 1.5;          // leve meneo al ritmo
@@ -12845,8 +12970,9 @@ function drawUI() {
 
   // hotbar
   const hbY = H - 70;
-  ABILITIES.forEach((ab, i) => {
-    const x = 20 + i * 31;
+  HOTBAR_ORDER.forEach((i, pos) => {
+    const ab = ABILITIES[i];
+    const x = 20 + pos * 31;
     const isOwned = owned.has(i);
     const isActive = active === i;
     ctx.fillStyle = isOwned ? (isActive ? '#335' : '#223') : '#111';
@@ -12858,7 +12984,7 @@ function drawUI() {
     ctx.fillStyle = isOwned ? '#fff' : '#555';
     ctx.font = 'bold 9px monospace';
     const keyLabels = ['1','2','3','4','5','6','7','8','9','0','-','=','⇥',']','[','\\','/',';',"'",',','.','`','','','','',''];
-    ctx.fillText(keyLabels[i] || '?', x + 2, hbY + 11);
+    ctx.fillText(keyLabels[pos] || '', x + 2, hbY + 11);
     let pelletColor = ab.color;
     if (i === 26 && isOwned) pelletColor = STAND_COLORS[standForm];
     else if (i === 17 && isOwned) pelletColor = ESPIRAL_COLORS[tuskAct];
